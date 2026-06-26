@@ -16,6 +16,7 @@
   --sh-lift:0 4px 14px rgba(30,39,97,.10);
 }
 *{box-sizing:border-box;margin:0;padding:0}
+html{overflow-y:scroll;scrollbar-gutter:stable}
 body{font-family:-apple-system,'Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;
   background:var(--paper);color:var(--ink);font-size:13px;line-height:1.5;padding:24px 28px 60px;-webkit-font-smoothing:antialiased}
 .wrap{max-width:1280px;margin:0 auto}
@@ -825,6 +826,7 @@ tr.main.arch:hover{opacity:1}
 .salesKpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:14px 0}
 .salesKpi{background:#fff;border:1px solid #e7eaf2;border-radius:10px;padding:13px 15px}
 .salesKpi .v{font-size:20px;font-weight:800;color:var(--navy)}
+.salesKpi .v{word-break:keep-all;overflow-wrap:anywhere;line-height:1.18}
 .salesKpi .l{font-size:10.5px;color:#7a8194;margin-top:3px}
 .salesKpi .sub{font-size:10px;color:#9aa1b2;margin-top:2px}
 .salesKpi.goal .bar{height:6px;background:#eef1f7;border-radius:4px;margin-top:6px;overflow:hidden}
@@ -1020,7 +1022,7 @@ tr.main.arch:hover{opacity:1}
   <button class="tabbtn" data-tab="cost">원가·매입</button>
   <button class="tabbtn" data-tab="market">시장·전략</button>
   <button class="tabbtn" data-tab="sales">매출 대시보드</button>
-  <button class="tabbtn" data-tab="review">리뷰 분석</button>
+  <button class="tabbtn" data-tab="review">고객 불만</button>
   <button class="tabbtn" data-tab="mfr">제조사 관리</button>
 </div>
 
@@ -6734,6 +6736,7 @@ function salesBreakdownHtml(sd, view){
 
 // ===== [v62] 리뷰 분석 대시보드 =====
 let reviewFilter = {senti:'', cat:''};   // 리뷰 목록 필터
+let reviewPeriod = {from:'', to:''};     // 고객 불만 대시보드 기간 필터
 
 function reviewCategory(nm){
   const n=String(nm||'');
@@ -6845,7 +6848,7 @@ function parseReviewWorkbook(wb){
     if(!purchaseByCat[cat]) purchaseByCat[cat]={};
     reviewPurchase(body).forEach(pc=>{ addTopic(purchaseAll,pc); addTopic(purchaseByCat[cat],pc); });
     // 목록 보관: 불만·보통은 전량(CS 중요), 만족은 앞 600개까지
-    const rec={nm,cat,rate,senti,body:body.slice(0,200),user,date:dateRaw.slice(0,16),photo,best,kind,topics:tps,emo};
+    const rec={nm,cat,rate,senti,body:body.slice(0,200),user,date:dateRaw.slice(0,16),ym,photo,best,kind,topics:tps,emo};
     if(senti!=='만족') list.push(rec);
     else if(satKept<600){ list.push(rec); satKept++; }
   }
@@ -6877,6 +6880,94 @@ function handleReviewUpload(file){
   if(typeof ensureXlsx==='function') ensureXlsx(proceed); else proceed();
 }
 
+function reviewComplaintStats(rd){
+  const months=rd.months||[];
+  if(months.length){
+    const first=months[0], last=months[months.length-1];
+    if(!reviewPeriod.from || reviewPeriod.from<first || reviewPeriod.from>last) reviewPeriod.from=first;
+    if(!reviewPeriod.to || reviewPeriod.to<first || reviewPeriod.to>last) reviewPeriod.to=last;
+    if(reviewPeriod.from>reviewPeriod.to){ reviewPeriod.from=first; reviewPeriod.to=last; }
+  }
+  const from=reviewPeriod.from||'', to=reviewPeriod.to||'';
+  const inRange=m=>(!m&&!from&&!to)||((!from||m>=from)&&(!to||m<=to));
+  const list=(rd.list||[]).filter(r=>Number(r.rate)<=3 && inRange(r.ym||''));
+  const open=list.filter(r=>Number(r.rate)<=2).length;
+  const closed=list.filter(r=>Number(r.rate)===3).length;
+  const monthRows=months.filter(inRange).map(m=>{
+    const rows=list.filter(r=>r.ym===m);
+    return {m, open:rows.filter(r=>Number(r.rate)<=2).length, closed:rows.filter(r=>Number(r.rate)===3).length};
+  });
+  const add=(map,key,status)=>{
+    key=key||'기타';
+    if(!map[key]) map[key]={open:0,closed:0,total:0};
+    map[key][status]++; map[key].total++;
+  };
+  const byCat={}, byReason={}, byKind={};
+  list.forEach(r=>{
+    const status=Number(r.rate)<=2?'open':'closed';
+    add(byCat,r.cat,status);
+    add(byKind,r.kind||'일반',status);
+    const topics=(r.topics&&r.topics.length)?r.topics:['기타/미분류'];
+    topics.forEach(t=>add(byReason,t,status));
+  });
+  const sortMap=map=>Object.entries(map).sort((a,b)=>b[1].total-a[1].total);
+  return {from,to,total:list.length,open,closed,monthRows,byCat:sortMap(byCat),byReason:sortMap(byReason),byKind:sortMap(byKind),list};
+}
+
+function complaintRate(n,total){ return total?Math.round(n/total*100):0; }
+
+function complaintDashboardHtml(rd){
+  const st=reviewComplaintStats(rd);
+  const topReason=st.byReason[0], topCat=st.byCat[0];
+  const range=(st.from||st.to)?`${st.from||'처음'} ~ ${st.to||'최근'}`:'전체 기간';
+  const unresolvedPct=complaintRate(st.open,st.total);
+  const closedPct=complaintRate(st.closed,st.total);
+  const reasonRows=st.byReason.slice(0,8).map(([k,v])=>{
+    const openW=complaintRate(v.open,v.total), closedW=complaintRate(v.closed,v.total);
+    return `<div class="salesBar"><span class="nm">${k}</span><span class="track"><i style="width:${closedW}%;background:#72bfd0"></i><i style="width:${openW}%;background:#ef7f72;position:absolute;left:${closedW}%;top:0"></i></span><span class="val">${salesWon(v.total)}건</span><span class="pct">${openW}%</span></div>`;
+  }).join('') || '<div class="salesEmpty">선택 기간의 불만 데이터가 없습니다.</div>';
+  return `<div class="complaintHero">
+    <div class="complaintHead">
+      <div>
+        <div class="complaintTitle">고객 불만 Dashboard</div>
+        <div class="complaintTotal">
+          <span class="label">Total Complaints:</span>
+          <span>Closed <b class="num closed">${salesWon(st.closed)}</b></span>
+          <span>Open <b class="num open">${salesWon(st.open)}</b></span>
+          <span>Total <b class="num">${salesWon(st.total)}</b></span>
+        </div>
+      </div>
+      <div>
+        <div class="complaintLegend"><span><i style="background:#72bfd0"></i>해결/완화 추정</span><span><i style="background:#ef7f72"></i>미해결 추정</span></div>
+        <div class="complaintNote">기간: ${range} · 1~2점은 미해결, 3점은 해결/완화로 임시 분류</div>
+      </div>
+    </div>
+    <div class="complaintNote">핵심 신호: 미해결 비중 ${unresolvedPct}% · 해결/완화 비중 ${closedPct}% · 주요 원인 ${topReason?topReason[0]:'-'} · 주요 품목 ${topCat?topCat[0]:'-'}</div>
+  </div>
+  <div class="complaintGrid">
+    <div class="salesSec"><h4>월별 불만 접수 <span class="secSub">해결/미해결 비교</span></h4>${chartBox('reviewComplaintMonthStack',280)}</div>
+    <div class="salesSec"><h4>미해결 불만 품목 <span class="secSub">클릭 필터 대신 빠른 우선순위</span></h4>${chartBox('reviewOpenCatBar',280)}</div>
+  </div>
+  <div class="complaintGridWide">
+    <div class="salesSec"><h4>원인별 불만 규모 <span class="secSub">해결/미해결</span></h4>${chartBox('reviewReasonStack',Math.max(230,st.byReason.length*30+60))}<div style="margin-top:10px">${reasonRows}</div></div>
+    <div class="salesSec"><h4>고객 특성별 불만 규모 <span class="secSub">리뷰 유형 기준</span></h4>${chartBox('reviewKindStack',260)}<div class="complaintNote">리뷰 엑셀에 연령·성별 같은 인구통계 필드가 없어 리뷰 유형을 고객 특성 대체 축으로 사용합니다.</div></div>
+  </div>`;
+}
+
+function bindReviewPeriodControls(rd){
+  const fromEl=document.getElementById('reviewFromMonth'), toEl=document.getElementById('reviewToMonth');
+  const months=(rd&&rd.months)||[];
+  if(!fromEl||!toEl||!months.length) return;
+  const first=months[0], last=months[months.length-1];
+  if(!reviewPeriod.from || reviewPeriod.from<first || reviewPeriod.from>last) reviewPeriod.from=first;
+  if(!reviewPeriod.to || reviewPeriod.to<first || reviewPeriod.to>last) reviewPeriod.to=last;
+  if(reviewPeriod.from>reviewPeriod.to){ reviewPeriod.from=first; reviewPeriod.to=last; }
+  [fromEl,toEl].forEach(el=>{ el.min=months[0]; el.max=months[months.length-1]; });
+  fromEl.value=reviewPeriod.from; toEl.value=reviewPeriod.to;
+  fromEl.onchange=()=>{ reviewPeriod.from=fromEl.value; if(reviewPeriod.to&&reviewPeriod.from>reviewPeriod.to) reviewPeriod.to=reviewPeriod.from; renderReview(); };
+  toEl.onchange=()=>{ reviewPeriod.to=toEl.value; if(reviewPeriod.from&&reviewPeriod.to<reviewPeriod.from) reviewPeriod.from=reviewPeriod.to; renderReview(); };
+}
+
 function renderReview(){
   const meta=document.getElementById('reviewMeta');
   const kpis=document.getElementById('reviewKpis');
@@ -6888,16 +6979,20 @@ function renderReview(){
     if(body) body.innerHTML='<div class="salesEmpty">리뷰 엑셀을 업로드하면 평점 분포·품목별 평점·월별 추이·리뷰 목록을 볼 수 있습니다.</div>';
     return;
   }
-  if(meta) meta.textContent=`${rd.fileName||'업로드'} · ${salesWon(rd.total)}건 · ${rd.months.length?rd.months[0]+'~'+rd.months[rd.months.length-1]:''} · ${rd.uploadedAt} 반영`;
+  bindReviewPeriodControls(rd);
+  const cs=reviewComplaintStats(rd);
+  if(meta) meta.textContent=`${rd.fileName||'업로드'} · ${salesWon(rd.total)}건 · ${cs.from||rd.months[0]}~${cs.to||rd.months[rd.months.length-1]} · ${rd.uploadedAt} 반영`;
   const satPct=rd.total?Math.round(rd.senti['만족']/rd.total*100):0;
   const photoPct=rd.total?Math.round(rd.photoCnt/rd.total*100):0;
+  const openPct=complaintRate(cs.open,cs.total);
+  const topReason=cs.byReason[0], topCat=cs.byCat[0];
   if(kpis) kpis.innerHTML=`
-    <div class="salesKpi accent"><div class="v" style="color:${rd.avg>=4.5?CC.green:rd.avg>=4?CC.gold:CC.red}">${rd.avg.toFixed(2)}</div><div class="l">평균 평점</div><div class="sub">5점 만점</div></div>
-    <div class="salesKpi"><div class="v">${salesWon(rd.total)}</div><div class="l">총 리뷰 수</div><div class="sub">목표 베스트SKU 600+</div></div>
-    <div class="salesKpi goal"><div class="v">${satPct}%</div><div class="l">만족 비율 (5점)</div><div class="bar"><i style="width:${satPct}%;background:${CC.green}"></i></div><div class="sub">불만 ${rd.senti['불만']}건</div></div>
-    <div class="salesKpi"><div class="v">${photoPct}%</div><div class="l">포토·영상 리뷰</div><div class="sub">${salesWon(rd.photoCnt)}건</div></div>
-    <div class="salesKpi"><div class="v">${salesWon(rd.bestCnt)}</div><div class="l">베스트 리뷰</div><div class="sub">한달사용 ${salesWon(rd.kind['한달사용']||0)}</div></div>`;
-  body.innerHTML = reviewDistHtml(rd)+reviewEmotionHtml(rd)+reviewPurchaseHtml(rd)+reviewNegTopicHtml(rd)+reviewCatTopicHtml(rd)+reviewCatHtml(rd)+reviewMonthHtml(rd)+reviewListHtml(rd);
+    <div class="salesKpi accent"><div class="v">${salesWon(cs.total)}</div><div class="l">기간 내 불만 접수</div><div class="sub">${cs.from||'-'}~${cs.to||'-'}</div></div>
+    <div class="salesKpi"><div class="v" style="color:#ef7f72">${salesWon(cs.open)}</div><div class="l">미해결 추정</div><div class="sub">1~2점 리뷰</div></div>
+    <div class="salesKpi goal"><div class="v">${openPct}%</div><div class="l">미해결 비중</div><div class="bar"><i style="width:${openPct}%;background:#ef7f72"></i></div><div class="sub">해결/완화 ${salesWon(cs.closed)}건</div></div>
+    <div class="salesKpi"><div class="v">${topReason?topReason[0]:'-'}</div><div class="l">최다 원인</div><div class="sub">${topReason?salesWon(topReason[1].total)+'건':'데이터 없음'}</div></div>
+    <div class="salesKpi"><div class="v">${topCat?topCat[0]:'-'}</div><div class="l">최다 품목</div><div class="sub">만족 ${satPct}% · 포토 ${photoPct}%</div></div>`;
+  body.innerHTML = complaintDashboardHtml(rd)+reviewDistHtml(rd)+reviewNegTopicHtml(rd)+reviewCatTopicHtml(rd)+reviewListHtml(rd);
   bindReviewFilters();
   drawReviewCharts(rd);
 }
@@ -6907,6 +7002,33 @@ function drawReviewCharts(rd){
   if(!window.Chart) return;
   const legPos=isNarrow()?'bottom':'right';
   const legFont={size:isNarrow()?9.5:10.5};
+  const cs=reviewComplaintStats(rd);
+  const cClosed='#72bfd0', cOpen='#ef7f72';
+  makeChart('reviewComplaintMonthStack',{ type:'bar',
+    data:{ labels:cs.monthRows.map(x=>x.m), datasets:[
+      {label:'해결/완화 추정', data:cs.monthRows.map(x=>x.closed), backgroundColor:cClosed, borderRadius:3, stack:'complaints'},
+      {label:'미해결 추정', data:cs.monthRows.map(x=>x.open), backgroundColor:cOpen, borderRadius:3, stack:'complaints'} ] },
+    options:{ plugins:{legend:{position:'bottom', labels:{font:legFont}}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${salesWon(c.parsed.y)}건`}}},
+      scales:{ x:{stacked:true, grid:{display:false}}, y:{stacked:true, grid:{color:CC.grid}, title:{display:true,text:'건수'}} } } });
+  const openCats=cs.byCat.filter(([,v])=>v.open).slice(0,10);
+  makeChart('reviewOpenCatBar',{ type:'bar',
+    data:{ labels:openCats.map(([k])=>clipLabel(k,isNarrow()?8:13)), datasets:[{label:'미해결 추정', data:openCats.map(([,v])=>v.open), backgroundColor:cOpen, borderRadius:4}] },
+    options:{ indexAxis:'y', plugins:{legend:{display:false}, tooltip:{callbacks:{title:c=>openCats[c[0].dataIndex][0], label:c=>` 미해결 ${salesWon(c.parsed.x)}건`}}},
+      scales:{ x:{grid:{color:CC.grid}}, y:{grid:{display:false}} } } });
+  const reasons=cs.byReason.slice(0,10);
+  makeChart('reviewReasonStack',{ type:'bar',
+    data:{ labels:reasons.map(([k])=>clipLabel(k,isNarrow()?8:12)), datasets:[
+      {label:'해결/완화 추정', data:reasons.map(([,v])=>v.closed), backgroundColor:cClosed, borderRadius:3, stack:'reason'},
+      {label:'미해결 추정', data:reasons.map(([,v])=>v.open), backgroundColor:cOpen, borderRadius:3, stack:'reason'} ] },
+    options:{ indexAxis:'y', plugins:{legend:{position:'bottom', labels:{font:legFont}}, tooltip:{callbacks:{title:c=>reasons[c[0].dataIndex][0], label:c=>` ${c.dataset.label}: ${salesWon(c.parsed.x)}건`}}},
+      scales:{ x:{stacked:true, grid:{color:CC.grid}}, y:{stacked:true, grid:{display:false}} } } });
+  const kinds=cs.byKind.slice(0,8);
+  makeChart('reviewKindStack',{ type:'bar',
+    data:{ labels:kinds.map(([k])=>clipLabel(k,isNarrow()?8:12)), datasets:[
+      {label:'해결/완화 추정', data:kinds.map(([,v])=>v.closed), backgroundColor:cClosed, borderRadius:3},
+      {label:'미해결 추정', data:kinds.map(([,v])=>v.open), backgroundColor:cOpen, borderRadius:3} ] },
+    options:{ plugins:{legend:{position:'bottom', labels:{font:legFont}}, tooltip:{callbacks:{title:c=>kinds[c[0].dataIndex][0], label:c=>` ${c.dataset.label}: ${salesWon(c.parsed.y)}건`}}},
+      scales:{ x:{grid:{display:false}}, y:{grid:{color:CC.grid}} } } });
   // ① 평점 분포 도넛 (5~1점) — 중앙에 평균평점
   const distColors={5:CC.green,4:CC.blueL,3:CC.gold,2:CC.redL,1:CC.red};
   const ds=[5,4,3,2,1].filter(s=>rd.dist[s]);
