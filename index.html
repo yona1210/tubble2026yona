@@ -652,6 +652,17 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .roadPeriod{font-size:12px;font-weight:800;color:var(--navy);width:80px;flex-shrink:0}
 .roadBody b{font-size:13px;color:var(--ink)}.roadDetail{font-size:11.5px;color:#666;margin-top:3px;line-height:1.5}
 @media(max-width:760px){.mKpis{grid-template-columns:repeat(2,1fr)}.mTbl{font-size:10.5px}}
+/* 발주 금액·정수(MOQ) 검토 표 */
+.gomWrap{margin-top:14px;border-top:1px dashed #d5ddf2;padding-top:10px}
+.gomTitle{font-weight:800;font-size:12.5px;color:#1E2761;margin-bottom:6px}
+.gomHint{font-weight:400;font-size:10px;color:#8a93b8;display:block}
+.gomTbl input{border:1px solid #cdd6ef;border-radius:6px;padding:3px 6px;font-size:12px}
+.gomMoq{margin-top:8px;font-size:12.5px;font-weight:700;padding:8px 11px;border-radius:8px;background:#f4f6fb}
+.gomMoq.ok{background:#e6f4ec;color:#157a4a}
+.gomMoq.under{background:#fdeceb;color:#C0392B}
+.gomMoqEdit{margin-top:6px;font-size:11px;color:#666}
+.gomCov{font-weight:400;font-size:11px;color:#555}
+.gomCov input{border:1px solid #cdd6ef;border-radius:5px;padding:2px 4px;font-size:11px}
 /* 묶음 발주 그룹 */
 .grpSelect{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line)}
 .grpLabel{font-size:11px;font-weight:800;color:var(--navy);margin-right:4px}
@@ -2832,6 +2843,13 @@ if(!DATA.costGroups){ DATA.costGroups=[
    items:['주방세제 500ml','주방세제 1L 리필'],
    memo:'본품과 리필은 통상 함께 발주'}
 ]; }
+// [발주] 용기세척제 묶음: 발주 후 1개월 확보 기준 + 그룹 MOQ(개별 MOQ 플로어 미적용) — 재고·발주 전반 연동
+function applyMultiCleanerOrderBasis(){
+  const g=(DATA.costGroups||[]).find(x=>x.id==='multi_cleaner'); if(!g||!g.items) return;
+  g.items.forEach(function(nm){ const s=(DATA.stock||[]).find(function(x){return x.nm===nm;});
+    if(s){ if(s.targetMonths==null) s.targetMonths=1; if(s.skipItemMoq==null) s.skipItemMoq=true; } });
+}
+applyMultiCleanerOrderBasis();
 
 // 데일리 재고 이력: 오늘 재고 업데이트를 누적해 실제 재고 감소 속도 산출
 // 구조: { "품목명": [{date:'YYYY-MM-DD', stock:1234, source:'데일리', file:'파일명'}] }
@@ -5120,6 +5138,9 @@ function groupItemMetric(nm){
   const stockout=(c&&verified)?!!c.stockoutBeforeArrive:false;
   const unit=stockItem?(stockItem.stockUnit||'EA'):'EA';
   return {nm,exists:true,cur,curRound,qty,buy,buyVat,stock:totalStock,price,rate,verified,stockout,unit,
+    uc:(stockItem?(stockItem.unitConversion||1):1), moq:(stockItem?(stockItem.moq||0):0),
+    daily:(c?(c.daily||0):0), arrivalBase:(c?(c.arrivalBaseStock||0):0), mult:(stockItem?(+stockItem.orderMultiple||1):1),
+    tgt:(stockItem&&stockItem.targetMonths!=null?+stockItem.targetMonths:null),
     runout:(c?c.runout:null),status:(c?c.status:'na')};
 }
 function groupMetrics(g){
@@ -5172,8 +5193,91 @@ function groupViewHtml(g){
     <td class="r">${won(M.totalBuy)}</td><td class="r">${won(M.totalBuyVat)}</td><td class="r">${won(M.totalStock)}</td>
     <td class="r ${rateCls}">${M.avgRate!=null?(M.avgRate*100).toFixed(0)+'%':'-'}</td></tr>
     </tbody></table>`;
-  return card+table;
+  const money=(g.id==='multi_cleaner'||g.orderPrices)?groupOrderMoneyHtml(g,M):'';
+  return card+table+money;
 }
+// ===== [발주금액] 묶음 발주 그룹: 권장수량×객단가 = 발주금액, 정수 환산·MOQ 검토 =====
+function groupOrderMoneyHtml(g,M){
+  if(!g.orderPrices) g.orderPrices={};
+  if(g.id==='multi_cleaner'){ const DEF={'다목적 용기세척제 본품30정':2460,'다목적 용기세척제 실속100정':7050,'다목적 용기세척제 스타터10정':940};
+    Object.keys(DEF).forEach(nm=>{ if(g.orderPrices[nm]==null) g.orderPrices[nm]=DEF[nm]; }); }
+  if(!g.recOverrides) g.recOverrides={};
+  if(g.moqTabs==null) g.moqTabs=0;
+  // 확보 기간(개월)은 품목(s.targetMonths)에 저장 — 재고·발주 탭과 동일 기준으로 연동
+  const tm=(function(){ const it=M.items.find(x=>x.exists&&x.tgt!=null); return it&&it.tgt!=null?it.tgt:1; })();
+  const editable=!(typeof VIEWONLY!=='undefined'&&VIEWONLY)&&!(typeof EXTERNAL!=='undefined'&&EXTERNAL);
+  let totAmt=0, totTabs=0, moqTabs=g.moqTabs||0;
+  const rows=M.items.filter(m=>m.exists).map(m=>{
+    const nmE=String(m.nm).replace(/"/g,'&quot;');
+    // 권장 발주수량 = calcStock 결과(발주 후 확보기간·그룹MOQ 반영) — 위 표·재고·발주 탭과 동일 값
+    const auto=m.qty||0;
+    const ov=g.recOverrides[m.nm];
+    const rec=(ov!=null&&ov!=='')?Number(ov):auto;
+    const price=(g.orderPrices[m.nm]!=null)?Number(g.orderPrices[m.nm]):0;
+    const uc=m.uc||1;
+    const amt=Math.round((isFinite(rec)?rec:0)*(isFinite(price)?price:0));
+    const tabs=(isFinite(rec)?rec:0)*uc;
+    totAmt+=amt; totTabs+=tabs;
+    if(!moqTabs && m.moq) moqTabs=m.moq;
+    const recCell=editable
+      ? `<input type="number" class="gomRec" value="${ov!=null?ov:''}" placeholder="${won(auto)}" oninput="recalcGroupMoney('${g.id}')" style="width:88px;text-align:right"><div class="gomHint">${ov!=null?'수정됨 · 자동 '+won(auto):'자동('+tm+'개월 확보)'}</div>`
+      : won(rec);
+    const priceCell=editable
+      ? `<input type="number" class="gomPrice" value="${g.orderPrices[m.nm]!=null?g.orderPrices[m.nm]:''}" oninput="recalcGroupMoney('${g.id}')" style="width:88px;text-align:right">`
+      : won(price);
+    return `<tr class="gomRow" data-gid="${g.id}" data-nm="${nmE}" data-auto="${auto}" data-uc="${uc}" data-moq="${m.moq||0}">
+      <td class="l">${m.nm}</td>
+      <td class="r">${recCell}</td>
+      <td class="r">${priceCell}</td>
+      <td class="r gomAmt">${won(amt)}</td>
+      <td class="r">×${won(uc)}</td>
+      <td class="r gomTabs">${won(tabs)}정</td>
+    </tr>`;
+  }).join('');
+  const man=totTabs/10000, ok=moqTabs>0&&totTabs>=moqTabs;
+  const moqLine=`<div class="gomMoq ${moqTabs>0?(ok?'ok':'under'):''}" id="gomMoq_${g.id}">${moqTabs>0?`총 환산 <b>${won(totTabs)}정</b> = <b>${man.toFixed(1)}만정</b> / MOQ ${won(moqTabs/10000)}만정 — ${ok?'✅ 충족':`⚠️ 미달 (${won(moqTabs-totTabs)}정 부족)`}`:'MOQ 미설정'}</div>`;
+  const moqEdit=editable?`<div class="gomMoqEdit">MOQ(정) <input type="number" value="${g.moqTabs||''}" placeholder="예: 500000" oninput="updateGroupMoq('${g.id}',this.value)" style="width:110px;text-align:right"> <span class="gomHint">비우면 품목 MOQ(${won(moqTabs)}정) 자동 사용</span></div>`:'';
+  return `<div class="gomWrap">
+    <div class="gomTitle">발주 금액 · 정수(MOQ) 검토 ${editable?`<span class="gomCov">발주 후 <input type="number" step="0.5" min="0" value="${tm}" oninput="updateGroupTargetMonths('${g.id}',this.value)" style="width:50px;text-align:center"> 개월 확보 기준 · 권장수량·객단가 직접 편집 가능</span>`:`<span class="gomHint">발주 후 ${tm}개월 확보 기준</span>`}</div>
+    <table class="gTbl gomTbl"><thead><tr>
+      <th class="l">SKU</th><th class="r">권장 발주수량<br><span class="gomHint">발주후 ${tm}개월</span></th><th class="r">객단가(원)</th><th class="r">발주 금액</th><th class="r">정수</th><th class="r">환산 정</th>
+    </tr></thead><tbody>${rows}
+      <tr class="gTot"><td class="l">합계</td><td class="r">-</td><td class="r">-</td><td class="r" id="gomTotAmt_${g.id}">${won(totAmt)}</td><td class="r">-</td><td class="r" id="gomTotTabs_${g.id}">${won(totTabs)}정</td></tr>
+    </tbody></table>
+    ${moqLine}${moqEdit}
+  </div>`;
+}
+window.recalcGroupMoney=function(gid){
+  const g=DATA.costGroups.find(x=>x.id===gid); if(!g) return;
+  g.orderPrices=g.orderPrices||{}; g.recOverrides=g.recOverrides||{};
+  let totAmt=0, totTabs=0, moqTabs=g.moqTabs||0;
+  document.querySelectorAll('.gomRow[data-gid="'+gid+'"]').forEach(function(tr){
+    const nm=tr.getAttribute('data-nm');
+    const auto=Number(tr.getAttribute('data-auto'))||0;
+    const uc=Number(tr.getAttribute('data-uc'))||1;
+    const mq=Number(tr.getAttribute('data-moq'))||0;
+    const recInp=tr.querySelector('.gomRec'), prInp=tr.querySelector('.gomPrice');
+    const recV=recInp?String(recInp.value).trim():''; const prV=prInp?String(prInp.value).trim():'';
+    if(recV==='') delete g.recOverrides[nm]; else g.recOverrides[nm]=Number(recV);
+    g.orderPrices[nm]=(prV==='')?null:Number(prV);
+    const rec=(recV==='')?auto:Number(recV);
+    const price=(prV==='')?0:Number(prV);
+    const amt=Math.round((isFinite(rec)?rec:0)*(isFinite(price)?price:0));
+    const tabs=(isFinite(rec)?rec:0)*uc;
+    totAmt+=amt; totTabs+=tabs;
+    if(!moqTabs && mq) moqTabs=mq;
+    const aC=tr.querySelector('.gomAmt'); if(aC) aC.textContent=won(amt);
+    const tC=tr.querySelector('.gomTabs'); if(tC) tC.textContent=won(tabs)+'정';
+  });
+  const at=document.getElementById('gomTotAmt_'+gid); if(at) at.textContent=won(totAmt);
+  const tt=document.getElementById('gomTotTabs_'+gid); if(tt) tt.textContent=won(totTabs)+'정';
+  const ml=document.getElementById('gomMoq_'+gid);
+  if(ml){ const ok=moqTabs>0&&totTabs>=moqTabs; ml.className='gomMoq '+(moqTabs>0?(ok?'ok':'under'):'');
+    ml.innerHTML=moqTabs>0?('총 환산 <b>'+won(totTabs)+'정</b> = <b>'+(totTabs/10000).toFixed(1)+'만정</b> / MOQ '+won(moqTabs/10000)+'만정 — '+(ok?'✅ 충족':'⚠️ 미달 ('+won(moqTabs-totTabs)+'정 부족)')):'MOQ 미설정'; }
+  if(typeof markDirty==='function') markDirty();
+};
+window.updateGroupMoq=function(gid,v){ const g=DATA.costGroups.find(x=>x.id===gid); if(g){ g.moqTabs=(v===''||v==null)?0:Number(v); recalcGroupMoney(gid); } };
+window.updateGroupTargetMonths=function(gid,v){ const g=DATA.costGroups.find(x=>x.id===gid); if(!g) return; const tm=(v===''||v==null)?1:Math.max(0,Number(v)); (g.items||[]).forEach(function(nm){ const s=(DATA.stock||[]).find(function(x){return x.nm===nm;}); if(s) s.targetMonths=tm; }); if(typeof markDirty==='function') markDirty(); if(typeof renderCost==='function') renderCost(); if(typeof renderStock==='function') renderStock(); if(typeof renderActiveTab==='function') renderActiveTab(); };
 window.updateGroupMemo=function(id,v){ const g=DATA.costGroups.find(x=>x.id===id); if(g){ g.memo=v; markDirty(); } };
 window.selectGroup=function(v){ costGroupSel=v; renderCost(); };
 function ciDistHtml(){
@@ -7826,7 +7930,7 @@ function calcStockCoreV47(s,stock,da){
   const daily=Math.max(0,Number(da.daily)||0);
   const weekly=(da.baseDaily||0)*7;
   const set=DATA.stockset||{};
-  const lead=Math.max(0,+s.lead||0), buffer=Math.max(0,+set.buffer||0), target=Math.max(0,+set.target||3);
+  const lead=Math.max(0,+s.lead||0), buffer=Math.max(0,+set.buffer||0), target=Math.max(0,(s.targetMonths!=null?+s.targetMonths:(+set.target||3)));
   const unitReady=hasUnit(s);
   const unit=s.stockUnit||'EA';
   const unitCost=getCurrentCost(s.nm, s.cost);
@@ -7856,7 +7960,8 @@ function calcStockCoreV47(s,stock,da){
   if(unitReady && needRaw>0){
     const moqStock=moqInStockUnit(s);
     const mult=Math.max(1,+s.orderMultiple||1);
-    orderQty=Math.ceil(Math.max(needRaw,moqStock)/mult)*mult;
+    const floorNeed=s.skipItemMoq?needRaw:Math.max(needRaw,moqStock);   // 그룹 MOQ 품목은 개별 MOQ 플로어 미적용
+    orderQty=Math.ceil(floorNeed/mult)*mult;
     orderQtyOrderUnit=toOrderUnit(s,orderQty);
   }
   const arrive=new Date(NOW.getTime()+lead*86400000);
