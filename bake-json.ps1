@@ -9,6 +9,13 @@ $ErrorActionPreference = 'Stop'
 $dir = $PSScriptRoot
 $L1  = [Text.Encoding]::GetEncoding(28591)   # 1바이트=1글자, 무손실
 
+# JSON 미니파이어(문자열 안은 그대로 두고 밖의 공백만 제거 — 무손실). 배포 파일 축소용.
+if(-not ('JsonMin' -as [type])){
+Add-Type -Language CSharp -TypeDefinition @'
+public static class JsonMin { public static string Run(string s){ var sb=new System.Text.StringBuilder(s.Length); bool q=false; for(int i=0;i<s.Length;i++){ char c=s[i]; if(q){ sb.Append(c); if(c=='\\'){ if(i+1<s.Length){ sb.Append(s[i+1]); i++; } } else if(c=='"'){ q=false; } } else { if(c=='"'){ q=true; sb.Append(c); } else if(c==' '||c=='\t'||c=='\r'||c=='\n'){} else { sb.Append(c); } } } return sb.ToString(); } }
+'@
+}
+
 if(-not (Test-Path $Json)){ throw ".json 없음: $Json" }
 $j = ([IO.File]::ReadAllText($Json, $L1)).Trim()
 
@@ -24,8 +31,10 @@ $before = $escaped
 $escaped = $escaped -replace '"viewonly":\s*true','"viewonly":false'
 if($escaped -ne $before){ Write-Host "  * viewonly:true -> false 로 강제(라이브 배포)" }
 
-# data/tubble-data.js 작성
-$dataJs = 'window.__TUBBLE_DATA__=' + $escaped + ';'
+# 무손실 압축(공백 제거) 후 data/tubble-data.js 작성
+$compact = [JsonMin]::Run($escaped)
+Write-Host ("  * 데이터 압축: {0:N0} -> {1:N0} bytes" -f $escaped.Length, $compact.Length)
+$dataJs = 'window.__TUBBLE_DATA__=' + $compact + ';'
 New-Item -ItemType Directory -Force -Path (Join-Path $dir 'data') | Out-Null
 [IO.File]::WriteAllText((Join-Path $dir 'data\tubble-data.js'), $dataJs, $L1)
 Write-Host ("[OK] data/tubble-data.js 갱신 : {0:N0} bytes" -f $dataJs.Length)
