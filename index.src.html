@@ -2645,11 +2645,11 @@ body{padding-bottom:48px}
     <span class="salesMeta" style="color:#9aa1b2;font-size:10.5px">손익계산서·재무상태표 파일 여러 개 한 번에 선택 가능 (파일명에 제조사·연도 포함 / 신규사 자동 추가)</span>
   <div class="commonbar" id="commonbar" data-host="mfr">
     <button class="tbtn" id="cbSave" title="">파일 백업 저장</button>
-    <button class="tbtn" id="btnSheetLoad" title="구글 시트에서 최신 데이터 불러오기">↻ 시트 동기화</button>
+    <button class="tbtn" id="btnSheetLoad" title="구글 시트에서 최신 데이터 불러오기" style="display:none">↻ 시트 동기화</button>
     <div class="moremenu">
       <button class="tbtn" id="cbMore" title="">더보기 ▾</button>
       <div class="moredrop" id="cbMoreDrop">
-        <button class="mitem" id="cbSheetSave">시트에 저장 (관리자)</button>
+        <button class="mitem" id="cbSheetSave" style="display:none">시트에 저장 (관리자)</button>
         <div class="mdiv"></div>
         <button class="mitem" id="cbLoad" title="">파일 불러오기</button>
         <button class="mitem" id="cbRevert" title="">파일 저장 시점으로 되돌리기</button>
@@ -10344,9 +10344,9 @@ function verifySheetSaved(beforeTs){
 // 저장된 정적 HTML이 남아 있어도, 진입 시 현재 열린 탭은 항상 최신 렌더 결과로 맞춘다.
 setTimeout(()=>{ if(typeof renderActiveTab==='function') renderActiveTab(); }, 0);
 
-// 페이지 로드 시 자동으로 시트 최신본 불러오기 (조용히)
-//  - 실패해도 HTML 내장 데이터로 작동 (오프라인 안전)
-if(!VIEWONLY && !EXTERNAL){ loadFromSheet({ silent:true }); }
+// [비활성화] 부팅 시 시트 자동 로드 제거 — 시트의 옛 데이터가 베이크된 최신 데이터를 조용히 덮어쓰는 문제 방지.
+//  데이터 원본은 베이크된 window.__TUBBLE_DATA__(data/tubble-data.js). 시트 연동은 사용하지 않음(불안정·용량한계).
+// if(!VIEWONLY && !EXTERNAL){ loadFromSheet({ silent:true }); }
 
 
 </script>
