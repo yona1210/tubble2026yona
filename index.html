@@ -306372,6 +306372,8 @@ function saveEdit(tab){
   if(tab==='stock') stockEdit=false;
   if(tab==='cost') costEdit=false;
   syncEditToolbar(tab); updateLockUI(); updateSaveStatus(); rerenderTab(tab);
+  // [v75] 편집 반영 시 주간보고 모달이 열려 있으면 즉시 재렌더(실시간 반영) — 닫혀 있으면 아무 것도 안 함
+  try{ const _rm=document.getElementById('reportModal'); if(_rm && _rm.classList.contains('open')){ const _rb=document.getElementById('btnReport'); if(_rb) _rb.click(); } }catch(e){}
   // [조건8] 저장 완료 토스트
   toast(delCount>0?`수정사항이 반영되었습니다 (삭제 ${delCount}건 확정). 파일 저장을 눌러 백업하세요.`:'수정사항이 반영되었습니다. 파일 저장을 눌러 백업하세요.');
 }
@@ -310243,10 +310245,12 @@ function buildWeeklyFormRows(){
     s.st9.forEach((st,k)=>{ if(st==='done' && inRange((s.d9[k]||[])[1],weekAgo,NOW)) doneNow.push(`${STEPS[k]}(${s.d9[k][1]})`); });
     // 다음 미완 공정 (plan/doing 중 가장 앞)
     let nextStepIdx=-1;
-    for(let k=0;k<STEPS.length;k++){ if(s.st9[k]==='doing'){nextStepIdx=k;break;} }
+    for(let k=STEPS.length-1;k>=0;k--){ if(s.st9[k]==='doing'){nextStepIdx=k;break;} }   // [v76] 가장 진행된(뒤쪽) doing 우선 — 멀티/비순차 doing 시 실제 단계 반영
     if(nextStepIdx<0) for(let k=0;k<STEPS.length;k++){ if(s.st9[k]==='plan'){nextStepIdx=k;break;} }
     const nextStep = nextStepIdx>=0? STEPS[nextStepIdx] : '전 공정 완료';
     const nextStepDue = nextStepIdx>=0? ((s.d9[nextStepIdx]||[])[1]||'') : '';
+    // [v76] 출시일 유효값만 (미정 '-' 대시 누출 방지)
+    const launchC = (s.launch && s.launch!=='-' && !/^-+$/.test(s.launch)) ? s.launch : '';
     // 차주 완료예정 공정
     const dueNext=[];
     s.st9.forEach((st,k)=>{ if((st==='plan'||st==='doing') && inRange((s.d9[k]||[])[1],NOW,weekAhead)) dueNext.push(`${STEPS[k]}(${s.d9[k][1]})`); });
@@ -310269,58 +310273,75 @@ function buildWeeklyFormRows(){
       // 다음 태그('[') 또는 줄바꿈 전까지
       const stop=rest.search(/[\[\n]/);
       if(stop>=0) rest=rest.slice(0,stop);
-      return rest.trim();
+      return rest.replace(/[\s\/·,]+$/,'').trim();   // [v76] 후행 구분자(/ · ,) 정리
     };
     const tagThis=tagPick('금주');   // 이번주 실제 한 일
     const tagResult=tagPick('결과'); // 이번주 결과·수치
     // 태그를 뺀 순수 메모 (기존 폴백용)
     const memoClean=memo.replace(/\[(금주|결과)\][^\[\n]*/g,'').trim();
     const memoCleanFirst=(memoClean.split(/\n|\s+\/\s+/)[0]||'').trim();
-    // [v70] 재발주 품목(발주 키워드 + 입고/출시 이력) 판정 — 보관 여부 무관
     const txt2=((s.nextAction||'')+' '+(s.memo||''));
-    const isReorder = /발주|재입고/.test(txt2) && s.st9.some((st,k)=>k>=9 && st==='done') && w.state!=='doing';
+    const inboundNow = s.st9[STEPS.indexOf('입고')]==='doing';  // 입고 단계 진행 중
+    // [v75] 발주·입고 중심 판정 — 재발주 / 입고 진행 중 / 발주이력 → 과거 신규공정(행정 등) 오표시 방지, 메모(입고 로그) 우선
+    const isReorder = s.type==='재발주' || inboundNow || (/발주|재입고/.test(txt2) && s.st9.some((st,k)=>k>=9 && st==='done'));
     // F 계획 = 지난주 보고의 L목표 (스냅샷 연결). 없으면 추정값 폴백
     const snapL = getLastSnapshotGoal(s.nm);
     let F, G, H, J, K, L;
     if(isReorder){
-      const mp = memoClean.split(/[.\n]/).map(x=>x.trim()).filter(Boolean);
-      const doneBit = mp.find(p=>/입고완료|입고\(|완료/.test(p)) || '';
-      const planBit = mp.find(p=>/발주|견적/.test(p)) || (s.nextAction||'');
-      const dateBit = mp.find(p=>/\d{1,2}\/\d{1,2}|\d{1,2}월/.test(p) && /발주|재고/.test(p)) || '';
-      F = snapL || (s.nextAction||'재발주 시점·물량 검토');
-      G = tagThis || ((doneBit?doneBit+', ':'') + (planBit?planBit:'재발주 견적 진행'));
-      H = tagResult || `${planBit||s.nextAction||'재발주 검토'} 진행 중`;
-      J = '재발주 확정·품의';
-      K = s.nextAction? s.nextAction.trim() : '재발주 견적·MOQ 수량 확정';
-      L = dateBit || `${(s.nextAction||'재발주').replace(/확정$/,'')} 확정·발주 진행`;
+      // [v75] 발주·입고 중심: 메모(발주·입고 진행 로그)를 진행/결과에 그대로 노출 (과거 공정 완료 하이라이트 안 함)
+      // [v76] 날짜 점(6.29)은 보존하고 문장 점만 분리
+      const bits = memoClean.split(/\n|,\s*|\s+및\s+|(?<!\d)\.(?!\d)/).map(x=>x.trim()).filter(Boolean);
+      const doneBit = bits.find(p=>/완료|입고완료/.test(p)) || '';
+      const ongoingBit = bits.filter(b=>b!==doneBit).find(b=>!/완료/.test(b)) || '';
+      F = snapL || (s.nextAction||'입고·발주 관리');
+      G = tagThis || (bits.length ? bits.join(' · ') : (s.nextAction||'입고 진행'));
+      // [v76] H는 G와 겹치지 않게: 진행 중인 항목(2개 이상일 때) 우선, 아니면 nextAction 상태
+      H = tagResult || ((bits.length>1 && ongoingBit) ? ongoingBit : (s.nextAction ? `${s.nextAction} 진행 중` : (doneBit||'입고 진행 중')));
+      J = s.nextAction ? s.nextAction.trim() : '입고 일정 확정';
+      K = '입고 일정·수량 확인, 재고 소진 대비';
+      L = launchC ? `${launchC} 입고/출시 목표` : '입고 완료·재고 안정화';
     } else {
+      // [v76] 빈 날짜/대시(-) 정리
+      const dueC = (nextStepDue && nextStepDue!=='-' && !/^-+$/.test(nextStepDue)) ? nextStepDue : '';
+      const curState = nextStepIdx>=0 ? s.st9[nextStepIdx] : '';   // 현재 공정 상태(doing/plan)
+      // 현재 공정 다음의 미완 공정 (H '다음' 표기용) — work() 대신 nextStep 기준으로 통일(비순차 역순 방지)
+      let afterIdx=-1;
+      if(nextStepIdx>=0) for(let k=nextStepIdx+1;k<STEPS.length;k++){ if(s.st9[k]==='doing'||s.st9[k]==='plan'){afterIdx=k;break;} }
+      const afterStage = afterIdx>=0? STEPS[afterIdx] : '';
+      const afterDueRaw = afterIdx>=0? ((s.d9[afterIdx]||[])[1]||'') : '';
+      const afterDue = (afterDueRaw && afterDueRaw!=='-' && !/^-+$/.test(afterDueRaw)) ? afterDueRaw : '';
       // F 계획(지난주 목표): 스냅샷 우선
-      F = snapL ? snapL : (w.cur && w.cur!=='착수 전' ? `${w.cur.replace(' 대기','')} 진행` : (s.nextAction||'진행 점검'));
-      // [v71] G 진행(실제 한 일·날짜): 메모[금주] 우선 → 이번주 완료공정+날짜 → doing 공정+메모
+      F = snapL ? snapL : (nextStep!=='전 공정 완료' ? `${nextStep} 진행` : (s.nextAction||'출시·판매 마무리'));
+      // G 진행(이번주 한 일): 메모[금주] > 이번주 완료공정+날짜 > 현재공정 진행/준비
       if(tagThis){
         G = tagThis;
       } else if(doneNow.length){
         G = `${doneNow.join(', ')} 완료`;
-      } else if(w.state==='doing'){
-        const due=nextStepDue?` (~${nextStepDue})`:'';
-        G = `${w.cur} 진행 중${memoCleanFirst?' · '+memoCleanFirst:due}`;
+      } else if(curState==='doing'){
+        G = `${nextStep} 진행 중${memoCleanFirst?' · '+memoCleanFirst:(dueC?` (~${dueC})`:'')}`;
+      } else if(nextStep!=='전 공정 완료'){
+        G = memoCleanFirst || `${nextStep} 준비 중`;
       } else {
-        G = memoCleanFirst || `${w.cur} 준비 중`;
+        G = memoCleanFirst || '전 공정 완료';
       }
-      // [v71] H 결과(상태·판단·다음 예정): 메모[결과] 우선 → 현재단계 + 다음공정 예정일
+      // [v76] H 결과(현황·다음 마일스톤): '다음 공정' 지향으로 G와 중복 회피, '대기 진행 중' 모순 제거
       if(tagResult){
         H = tagResult;
+      } else if(nextStep==='전 공정 완료'){
+        H = '전 공정 완료 · 출시 준비';
+      } else if(afterStage){
+        H = `다음 ${afterStage}${afterDue?` 예정(~${afterDue})`:' 예정'}`;
+      } else if(curState==='doing'){
+        H = `${nextStep} 마무리 단계${dueC?` (~${dueC})`:''}`;
       } else {
-        const nextBit = (nextStep!=='전 공정 완료' && nextStepDue)? `${nextStep} 예정(~${nextStepDue})`
-                       : (nextStep!=='전 공정 완료'? `${nextStep} 예정` : '전 공정 완료');
-        H = `${w.cur} 진행 중 · ${nextBit}`;
+        H = `${nextStep} 착수 예정${dueC?`(~${dueC})`:''}`;
       }
-      // J 계획(다음주): 다음 미완 공정
-      J = nextStep!=='전 공정 완료'? `${nextStep} 진행${nextStepDue?'('+nextStepDue+')':''}` : '출시·판매 모니터링';
+      // J 계획(다음주): 현재 미완 공정 진행
+      J = nextStep!=='전 공정 완료'? `${nextStep} 진행${dueC?'('+dueC+')':''}` : '출시·판매 모니터링';
       // K 액션(방법): nextAction 우선
       K = s.nextAction? s.nextAction.trim() : (memoParts.slice(0,2).join(' / ')||nextStep);
-      // L 목표(달성치·날짜): 차주 완료예정 + 출시일
-      L = dueNext.length ? `${dueNext.join(', ')}${s.launch?' · 출시 '+s.launch:''}` : (s.launch? `${s.launch} 출시 목표` : nextStep+' 완료');
+      // L 목표(달성치·날짜): 차주 완료예정 + 출시일(유효값만)
+      L = dueNext.length ? `${dueNext.join(', ')}${(launchC && !dueNext.some(x=>/^출시/.test(x)))?' · 출시 '+launchC:''}` : (launchC? `${launchC} 출시 목표` : nextStep+' 완료');
     }
     const Fest = !snapL;  // 추정 여부 (스냅샷 없으면 추정)
     return {
