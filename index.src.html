@@ -8122,9 +8122,10 @@ let salesTimeMode = 'month';          // [v83] YoY 비교 뷰 내 단위(월별/
 // 품명 → 카테고리 매핑 (BK 확정 9종)
 function salesCategory(nm){
   const n=String(nm||'');
+  if(n.includes('한화')) return '기타';                              // 한화 OEM 등 자사 제품 아님 → 기타
+  if(n.includes('세정티슈')||n.includes('물티슈')) return '세정티슈';    // 세정티슈 먼저 (다목적 세정티슈가 다목적용기세척제로 가지 않도록)
   if(n.includes('텀블러')||n.includes('용기세척')||n.includes('다목적')) return '다목적용기세척제';
   if(n.includes('캡슐세제')) return '캡슐세제';
-  if(n.includes('세정티슈')||n.includes('물티슈')) return '세정티슈';
   if(n.includes('탈취')) return '탈취제';
   if(n.includes('주방세제')) return '주방세제';
   if(n.includes('욕실')) return '욕실클리너';
@@ -8419,7 +8420,7 @@ function parseSalesWorkbook(wb){
   const hdr=rows[hi].map(x=>String(x).trim());
   const col=(name)=>hdr.indexOf(name);
   const ci={
-    biz:col('사업단위'), date:col('매출일'), ch:col('판매 구분')>=0?col('판매 구분'):col('판매구분'),
+    biz:col('사업단위'), date:col('매출일'), ch:col('거래처 구분')>=0?col('거래처 구분'):(col('거래처구분')>=0?col('거래처구분'):(col('판매 구분')>=0?col('판매 구분'):col('판매구분'))),
     owner:col('담당자'), client:col('거래처'), nm:col('품명'), qty:col('수량'),
     amt:col('원화판매금액')>=0?col('원화판매금액'):col('판매금액'), wh:col('창고')
   };
@@ -8442,8 +8443,9 @@ function parseSalesWorkbook(wb){
     const qty=Number(String(r[ci.qty]).replace(/[^0-9.-]/g,''))||0;
     const item=salesNormName(r[ci.nm]);
     const cat=salesCategory(r[ci.nm]);
-    const ch=String(r[ci.ch]||'기타').trim()||'기타';
+    let ch=String(r[ci.ch]||'기타').trim()||'기타';
     const client=String(r[ci.client]||'-').trim()||'-';
+    if(ch==='온라인 일반') ch=refineOnlineChannel(client);   // [온라인 일반 세분화] 거래처명으로 쿠팡·스마트스토어 분리
     const wh=ci.wh>=0?(String(r[ci.wh]||'-').trim()||'-'):'-';
     months.add(ym); totalAmt+=amt; totalQty+=qty; rowCnt++;
     const acc=(map,key)=>{ if(!map[key])map[key]={amt:0,qty:0,byMonth:{}}; map[key].amt+=amt; map[key].qty+=qty; map[key].byMonth[ym]=(map[key].byMonth[ym]||0)+amt; };
@@ -8469,7 +8471,7 @@ function parseSalesWorkbookEnhanced(wb){
   const hdr=rows[hi].map(x=>String(x).trim());
   const col=(name)=>hdr.indexOf(name);
   const ci={
-    biz:col('사업단위'), date:col('매출일'), ch:col('판매 구분')>=0?col('판매 구분'):col('판매구분'),
+    biz:col('사업단위'), date:col('매출일'), ch:col('거래처 구분')>=0?col('거래처 구분'):(col('거래처구분')>=0?col('거래처구분'):(col('판매 구분')>=0?col('판매 구분'):col('판매구분'))),
     owner:col('담당자'), client:col('거래처'), nm:col('품명'), qty:col('수량'),
     amt:col('원화판매금액')>=0?col('원화판매금액'):col('판매금액'), wh:col('창고')
   };
@@ -8520,8 +8522,9 @@ function parseSalesWorkbookEnhanced(wb){
     const stockRow=(typeof findStockByName==='function') ? (findStockByName(rawName)||findStockByName(item)) : null;
     const stockNm=stockRow&&stockRow.nm?stockRow.nm:item;
     const cat=salesCategory(rawName);
-    const ch=String(r[ci.ch]||'기타').trim()||'기타';
+    let ch=String(r[ci.ch]||'기타').trim()||'기타';
     const client=String(r[ci.client]||'-').trim()||'-';
+    if(ch==='온라인 일반') ch=refineOnlineChannel(client);   // [온라인 일반 세분화] 거래처명으로 쿠팡·스마트스토어 분리
     const wh=ci.wh>=0?(String(r[ci.wh]||'-').trim()||'-'):'-';
     months.add(ym); totalAmt+=amt; totalQty+=qty; rowCnt++;
     if(dateKey) dayKeys.add(dateKey);
@@ -8546,6 +8549,13 @@ function parseSalesWorkbookEnhanced(wb){
 }
 // [v80] ===== ERP 매출 → 재고 연동: 거래처→채널 매핑 기반 채널 집계 =====
 const SALES_CHANNELS=['스마트스토어','쿠팡','공구','홈쇼핑','B2B','B2C외부몰'];
+// [온라인 일반 세분화] ERP '온라인 일반' 채널을 거래처명 기준 쿠팡·스마트스토어로 분리 (나머지는 '온라인 일반' 유지)
+function refineOnlineChannel(client){
+  const s=String(client||'');
+  if(/쿠팡|coupang/i.test(s)) return '쿠팡';
+  if(/스마트스토어|스토어팜|네이버|smartstore/i.test(s)) return '스마트스토어';
+  return '온라인 일반';
+}
 function guessClientChannel(name){
   const s=String(name||'');
   if(/쿠팡|coupang/i.test(s)) return '쿠팡';
@@ -8558,16 +8568,9 @@ function guessClientChannel(name){
 }
 // 매출 업로드 → ① 미분류 거래처(채널) 분류 → ② 미분류 카테고리(대분류) 분류 순서로 물어봄
 function syncStockFromSales(agg){
-  const icq=agg && agg.itemClientMonthlyQty;
-  if(!icq || !Object.keys(icq).length){ if(typeof renderStock==='function') renderStock(); promptCategoryGroups(); return; }
-  if(!DATA.clientChannelMap) DATA.clientChannelMap={};
-  const clientTot={};
-  Object.values(icq).forEach(cm=>Object.entries(cm).forEach(([cl,ym])=>{ if(!cl||cl==='-') return; const t=Object.values(ym).reduce((a,b)=>a+(b||0),0); clientTot[cl]=(clientTot[cl]||0)+t; }));
-  const unmapped=Object.keys(clientTot).filter(cl=>!DATA.clientChannelMap[cl]).sort((a,b)=>clientTot[b]-clientTot[a]);
-  if(unmapped.length) showClassifyModal({ title:'① 거래처 → 채널 분류', items:unmapped, totals:clientTot, options:SALES_CHANNELS,
-    guess:guessClientChannel, map:DATA.clientChannelMap, unit:'기간 수량', itemLabel:'거래처', optLabel:'채널',
-    onDone:()=>{ finalizeSalesSync(agg); promptCategoryGroups(); }, onCancel:()=>{ if(typeof renderStock==='function') renderStock(); promptCategoryGroups(); } });
-  else { finalizeSalesSync(agg); promptCategoryGroups(); }
+  // [채널=거래처 구분] ERP '거래처 구분' 열을 채널로 직접 집계 — 거래처→채널 수동 분류 모달 없음
+  finalizeSalesSync(agg);
+  promptCategoryGroups();
 }
 // 업로드 시 미분류 카테고리(→대분류)가 있으면 분류 모달
 function promptCategoryGroups(){
@@ -8582,28 +8585,31 @@ function promptCategoryGroups(){
 }
 // 매핑 확정 후: CHANNEL_DATA(품목×채널×월) + 월판매(품목×월) 갱신
 function finalizeSalesSync(agg){
-  const icq=(agg&&agg.itemClientMonthlyQty)||{}, map=DATA.clientChannelMap||{};
-  const monthsSet=new Set();
-  Object.values(icq).forEach(cm=>Object.values(cm).forEach(ym=>Object.keys(ym).forEach(m=>monthsSet.add(m))));
+  // [채널=거래처 구분] 품목×거래처구분×월 집계 (itemChannelDailyQty의 일별을 월별로 합산 · 거래처→채널 수동 매핑 불필요)
+  const icdq=(agg&&agg.itemChannelDailyQty)||{};
+  const monthsSet=new Set(), chTot={};
+  Object.values(icdq).forEach(chm=>Object.entries(chm).forEach(([ch,dk])=>{
+    Object.entries(dk).forEach(([d,q])=>{ monthsSet.add(String(d).slice(0,7)); chTot[ch]=(chTot[ch]||0)+(q||0); });
+  }));
   const months=[...monthsSet].sort().slice(-12);
   if(!months.length){ if(typeof renderStock==='function') renderStock(); return; }
-  const channels=SALES_CHANNELS.slice(), items={};
-  Object.entries(icq).forEach(([item,cm])=>{
-    const chMonth={}; channels.forEach(ch=>chMonth[ch]=months.map(()=>0));
-    Object.entries(cm).forEach(([cl,ym])=>{
-      const ch=map[cl]; if(!ch||!chMonth[ch]) return;   // 미매핑 거래처는 채널 집계 제외(월판매엔 포함)
-      Object.entries(ym).forEach(([mo,q])=>{ const mi=months.indexOf(mo); if(mi>=0) chMonth[ch][mi]+=(q||0); });
+  const channels=Object.keys(chTot).sort((a,b)=>chTot[b]-chTot[a]), items={};   // 규모 큰 채널 순
+  Object.entries(icdq).forEach(([item,chm])=>{
+    items[item]={};
+    channels.forEach(ch=>{
+      const arr=months.map(()=>0), dk=chm[ch]||{};
+      Object.entries(dk).forEach(([d,q])=>{ const mi=months.indexOf(String(d).slice(0,7)); if(mi>=0) arr[mi]+=(q||0); });
+      items[item][ch]=arr.map(v=>Math.round(v));
     });
-    items[item]={}; channels.forEach(ch=>{ items[item][ch]=chMonth[ch].map(v=>Math.round(v)); });
   });
   CHANNEL_DATA.months=months; CHANNEL_DATA.channels=channels; CHANNEL_DATA.items=items;
   DATA.channelData={months:months.slice(), channels:channels.slice(), items};   // 새로고침 후에도 유지
-  // 월판매: 품목 월별 총수량(전 거래처 합) → 이력 → msale 발주 기준
+  // 월판매: 품목 월별 총수량(전 채널 합) → 이력 → msale 발주 기준
   if(typeof recordMonthlySales==='function'){
-    Object.entries(icq).forEach(([item,cm])=>{
+    Object.entries(icdq).forEach(([item,chm])=>{
       const mTot={};
-      Object.values(cm).forEach(ym=>Object.entries(ym).forEach(([mo,q])=>{ mTot[mo]=(mTot[mo]||0)+(q||0); }));
-      Object.entries(mTot).forEach(([mo,q])=>{ recordMonthlySales(item, String(mo).replace('-','.'), Math.round(q), 'ERP 매출 업로드'); });
+      Object.values(chm).forEach(dk=>Object.entries(dk).forEach(([d,q])=>{ const mo=String(d).slice(0,7); mTot[mo]=(mTot[mo]||0)+(q||0); }));
+      Object.entries(mTot).forEach(([mo,q])=>{ recordMonthlySales(item, mo.replace('-','.'), Math.round(q), 'ERP 매출 업로드'); });
     });
   }
   if(typeof refreshMonthlySalesAverages==='function') refreshMonthlySalesAverages();
@@ -8878,27 +8884,19 @@ function drawSalesSummaryCharts(sd){
 
 // [v73] 차원 뷰(품목/카테고리/채널) — 채널은 거래처 데이터 사용
 // [v81] 대분류(주방/세탁/청소/탈취) — 카테고리를 묶는 사용자 매핑
-const CAT_GROUPS=['주방','세탁','청소','탈취'];
+const CAT_GROUPS=['주방','세탁','청소','탈취','기타'];
 function guessCategoryGroup(cat){
   const s=String(cat||'');
   if(/주방|용기세척|다목적|식기세척/.test(s)) return '주방';
   if(/세탁|캡슐|이염방지|시트세제/.test(s)) return '세탁';
   if(/탈취|방향/.test(s)) return '탈취';
   if(/욕실|청소|티슈|클리너|세정|물티슈/.test(s)) return '청소';
-  return '';
+  return '기타';   // 매칭 안 되는 카테고리(선물세트 등 '기타')는 대분류도 '기타'
 }
 // 거래처 → 채널 집계 (clientChannelMap 사용 · 미분류 전엔 거래처 그대로)
 function salesChannelAgg(sd){
-  const map=DATA.clientChannelMap||{}, cl=sd.client||{};
-  if(!Object.keys(map).length) return cl;
-  const out={};
-  Object.entries(cl).forEach(([name,o])=>{
-    const ch=map[name]||'미분류';
-    if(!out[ch]) out[ch]={amt:0,qty:0,byMonth:{}};
-    out[ch].amt+=o.amt||0; out[ch].qty+=o.qty||0;
-    Object.entries(o.byMonth||{}).forEach(([ym,a])=>{ out[ch].byMonth[ym]=(out[ch].byMonth[ym]||0)+a; });
-  });
-  return out;
+  // [채널=거래처 구분] ERP '거래처 구분' 열을 채널로 직접 집계 (거래처→채널 수동 매핑 불필요)
+  return sd.channel||{};
 }
 // 카테고리 → 대분류 집계 (catGroupMap 사용 · 미분류는 '미분류' 버킷)
 function salesGroupAgg(sd){
@@ -8938,9 +8936,9 @@ function salesDimHtml(sd, view){
     return `<tr><td>${x.nm}</td>${cells}<td><b>${salesEok(x.amt)}</b></td><td>${pct}%</td></tr>`;
   }).join('');
   const totRow=`<tr class="tot"><td>합계</td>${cyMonths.map(mo=>`<td>${salesWon(Math.round(((ymObj[cy]&&ymObj[cy][mo])||0)/1e4))}만</td>`).join('')}<td>${salesEok(cyTotal)}</td><td>100%</td></tr>`;
-  // [v81] 채널·대분류 분류 관리 바
+  // [v81] 대분류 분류 관리 바 (채널은 ERP '거래처 구분' 열로 자동 집계 — 수동 분류 불필요)
   let classifyBar='';
-  if(view==='channel'||view==='group'){
+  if(view==='group'){
     const isCh=view==='channel';
     const srcMap=isCh?(sd.client||{}):(sd.category||{}), mp=isCh?(DATA.clientChannelMap||{}):(DATA.catGroupMap||{});
     const unmapped=Object.keys(srcMap).filter(k=>k&&k!=='-'&&!mp[k]).length;
