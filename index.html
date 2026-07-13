@@ -2441,6 +2441,7 @@ body{padding-bottom:48px}
     <div class="previewNote">반영 시 <b>현재고(inventory)와 데일리 이력</b>이 갱신됩니다. 정상 마감 재고만 순재고 감소 추이 계산에 반영되며, 창고별 수량은 원가·매입 탭에 함께 반영됩니다. 월판매·채널 추이·원가·MOQ·리드타임·판가는 변경되지 않습니다.</div></div>
     <div class="efactions">
       <button class="tbtn accent" id="btnDailyApply" title="">확인 후 현재고 반영</button>
+      <button class="tbtn" id="btnDailyAddSelected">선택 품목 신규 재고 추가</button>
       <button class="tbtn" id="btnDailyCopyMiss">미매칭 품목 복사</button>
       <button class="tbtn" id="btnDailyCancel">취소</button>
     </div>
@@ -6877,7 +6878,7 @@ function buildDailyPreview(file,arr){
     const statusUnknown = (status==='__UNKNOWN__');
     if(statusUnknown) status=null;   // [v34] 자동 정상마감 변경 금지
     const target=findStockByName(fileNm);
-    if(!target){ missed.push({fileNm,stock:(stockVal!=null?Math.round(stockVal):'-')}); continue; }
+    if(!target){ missed.push({fileNm,stock:(stockVal!=null?Math.round(stockVal):'-'),stockVal:(stockVal!=null?Math.round(stockVal):null),wh:(hasWh?warehouses:{}),whStatus:whStatusForUpdate,status:(status||'정상 마감 재고')}); continue; }
     const idx=(DATA.stock||[]).indexOf(target);
     const oldStock=invTotal(target);
     const newStock=(stockVal!=null?Math.round(stockVal):null);
@@ -6932,7 +6933,7 @@ function renderDailyPreview(preview){
     const sel=`<select data-pvstatus="${ri}" style="font-size:10px;padding:1px 4px;${x.statusUnknown?'border-color:#c0392b;background:#fdeceb':''}">${selOpts}</select>`;
     return `<tr><td class="l">${x.nm}${whTxt}<div style="margin-top:3px">${sel}</div></td><td class="l" style="color:#888">${x.fileNm}</td><td>${won(x.oldStock)}</td><td>${won(x.newStock)}${u!=='EA'?u:''}</td><td class="${dcls}">${deltaTxt}</td><td>${fmtMDfull(x.beforeRunout)} → <b>${fmtMDfull(x.afterRunout)}</b></td><td>${won(x.beforeOrderQty)} → <b>${won(x.afterOrderQty)}</b></td><td>${won(Math.round(x.afterDaily))}${u}/일<br><span style="font-size:9px;color:#888">${x.afterSource}</span></td><td>${warn}</td></tr>`;
   }).join('');
-  const missedRows=preview.missed.length?`<div class="previewNote"><b>미매칭 품목 ${preview.missed.length}건</b> (자동 반영 안 함)<br>${preview.missed.slice(0,12).map(x=>`${x.fileNm} (${won(x.stock)})`).join(', ')}${preview.missed.length>12?' 외':''}</div>`:'';
+  const missedRows=preview.missed.length?`<div class="previewNote"><b>미매칭 품목 ${preview.missed.length}건</b> — 재고로 등록할 품목을 체크하세요 <span style="color:#888">(현재고=파일값, 리드타임·MOQ·원가·단위는 기본값 → 등록 후 [수정하기]에서 보완)</span><div style="margin-top:6px;max-height:170px;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:3px 14px">${preview.missed.map((x,mi)=>`<label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:${x.stockVal!=null?'pointer':'not-allowed'};${x.stockVal!=null?'':'opacity:.5'}"><input type="checkbox" data-miss="${mi}"${x.stockVal!=null?'':' disabled'}><span>${x.fileNm} <b style="color:#555">(${won(x.stock)})</b></span></label>`).join('')}</div></div>`:'';
   const mismatchBanner=preview.mismatchCnt?`<div class="previewNote" style="background:#fdeceb;border-color:#eccfcd;color:#c0392b"><b>⚠ 총재고 ≠ 창고별 합계 불일치 ${preview.mismatchCnt}건</b> — 창고별 합계를 총재고로 반영합니다. 파일의 합계값과 다를 수 있으니 확인 후 반영하세요.</div>`:'';
   const unknownBanner=preview.unknownCnt?`<div class="previewNote" style="background:#fdf2e3;border-color:#f0d9a8;color:#a06a00"><b>⚠ 상태값 확인 필요 ${preview.unknownCnt}건</b> — 인식되지 않는 상태값입니다. 자동으로 정상 마감 처리하지 않습니다. 각 행의 상태를 직접 선택 후 반영하세요.</div>`:'';
   const blankWhBanner=preview.partialCnt?`<div class="previewNote" style="background:#fdf2e3;border-color:#f0d9a8;color:#a06a00"><b>⚠ 창고별 재고 일부 미입력 ${preview.partialCnt}건</b> — 일부 창고 셀이 공란입니다. <b>총재고 기준으로 반영</b>되며, 창고별 상세는 참고 재고(부분 합계)로 표시됩니다. 공란 창고는 0으로 저장하지 않습니다.</div>`:'';
@@ -6963,6 +6964,7 @@ function renderDailyPreview(preview){
   }
   refreshDailyApplyState();
   document.getElementById('btnDailyCopyMiss').style.display=preview.missed.length?'':'none';
+  document.getElementById('btnDailyAddSelected').style.display=preview.missed.length?'':'none';
   // 상태 드롭다운 변경 → 해당 update의 status 갱신 + 미확인 해제 + 버튼 재평가
   document.querySelectorAll('[data-pvstatus]').forEach(sel=>{
     sel.onchange=()=>{
@@ -7052,6 +7054,38 @@ document.getElementById('btnDailyCancel').onclick=()=>{
   pendingDailyStock=null;
   document.getElementById('dailyPreviewModal').classList.remove('open');
   toast('오늘 재고 업데이트 취소됨');
+};
+document.getElementById('btnDailyAddSelected').onclick=async()=>{
+  if(!pendingDailyStock||!pendingDailyStock.missed.length){toast('미매칭 품목이 없습니다');return;}
+  const checked=[...document.querySelectorAll('#dailyPreviewBody input[data-miss]:checked')].map(el=>+el.dataset.miss);
+  if(!checked.length){toast('재고로 등록할 품목을 체크하세요');return;}
+  const picks=checked.map(i=>pendingDailyStock.missed[i]).filter(m=>m&&m.stockVal!=null);
+  if(!picks.length){toast('선택 품목에 반영할 재고값이 없습니다');return;}
+  if(!await askConfirm(`선택한 ${picks.length}건을 신규 재고 품목으로 추가합니다.\n· 현재고·창고수량 = 파일값\n· 리드타임(30일)·MOQ(1000)·원가·단위(EA)는 기본값 → 추가 후 [수정하기]에서 보완\n계속할까요?`,{okText:'추가',title:'선택 품목 신규 재고 추가'})) return;
+  let added=0;
+  picks.forEach(m=>{
+    const nm=String(m.fileNm||'').replace(/\s*x\s*1개.*$/,'').trim();
+    if(!nm || (DATA.stock||[]).some(s=>s.nm===nm)) return;   // 빈이름·중복 제외
+    const wh=(m.wh&&Object.keys(m.wh).length)?m.wh:{};
+    const ns={ nm, cat:'기타', ch:'전채널', msale:0, msaleLegacy:0,
+      lead:30, cost:0, price:0, moq:1000, oem:'-', round:'',
+      stockUnit:'EA', orderUnit:'EA', unitConversion:1, orderMultiple:1, moqOrderUnit:1000,
+      targetMonths:1, skipItemMoq:true, rop:0, rec:0,
+      inventory:{ total:m.stockVal, warehouses:wh, updatedAt:fmtDate(NOW), source:pendingDailyStock.file, updateType:'daily', verified:true, warehouseStatus:(m.whStatus||'unknown') } };
+    if(typeof syncInventory==='function') syncInventory(ns);
+    DATA.stock.push(ns);
+    // 데일리 이력 1건 기록(순재고 감소 추이 시작점)
+    if(!DATA.dailyStockHistory) DATA.dailyStockHistory={};
+    if(!Array.isArray(DATA.dailyStockHistory[nm])) DATA.dailyStockHistory[nm]=[];
+    DATA.dailyStockHistory[nm].push({date:fmt(NOW),stock:m.stockVal,source:'데일리',file:pendingDailyStock.file,status:(m.status||'정상 마감 재고')});
+    added++;
+  });
+  const pickSet=new Set(picks.map(p=>p.fileNm));
+  pendingDailyStock.missed=pendingDailyStock.missed.filter(m=>!pickSet.has(m.fileNm));  // 추가분은 미매칭에서 제거
+  markDirty();
+  if(typeof renderStock==='function') renderStock();
+  renderDailyPreview(pendingDailyStock);   // 남은 미매칭으로 미리보기 갱신
+  toast(`신규 재고 ${added}건 추가됨 · 리드타임·MOQ·원가·단위를 [수정하기]에서 입력하세요`);
 };
 document.getElementById('btnDailyCopyMiss').onclick=()=>{
   if(!pendingDailyStock||!pendingDailyStock.missed.length){toast('복사할 미매칭 품목이 없습니다');return;}
