@@ -9337,7 +9337,7 @@ function salesBreakdownHtml(sd, view){
 })();
 
 // ===== [v62] 리뷰 분석 대시보드 =====
-let reviewFilter = {senti:'', cat:''};   // 리뷰 목록 필터
+let reviewFilter = {senti:'', cat:'', month:''};   // 리뷰 목록 필터 (감정/품목/월)
 let reviewItemSel = '';                   // [v76] 품목 세부 분석에서 선택된 품목
 let reviewMonthSel = '';                   // [v77] 월별 추이 분석에서 선택된 월
 let reviewPeriod = {from:'', to:''};     // 고객 리뷰 인사이트 기간 필터
@@ -9364,6 +9364,7 @@ const REVIEW_TOPICS={
   '사용편의':['편해','편하','간편','사용하기','쉽','편리','캡슐','한알','넣고'],
   '가격/가성비':['저렴','가격','가성비','합리'],
   '배송/포장':['배송','포장','빠르','도착','파손','누수'],
+  '패키지/디자인':['패키지','디자인','예쁘','이쁘','예뻐','이뻐','색상','색깔','고급','심플','용기','뚜껑','라벨','케이스'],
   '효과/만족도':['만족','효과','별로','그닥','모르겠','의문','실망','최고'],
   '용량/양':['용량','대용량','오래']
 };
@@ -10024,18 +10025,21 @@ function reviewMonthHtml(rd){
 // 리뷰 목록 (필터: 감정/카테고리)
 function reviewListHtml(rd){
   const cats=Object.keys(rd.category);
-  const catOpts=['<option value="">전체 카테고리</option>'].concat(cats.map(c=>`<option value="${c}"${reviewFilter.cat===c?' selected':''}>${c}</option>`)).join('');
+  const catOpts=['<option value="">전체 품목</option>'].concat(cats.map(c=>`<option value="${c}"${reviewFilter.cat===c?' selected':''}>${c}</option>`)).join('');
+  const monOpts=['<option value="">전체 월</option>'].concat((rd.months||[]).slice().reverse().map(m=>`<option value="${m}"${reviewFilter.month===m?' selected':''}>${m}</option>`)).join('');
   const sentiSeg=['','만족','보통','불만'].map(s=>`<button class="svTab${reviewFilter.senti===s?' on':''}" data-rsenti="${s}">${s==='불만'?'낮은 평점':(s||'전체')}</button>`).join('');
-  let list=rd.list.filter(r=>(!reviewFilter.senti||r.senti===reviewFilter.senti)&&(!reviewFilter.cat||r.cat===reviewFilter.cat));
+  const src=(rd.allList&&rd.allList.length)?rd.allList:(rd.list||[]);   // 월+품목 필터는 전체 리뷰 기준(정확)
+  let list=src.filter(r=>(!reviewFilter.senti||r.senti===reviewFilter.senti)&&(!reviewFilter.cat||r.cat===reviewFilter.cat)&&(!reviewFilter.month||r.ym===reviewFilter.month));
   const rows=list.slice(0,200).map(r=>{
     const stars='★'.repeat(r.rate)+'☆'.repeat(5-r.rate);
     const scls=r.senti==='만족'?'salesTrend-up':r.senti==='불만'?'salesTrend-down':'salesTrend-flat';
     const sentiLabel=r.senti==='불만'?'낮은 평점':r.senti;
     return `<tr><td style="max-width:120px;overflow:hidden;text-overflow:ellipsis">${r.cat}</td><td style="color:#f0a500;white-space:nowrap">${stars}</td><td class="${scls}">${sentiLabel}</td><td style="text-align:left;max-width:340px;white-space:normal">${r.body||'-'}${r.photo?' <span style="color:#3355FF;font-size:9px">📷</span>':''}</td><td>${r.user}</td><td style="font-size:10px">${r.date}</td></tr>`;
   }).join('');
-  return `<div class="salesSec"><h4>리뷰 목록 <span style="font-weight:400;font-size:11px;color:#8a93a8">(낮은 평점·보통 전량 + 만족 최근 600건 보관 · 표시 200건)</span></h4>
+  return `<div class="salesSec"><h4>리뷰 목록 <span style="font-weight:400;font-size:11px;color:#8a93a8">월·품목·감정으로 필터 · 표시 200건</span></h4>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
       <div class="salesViewSeg" id="reviewSentiSeg">${sentiSeg}</div>
+      <select id="reviewListMonthSel" style="padding:5px 8px;border:1px solid #d6dbe7;border-radius:6px;font-size:11px">${monOpts}</select>
       <select id="reviewCatSel" style="padding:5px 8px;border:1px solid #d6dbe7;border-radius:6px;font-size:11px">${catOpts}</select>
       <span style="font-size:11px;color:#8a93a8">${salesWon(list.length)}건 필터됨</span>
     </div>
@@ -10047,6 +10051,8 @@ function bindReviewFilters(){
   });
   const sel=document.getElementById('reviewCatSel');
   if(sel) sel.onchange=()=>{ reviewFilter.cat=sel.value; renderReview(); };
+  const msel=document.getElementById('reviewListMonthSel');
+  if(msel) msel.onchange=()=>{ reviewFilter.month=msel.value; renderReview(); };
   // [v76] 품목 세부 분석 선택 칩
   document.querySelectorAll('[data-rireviewitem]').forEach(b=>{
     b.onclick=()=>{ reviewItemSel=b.dataset.rireviewitem; renderReview(); };
