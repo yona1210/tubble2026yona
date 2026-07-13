@@ -3689,6 +3689,11 @@ function renderToday(){
 // 편집 적용
 window.applyEdit=function(idx){
   const s=DATA.sku[idx];
+  // [fix] st9/d9 길이를 11공정(STEPS)에 맞춰 보정 — 신규 추가·구버전 품목 편집 시 undefined 크래시 방지
+  if(!Array.isArray(s.st9)) s.st9=[];
+  if(!Array.isArray(s.d9)) s.d9=[];
+  while(s.st9.length<STEPS.length) s.st9.push('plan');
+  while(s.d9.length<STEPS.length) s.d9.push(['-','-']);
   let badDate=false;
   document.querySelectorAll(`[data-ei="${idx}"]`).forEach(el=>{
     const k=el.dataset.ek, k2=el.dataset.ek2;
@@ -3756,7 +3761,7 @@ document.getElementById('btnAddConfirm').onclick=()=>{
     owner:'미정', nextAction:'-', risk:'보통', waiting:'기타',
     launch:document.getElementById('m_launch').value||'-', memo:'신규 추가 품목',
     st9:['doing','plan','plan','plan','plan','plan','na','na','plan','plan','plan'],
-    d9:Array(9).fill(['-','-']).map(()=>['-','-'])
+    d9:Array(11).fill(['-','-']).map(()=>['-','-'])
   });
   markDirty();
   document.getElementById('addModal').classList.remove('open');
