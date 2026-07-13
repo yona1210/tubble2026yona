@@ -5066,7 +5066,18 @@ function costDetailHtml(nm){
   const qtys=d.qtys||{};
   const hasQty=ROUNDS.some(r=>(qtys[r]||0)>0);
   const rt=`<table class="cdrt"><thead><tr><th>차수</th>${ROUNDS.map(r=>`<th class="${r===curRound?'cur':''}">${r}</th>`).join('')}</tr></thead>
-    <tbody><tr><td class="nm">생산원가</td>${ROUNDS.map(r=>`<td class="${r===curRound?'cur':''}">${won(d.rounds[r])}</td>`).join('')}</tr></tbody></table>`;
+    <tbody>
+    <tr><td class="nm">생산원가</td>${ROUNDS.map(r=>`<td class="${r===curRound?'cur':''}">${won(d.rounds[r])}</td>`).join('')}</tr>
+    <tr><td class="nm">전 차수 대비</td>${ROUNDS.map((r,i)=>{
+      const curCls=r===curRound?' cur':'';
+      if(i===0) return `<td class="rdiff${curCls}" style="color:#aaa">기준</td>`;
+      const prev=Number(d.rounds[ROUNDS[i-1]])||0, val=Number(d.rounds[r])||0;
+      if(!prev||!val) return `<td class="rdiff${curCls}" style="color:#aaa">-</td>`;
+      const diff=val-prev, pct=diff/prev*100, up=diff>0, flat=diff===0;
+      const col=flat?'#888':(up?'#c0392b':'#1E9E63'), arw=flat?'−':(up?'▲':'▼');
+      return `<td class="rdiff${curCls}" style="color:${col};font-weight:700">${arw} ${up?'+':''}${pct.toFixed(1)}%<div style="font-size:9px;font-weight:600;opacity:.85">${up?'+':''}${won(diff)}</div></td>`;
+    }).join('')}</tr>
+    </tbody></table>`;
   // 매입 명세 (소계 = MOQ × 단가 자동계산)
   const sub=d.purchase.reduce((a,p)=>a+(+p[3]||0)*(+p[4]||0),0);
   // 이번 차수 발주량: qtys 최신값 우선, 없으면 매입 명세 대표 MOQ(완제품이면 그 MOQ, 분해형이면 원료/본품 MOQ)
@@ -5105,7 +5116,7 @@ function costDetailHtml(nm){
   const subVat=Math.round(sub*1.1);
   return `<div class="costdetail">
     <div class="cdhead"><b>${nm} · 원가·매입 상세 보고</b><span class="cdcur">이번 차수(${curRound}) · 발주 <b>${won(orderQty)}EA</b> · 생산원가 <b>${won(cur)}원</b><small>/EA·VAT별도</small></span></div>
-    <div class="cdsec"><div class="cdlbl">차수별 생산원가 추이 <span class="vatnote">※ VAT 별도 / 단위 원</span></div>${rt}<div class="cdchart">${roundMiniChart(d.rounds)}</div></div>
+    <div class="cdsec"><div class="cdlbl">차수별 생산원가 추이 <span class="vatnote">※ 전 차수 대비 <b style="color:#c0392b">▲인상</b>·<b style="color:#1E9E63">▼인하</b> / VAT 별도 / 단위 원</span></div>${rt}<div class="cdchart">${roundMiniChart(d.rounds)}</div></div>
     <div class="cdgrid">
       <div>
         <div class="orderbanner"><span class="obl">이번 차수 발주량</span><span class="obv">${won(orderQty)} <small>EA</small></span><span class="obsub">매입액 ${won(sub)}원 (VAT별도) · VAT포함 ${won(subVat)}원</span></div>
