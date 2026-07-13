@@ -615,7 +615,14 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .ein:focus{outline:none;border-color:var(--blue)}
 .xbtn{border:none;background:#fbe4e2;color:var(--red);width:20px;height:20px;border-radius:4px;cursor:pointer;font-weight:700}
 .costdetail.editmode .cdhead{background:var(--amber)}
-.costchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.costchips{display:flex;flex-direction:column;gap:5px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.costchipGrp{display:flex;align-items:flex-start;gap:10px}
+.costchipCat{font-size:10px;font-weight:700;color:#9aa1b2;min-width:96px;flex-shrink:0;text-align:right;padding-top:8px;letter-spacing:.2px}
+.costchipRow{display:flex;flex-wrap:wrap;gap:6px;flex:1}
+.costchip.rateOk:not(.on){box-shadow:inset 3px 0 0 #4caf7d}
+.costchip.rateMid:not(.on){box-shadow:inset 3px 0 0 #e0a83c}
+.costchip.rateHi:not(.on){box-shadow:inset 3px 0 0 #d9534f}
+.costchip.rateHi:not(.on) small{color:#c0392b}
 /* ===== 시장·전략 탭 (v18) ===== */
 .marketSeg{display:flex;flex-wrap:wrap;gap:6px}
 .mktTab{font-size:12.5px;font-weight:600;padding:7px 14px;border:1px solid var(--line);border-radius:16px;background:#fff;color:var(--ink);cursor:pointer}
@@ -5586,9 +5593,18 @@ function renderCost(){
   ].forEach(x=>k.insertAdjacentHTML('beforeend',`<div class="kpi ${x.alert?'alert':''} ${x.ci?'kpiCi':''}"${x.ci?` data-ci="${x.ci}" role="button" tabindex="0" title="클릭하여 분석 패널 열기"`:''}><div class="v">${x.v}</div><div class="l">${x.l}</div></div>`));
   // 본문: 품목 선택(칩) → 선택 품목만 표시
   if(shown.length && (!costSel || !DATA.costDetail[costSel] || !shown.includes(costSel))) costSel=shown[0];
-  const chips=shown.map(k=>{
-    const d=DATA.costDetail[k]; const cur=d.rounds[Object.keys(d.rounds).slice(-1)[0]]||0;
-    return `<button class="costchip ${k===costSel?'on':''} ${d._pendingDel?'penddel':''}" onclick="selectCost('${k.replace(/'/g,"\\'")}')">${d._pendingDel?'🗑 ':''}${k}<small>@${won(cur)}</small></button>`;
+  // 품목 칩: 카테고리별로 묶어 표시(스캔 쉽게) + 원가율(%)·색상
+  const chipCat=(nm)=>{ const st=DATA.stock.find(s=>s.nm===nm); return (st&&st.cat)?st.cat:'기타'; };
+  const chipGrp={}, chipOrder=[];
+  shown.forEach(k=>{ const c=chipCat(k); if(!chipGrp[c]){chipGrp[c]=[];chipOrder.push(c);} chipGrp[c].push(k); });
+  const chips=chipOrder.map(cat=>{
+    const items=chipGrp[cat].map(k=>{
+      const d=DATA.costDetail[k]; const cur=d.rounds[Object.keys(d.rounds).slice(-1)[0]]||0;
+      const st=DATA.stock.find(s=>s.nm===k); const rate=(st&&st.price>0)?cur/st.price:null;
+      const rcls=rate==null?'':(rate>0.5?'rateHi':rate>0.4?'rateMid':'rateOk');
+      return `<button class="costchip ${rcls} ${k===costSel?'on':''} ${d._pendingDel?'penddel':''}" onclick="selectCost('${k.replace(/'/g,"\\'")}')">${d._pendingDel?'🗑 ':''}${k}<small>@${won(cur)}${rate!=null?' · '+Math.round(rate*100)+'%':''}</small></button>`;
+    }).join('');
+    return `<div class="costchipGrp"><span class="costchipCat">${cat}</span><span class="costchipRow">${items}</span></div>`;
   }).join('');
   // v72: 원가율 분포 패널이 열려 있으면 막대가 곧 선택기 → 중복되는 칩 행 숨김
   const chipbar=(shown.length && !(ciOpen&&ciTab==='dist'))?`<div class="costchips">${chips}</div>`:'';
