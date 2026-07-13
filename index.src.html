@@ -623,6 +623,11 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .costchip.rateMid:not(.on){box-shadow:inset 3px 0 0 #e0a83c}
 .costchip.rateHi:not(.on){box-shadow:inset 3px 0 0 #d9534f}
 .costchip.rateHi:not(.on) small{color:#c0392b}
+.costSelWrap{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.costSelLbl{font-size:11px;font-weight:700;color:#8a93a8}
+.costSelDD{font-size:13px;font-weight:600;color:var(--ink);padding:8px 12px;border:1px solid #d6dbe7;border-radius:8px;background:#fff;min-width:340px;max-width:100%;cursor:pointer}
+.costSelDD:focus{outline:none;border-color:var(--blue)}
+.costSelCnt{font-size:11px;color:#9aa1b2}
 /* ===== 시장·전략 탭 (v18) ===== */
 .marketSeg{display:flex;flex-wrap:wrap;gap:6px}
 .mktTab{font-size:12.5px;font-weight:600;padding:7px 14px;border:1px solid var(--line);border-radius:16px;background:#fff;color:var(--ink);cursor:pointer}
@@ -5608,17 +5613,17 @@ function renderCost(){
   const chipCat=(nm)=>{ const st=DATA.stock.find(s=>s.nm===nm); return (st&&st.cat)?st.cat:'기타'; };
   const chipGrp={}, chipOrder=[];
   shown.forEach(k=>{ const c=chipCat(k); if(!chipGrp[c]){chipGrp[c]=[];chipOrder.push(c);} chipGrp[c].push(k); });
-  const chips=chipOrder.map(cat=>{
-    const items=chipGrp[cat].map(k=>{
+  // 품목 선택: 카테고리별 optgroup 드롭다운(컴팩트) — 각 옵션에 @원가·원가율%
+  const ddOpts=chipOrder.map(cat=>{
+    const opts=chipGrp[cat].map(k=>{
       const d=DATA.costDetail[k]; const cur=d.rounds[Object.keys(d.rounds).slice(-1)[0]]||0;
-      const st=DATA.stock.find(s=>s.nm===k); const rate=(st&&st.price>0)?cur/st.price:null;
-      const rcls=rate==null?'':(rate>0.5?'rateHi':rate>0.4?'rateMid':'rateOk');
-      return `<button class="costchip ${rcls} ${k===costSel?'on':''} ${d._pendingDel?'penddel':''}" onclick="selectCost('${k.replace(/'/g,"\\'")}')">${d._pendingDel?'🗑 ':''}${k}<small>@${won(cur)}${rate!=null?' · '+Math.round(rate*100)+'%':''}</small></button>`;
+      const st=DATA.stock.find(s=>s.nm===k); const rate=(st&&st.price>0)?Math.round(cur/st.price*100):null;
+      return `<option value="${k.replace(/"/g,'&quot;')}"${k===costSel?' selected':''}>${d._pendingDel?'🗑 ':''}${k} · @${won(cur)}원${rate!=null?' · 원가율 '+rate+'%':''}</option>`;
     }).join('');
-    return `<div class="costchipGrp"><span class="costchipCat">${cat}</span><span class="costchipRow">${items}</span></div>`;
+    return `<optgroup label="${cat}">${opts}</optgroup>`;
   }).join('');
-  // v72: 원가율 분포 패널이 열려 있으면 막대가 곧 선택기 → 중복되는 칩 행 숨김
-  const chipbar=(shown.length && !(ciOpen&&ciTab==='dist'))?`<div class="costchips">${chips}</div>`:'';
+  // v72: 원가율 분포 패널이 열려 있으면 막대가 곧 선택기 → 중복되는 선택기 숨김
+  const chipbar=(shown.length && !(ciOpen&&ciTab==='dist'))?`<div class="costSelWrap"><span class="costSelLbl">품목 선택</span><select class="costSelDD" onchange="selectCost(this.value)">${ddOpts}</select><span class="costSelCnt">${shown.length}개 품목</span></div>`:'';
   const ciPanel=ciPanelHtml();
   // 묶음 발주 선택 영역
   const groups=DATA.costGroups||[];
