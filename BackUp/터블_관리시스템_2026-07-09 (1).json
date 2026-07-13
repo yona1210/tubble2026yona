@@ -1007,13 +1007,55 @@
     "warn": 14,
     "salesWindow": 3
   },
-  "stock": [{"nm":"터블 선물세트 단상자","cat":"기타","ch":"전채널","msale":2776,"stock":2029,"lead":30,"cost":1280,"moq":4000,"oem":"대영알와이","round":"","rop":0,"rec":0,"price":0,"stockUnit":"EA","orderUnit":"EA","unitConversion":1,"orderMultiple":1,"moqOrderUnit":4000,"inventory":{"total":2029,"warehouses":{},"updatedAt":"2026-07-09","source":"신규 등록(수동)","updateType":"manual","verified":true,"warehouseStatus":"unknown"},"msaleLegacy":2776,"stockUpdatedAt":"2026-07-09","stockBasis":"수동 등록 · 대영알와이"},
+  "stock": [
+    {
+      "nm": "터블 선물세트 단상자",
+      "cat": "기타",
+      "ch": "전채널",
+      "msale": 2776,
+      "stock": 2029,
+      "lead": 30,
+      "cost": 1280,
+      "moq": 4000,
+      "oem": "대영알와이",
+      "round": "",
+      "rop": 0,
+      "rec": 0,
+      "price": 0,
+      "stockUnit": "EA",
+      "orderUnit": "EA",
+      "unitConversion": 1,
+      "orderMultiple": 1,
+      "moqOrderUnit": 4000,
+      "inventory": {
+        "total": 2029,
+        "warehouses": {
+          "다산 중곡창고": 1993,
+          "갤러리아백화점": 0,
+          "롯데백화점(위탁)": 0,
+          "와이엔에스커머스": 0,
+          "컬리 풀필먼트": 0,
+          "품고": 0,
+          "현진이에프씨": 0,
+          "SK네트웍스(티티컴)": 36
+        },
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
+        "updateType": "daily",
+        "verified": true,
+        "warehouseStatus": "fresh",
+        "warehouseUpdatedAt": "2026-07-09"
+      },
+      "msaleLegacy": 2776,
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산"
+    },
     {
       "nm": "캡슐세제 코튼가든",
       "cat": "캡슐세제",
       "ch": "전채널",
       "msale": 5496,
-      "stock": 28881,
+      "stock": 28628,
       "lead": 30,
       "cost": 1909,
       "moq": 1000,
@@ -1028,34 +1070,34 @@
       "orderMultiple": 1,
       "moqOrderUnit": 1000,
       "inventory": {
-        "total": 28881,
+        "total": 28628,
         "warehouses": {
-          "다산 중곡창고": 14719,
+          "다산 중곡창고": 14472,
           "갤러리아백화점": 0,
           "롯데백화점(위탁)": 0,
           "와이엔에스커머스": 0,
           "컬리 풀필먼트": 1,
-          "품고": 625,
+          "품고": 619,
           "현진이에프씨": 13512,
           "SK네트웍스(티티컴)": 24
         },
-        "updatedAt": "2026-07-08",
-        "source": "재고현황_260707.xlsx",
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
         "updateType": "daily",
         "verified": true,
-        "warehouseUpdatedAt": "2026-07-08",
+        "warehouseUpdatedAt": "2026-07-09",
         "warehouseStatus": "fresh"
       },
       "msaleLegacy": 4460,
-      "stockUpdatedAt": "2026-07-08",
-      "stockBasis": "재고현황_260707.xlsx · 창고별 합산"
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산"
     },
     {
       "nm": "캡슐세제 모닝머스크",
       "cat": "캡슐세제",
       "ch": "전채널",
       "msale": 5321,
-      "stock": 30492,
+      "stock": 30198,
       "lead": 30,
       "cost": 1909,
       "moq": 1000,
@@ -1070,34 +1112,34 @@
       "orderMultiple": 1,
       "moqOrderUnit": 1000,
       "inventory": {
-        "total": 30492,
+        "total": 30198,
         "warehouses": {
-          "다산 중곡창고": 20844,
-          "갤러리아백화점": 33,
+          "다산 중곡창고": 20528,
+          "갤러리아백화점": 56,
           "롯데백화점(위탁)": 0,
           "와이엔에스커머스": 0,
           "컬리 풀필먼트": 2,
-          "품고": 692,
+          "품고": 691,
           "현진이에프씨": 8837,
           "SK네트웍스(티티컴)": 84
         },
-        "updatedAt": "2026-07-08",
-        "source": "재고현황_260707.xlsx",
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
         "updateType": "daily",
         "verified": true,
-        "warehouseUpdatedAt": "2026-07-08",
+        "warehouseUpdatedAt": "2026-07-09",
         "warehouseStatus": "fresh"
       },
       "msaleLegacy": 4358,
-      "stockUpdatedAt": "2026-07-08",
-      "stockBasis": "재고현황_260707.xlsx · 창고별 합산"
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산"
     },
     {
       "nm": "다목적 용기세척제 스타터10정",
       "cat": "다목적용기세척제",
       "ch": "전채널",
       "msale": 4181,
-      "stock": 3149,
+      "stock": 2153,
       "lead": 14,
       "cost": 1031,
       "moq": 500000,
@@ -1112,9 +1154,9 @@
       "orderMultiple": 1,
       "moqOrderUnit": 1000,
       "inventory": {
-        "total": 3149,
+        "total": 2153,
         "warehouses": {
-          "다산 중곡창고": 1570,
+          "다산 중곡창고": 574,
           "갤러리아백화점": 0,
           "롯데백화점(위탁)": 0,
           "와이엔에스커머스": 0,
@@ -1123,18 +1165,18 @@
           "현진이에프씨": 0,
           "SK네트웍스(티티컴)": 150
         },
-        "updatedAt": "2026-07-08",
-        "source": "재고현황_260707.xlsx",
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
         "updateType": "daily",
         "verified": true,
         "legacyStock": 5865,
         "whTotal": 4812,
-        "warehouseUpdatedAt": "2026-07-08",
+        "warehouseUpdatedAt": "2026-07-09",
         "warehouseStatus": "fresh"
       },
       "msaleLegacy": 4017,
-      "stockUpdatedAt": "2026-07-08",
-      "stockBasis": "재고현황_260707.xlsx · 창고별 합산",
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산",
       "targetMonths": 1,
       "skipItemMoq": true
     },
@@ -1143,7 +1185,7 @@
       "cat": "청소물티슈",
       "ch": "전채널",
       "msale": 7817,
-      "stock": 3030,
+      "stock": 2714,
       "lead": 30,
       "cost": 1400,
       "moq": 20000,
@@ -1158,36 +1200,36 @@
       "orderMultiple": 1,
       "moqOrderUnit": 20000,
       "inventory": {
-        "total": 3030,
+        "total": 2714,
         "warehouses": {
-          "다산 중곡창고": 1426,
+          "다산 중곡창고": 1122,
           "갤러리아백화점": 0,
           "롯데백화점(위탁)": 0,
           "와이엔에스커머스": 0,
           "컬리 풀필먼트": 3,
-          "품고": 1541,
+          "품고": 1529,
           "현진이에프씨": 0,
           "SK네트웍스(티티컴)": 60
         },
-        "updatedAt": "2026-07-08",
-        "source": "재고현황_260707.xlsx",
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
         "updateType": "daily",
         "verified": true,
         "legacyStock": 547,
         "whTotal": 2579,
-        "warehouseUpdatedAt": "2026-07-08",
+        "warehouseUpdatedAt": "2026-07-09",
         "warehouseStatus": "fresh"
       },
       "msaleLegacy": 6014,
-      "stockUpdatedAt": "2026-07-08",
-      "stockBasis": "재고현황_260707.xlsx · 창고별 합산"
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산"
     },
     {
       "nm": "다목적 용기세척제 본품30정",
       "cat": "다목적용기세척제",
       "ch": "전채널",
       "msale": 2960,
-      "stock": 919,
+      "stock": 688,
       "lead": 14,
       "cost": 3200,
       "moq": 500000,
@@ -1202,29 +1244,29 @@
       "orderMultiple": 1,
       "moqOrderUnit": 1000,
       "inventory": {
-        "total": 919,
+        "total": 688,
         "warehouses": {
-          "다산 중곡창고": 360,
+          "다산 중곡창고": 137,
           "갤러리아백화점": 0,
           "롯데백화점(위탁)": 0,
           "와이엔에스커머스": 0,
           "컬리 풀필먼트": 1,
-          "품고": 438,
+          "품고": 430,
           "현진이에프씨": 0,
           "SK네트웍스(티티컴)": 120
         },
-        "updatedAt": "2026-07-08",
-        "source": "재고현황_260707.xlsx",
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
         "updateType": "daily",
         "verified": true,
         "legacyStock": 4269,
         "whTotal": 3718,
-        "warehouseUpdatedAt": "2026-07-08",
+        "warehouseUpdatedAt": "2026-07-09",
         "warehouseStatus": "fresh"
       },
       "msaleLegacy": 2637,
-      "stockUpdatedAt": "2026-07-08",
-      "stockBasis": "재고현황_260707.xlsx · 창고별 합산",
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산",
       "targetMonths": 1,
       "skipItemMoq": true
     },
@@ -1233,7 +1275,7 @@
       "cat": "다목적용기세척제",
       "ch": "전채널",
       "msale": 3522,
-      "stock": 2202,
+      "stock": 1473,
       "lead": 14,
       "cost": 7427,
       "moq": 500000,
@@ -1248,29 +1290,29 @@
       "orderMultiple": 1,
       "moqOrderUnit": 1000,
       "inventory": {
-        "total": 2202,
+        "total": 1473,
         "warehouses": {
-          "다산 중곡창고": 1910,
+          "다산 중곡창고": 1222,
           "갤러리아백화점": 0,
           "롯데백화점(위탁)": 0,
           "와이엔에스커머스": 0,
           "컬리 풀필먼트": 1,
-          "품고": 291,
+          "품고": 250,
           "현진이에프씨": 0,
           "SK네트웍스(티티컴)": 0
         },
-        "updatedAt": "2026-07-08",
-        "source": "재고현황_260707.xlsx",
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
         "updateType": "daily",
         "verified": true,
         "legacyStock": 1997,
         "whTotal": 2416,
-        "warehouseUpdatedAt": "2026-07-08",
+        "warehouseUpdatedAt": "2026-07-09",
         "warehouseStatus": "fresh"
       },
       "msaleLegacy": 3682,
-      "stockUpdatedAt": "2026-07-08",
-      "stockBasis": "재고현황_260707.xlsx · 창고별 합산",
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산",
       "targetMonths": 1,
       "skipItemMoq": true
     },
@@ -1279,7 +1321,7 @@
       "cat": "욕실세정제",
       "ch": "전채널",
       "msale": 1273,
-      "stock": 8830,
+      "stock": 8811,
       "lead": 30,
       "cost": 1450,
       "moq": 10752,
@@ -1294,36 +1336,36 @@
       "orderMultiple": 1,
       "moqOrderUnit": 10752,
       "inventory": {
-        "total": 8830,
+        "total": 8811,
         "warehouses": {
-          "다산 중곡창고": 8585,
+          "다산 중곡창고": 8571,
           "갤러리아백화점": 0,
           "롯데백화점(위탁)": 0,
           "와이엔에스커머스": 0,
           "컬리 풀필먼트": 0,
-          "품고": 227,
+          "품고": 222,
           "현진이에프씨": 0,
           "SK네트웍스(티티컴)": 18
         },
-        "updatedAt": "2026-07-08",
-        "source": "재고현황_260707.xlsx",
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
         "updateType": "daily",
         "verified": true,
         "legacyStock": 10390,
         "whTotal": 1401,
-        "warehouseUpdatedAt": "2026-07-08",
+        "warehouseUpdatedAt": "2026-07-09",
         "warehouseStatus": "fresh"
       },
       "msaleLegacy": 1358,
-      "stockUpdatedAt": "2026-07-08",
-      "stockBasis": "재고현황_260707.xlsx · 창고별 합산"
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산"
     },
     {
       "nm": "주방세제 500ml",
       "cat": "주방세제",
       "ch": "전채널",
       "msale": 693,
-      "stock": 6107,
+      "stock": 6038,
       "lead": 30,
       "cost": 2450,
       "moq": 1000,
@@ -1338,36 +1380,36 @@
       "orderMultiple": 1,
       "moqOrderUnit": 1000,
       "inventory": {
-        "total": 6107,
+        "total": 6038,
         "warehouses": {
-          "다산 중곡창고": 5241,
+          "다산 중곡창고": 5174,
           "갤러리아백화점": 0,
           "롯데백화점(위탁)": 0,
           "와이엔에스커머스": 0,
           "컬리 풀필먼트": 0,
-          "품고": 794,
+          "품고": 792,
           "현진이에프씨": 0,
           "SK네트웍스(티티컴)": 72
         },
-        "updatedAt": "2026-07-08",
-        "source": "재고현황_260707.xlsx",
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
         "updateType": "daily",
         "verified": true,
         "legacyStock": 1740,
         "whTotal": 1814,
-        "warehouseUpdatedAt": "2026-07-08",
+        "warehouseUpdatedAt": "2026-07-09",
         "warehouseStatus": "fresh"
       },
       "msaleLegacy": 786,
-      "stockUpdatedAt": "2026-07-08",
-      "stockBasis": "재고현황_260707.xlsx · 창고별 합산"
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산"
     },
     {
       "nm": "캡슐세제 아쿠아블루",
       "cat": "캡슐세제",
       "ch": "전채널",
       "msale": 1210,
-      "stock": 4273,
+      "stock": 4125,
       "lead": 30,
       "cost": 2768,
       "moq": 1000,
@@ -1382,36 +1424,36 @@
       "orderMultiple": 1,
       "moqOrderUnit": 1000,
       "inventory": {
-        "total": 4273,
+        "total": 4125,
         "warehouses": {
-          "다산 중곡창고": 3851,
+          "다산 중곡창고": 3705,
           "갤러리아백화점": 0,
           "롯데백화점(위탁)": 51,
           "와이엔에스커머스": 0,
           "컬리 풀필먼트": 3,
-          "품고": 299,
+          "품고": 297,
           "현진이에프씨": 0,
           "SK네트웍스(티티컴)": 69
         },
-        "updatedAt": "2026-07-08",
-        "source": "재고현황_260707.xlsx",
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
         "updateType": "daily",
         "verified": true,
         "legacyStock": 6381,
         "whTotal": 1045,
-        "warehouseUpdatedAt": "2026-07-08",
+        "warehouseUpdatedAt": "2026-07-09",
         "warehouseStatus": "fresh"
       },
       "msaleLegacy": 754,
-      "stockUpdatedAt": "2026-07-08",
-      "stockBasis": "재고현황_260707.xlsx · 창고별 합산"
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산"
     },
     {
       "nm": "주방세제 1L 리필",
       "cat": "주방세제",
       "ch": "전채널",
       "msale": 524,
-      "stock": 6567,
+      "stock": 6416,
       "lead": 30,
       "cost": 2435,
       "moq": 1000,
@@ -1426,36 +1468,36 @@
       "orderMultiple": 1,
       "moqOrderUnit": 1000,
       "inventory": {
-        "total": 6567,
+        "total": 6416,
         "warehouses": {
-          "다산 중곡창고": 5682,
+          "다산 중곡창고": 5533,
           "갤러리아백화점": 0,
           "롯데백화점(위탁)": 0,
           "와이엔에스커머스": 0,
           "컬리 풀필먼트": 0,
-          "품고": 873,
+          "품고": 871,
           "현진이에프씨": 0,
           "SK네트웍스(티티컴)": 12
         },
-        "updatedAt": "2026-07-08",
-        "source": "재고현황_260707.xlsx",
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
         "updateType": "daily",
         "verified": true,
         "legacyStock": 1978,
         "whTotal": 983,
-        "warehouseUpdatedAt": "2026-07-08",
+        "warehouseUpdatedAt": "2026-07-09",
         "warehouseStatus": "fresh"
       },
       "msaleLegacy": 623,
-      "stockUpdatedAt": "2026-07-08",
-      "stockBasis": "재고현황_260707.xlsx · 창고별 합산"
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산"
     },
     {
       "nm": "탈취제 어반베르데",
       "cat": "겔탈취제",
       "ch": "전채널",
       "msale": 1236,
-      "stock": 4088,
+      "stock": 3921,
       "lead": 30,
       "cost": 5450,
       "moq": 5000,
@@ -1470,36 +1512,36 @@
       "orderMultiple": 1,
       "moqOrderUnit": 1000,
       "inventory": {
-        "total": 4088,
+        "total": 3921,
         "warehouses": {
-          "다산 중곡창고": 3552,
+          "다산 중곡창고": 3389,
           "갤러리아백화점": 0,
           "롯데백화점(위탁)": 0,
           "와이엔에스커머스": 0,
           "컬리 풀필먼트": 0,
-          "품고": 464,
+          "품고": 460,
           "현진이에프씨": 0,
           "SK네트웍스(티티컴)": 72
         },
-        "updatedAt": "2026-07-08",
-        "source": "재고현황_260707.xlsx",
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
         "updateType": "daily",
         "verified": true,
         "legacyStock": 543,
         "whTotal": 1216,
-        "warehouseUpdatedAt": "2026-07-08",
+        "warehouseUpdatedAt": "2026-07-09",
         "warehouseStatus": "fresh"
       },
       "msaleLegacy": 1165,
-      "stockUpdatedAt": "2026-07-08",
-      "stockBasis": "재고현황_260707.xlsx · 창고별 합산"
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산"
     },
     {
       "nm": "캡슐세제 퍼퓸미모사",
       "cat": "캡슐세제",
       "ch": "전채널",
       "msale": 711,
-      "stock": 1274,
+      "stock": 1194,
       "lead": 30,
       "cost": 4136,
       "moq": 1000,
@@ -1514,9 +1556,9 @@
       "orderMultiple": 1,
       "moqOrderUnit": 1000,
       "inventory": {
-        "total": 1274,
+        "total": 1194,
         "warehouses": {
-          "다산 중곡창고": 916,
+          "다산 중곡창고": 836,
           "갤러리아백화점": 39,
           "롯데백화점(위탁)": 71,
           "와이엔에스커머스": 0,
@@ -1525,25 +1567,25 @@
           "현진이에프씨": 0,
           "SK네트웍스(티티컴)": 0
         },
-        "updatedAt": "2026-07-08",
-        "source": "재고현황_260707.xlsx",
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
         "updateType": "daily",
         "verified": true,
         "legacyStock": 2582,
         "whTotal": 1718,
-        "warehouseUpdatedAt": "2026-07-08",
+        "warehouseUpdatedAt": "2026-07-09",
         "warehouseStatus": "fresh"
       },
       "msaleLegacy": 416,
-      "stockUpdatedAt": "2026-07-08",
-      "stockBasis": "재고현황_260707.xlsx · 창고별 합산"
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산"
     },
     {
       "nm": "캡슐세제 퍼퓸그라스",
       "cat": "캡슐세제",
       "ch": "전채널",
       "msale": 672,
-      "stock": 2049,
+      "stock": 2040,
       "lead": 30,
       "cost": 4136,
       "moq": 1000,
@@ -1558,9 +1600,9 @@
       "orderMultiple": 1,
       "moqOrderUnit": 1000,
       "inventory": {
-        "total": 2049,
+        "total": 2040,
         "warehouses": {
-          "다산 중곡창고": 1669,
+          "다산 중곡창고": 1660,
           "갤러리아백화점": 0,
           "롯데백화점(위탁)": 100,
           "와이엔에스커머스": 0,
@@ -1569,25 +1611,25 @@
           "현진이에프씨": 0,
           "SK네트웍스(티티컴)": 0
         },
-        "updatedAt": "2026-07-08",
-        "source": "재고현황_260707.xlsx",
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
         "updateType": "daily",
         "verified": true,
         "legacyStock": 3227,
         "whTotal": 1295,
-        "warehouseUpdatedAt": "2026-07-08",
+        "warehouseUpdatedAt": "2026-07-09",
         "warehouseStatus": "fresh"
       },
       "msaleLegacy": 403,
-      "stockUpdatedAt": "2026-07-08",
-      "stockBasis": "재고현황_260707.xlsx · 창고별 합산"
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산"
     },
     {
       "nm": "세탁조 클리너",
       "cat": "세탁조클리너",
       "ch": "전채널",
       "msale": 414,
-      "stock": 2729,
+      "stock": 2712,
       "lead": 30,
       "cost": 3443,
       "moq": 2500,
@@ -1602,36 +1644,36 @@
       "orderMultiple": 1,
       "moqOrderUnit": 1000,
       "inventory": {
-        "total": 2729,
+        "total": 2712,
         "warehouses": {
-          "다산 중곡창고": 1888,
+          "다산 중곡창고": 1883,
           "갤러리아백화점": 0,
           "롯데백화점(위탁)": 0,
           "와이엔에스커머스": 0,
           "컬리 풀필먼트": 1,
-          "품고": 720,
+          "품고": 708,
           "현진이에프씨": 0,
           "SK네트웍스(티티컴)": 120
         },
-        "updatedAt": "2026-07-08",
-        "source": "재고현황_260707.xlsx",
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
         "updateType": "daily",
         "verified": true,
         "legacyStock": 3275,
         "whTotal": 1583,
-        "warehouseUpdatedAt": "2026-07-08",
+        "warehouseUpdatedAt": "2026-07-09",
         "warehouseStatus": "fresh"
       },
       "msaleLegacy": 328,
-      "stockUpdatedAt": "2026-07-08",
-      "stockBasis": "재고현황_260707.xlsx · 창고별 합산"
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산"
     },
     {
       "nm": "식기세척기 세제",
       "cat": "식기세척기세제",
       "ch": "전채널",
       "msale": 194,
-      "stock": 1002,
+      "stock": 984,
       "lead": 30,
       "cost": 5191,
       "moq": 1000,
@@ -1646,9 +1688,9 @@
       "orderMultiple": 1,
       "moqOrderUnit": 1000,
       "inventory": {
-        "total": 1002,
+        "total": 984,
         "warehouses": {
-          "다산 중곡창고": 710,
+          "다산 중곡창고": 692,
           "갤러리아백화점": 0,
           "롯데백화점(위탁)": 0,
           "와이엔에스커머스": 0,
@@ -1657,25 +1699,25 @@
           "현진이에프씨": 0,
           "SK네트웍스(티티컴)": 0
         },
-        "updatedAt": "2026-07-08",
-        "source": "재고현황_260707.xlsx",
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
         "updateType": "daily",
         "verified": true,
         "legacyStock": 1149,
         "whTotal": 631,
-        "warehouseUpdatedAt": "2026-07-08",
+        "warehouseUpdatedAt": "2026-07-09",
         "warehouseStatus": "fresh"
       },
       "msaleLegacy": 202,
-      "stockUpdatedAt": "2026-07-08",
-      "stockBasis": "재고현황_260707.xlsx · 창고별 합산"
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산"
     },
     {
       "nm": "이염방지 세탁시트",
       "cat": "세탁시트",
       "ch": "전채널",
       "msale": 12,
-      "stock": 3153,
+      "stock": 3145,
       "lead": 30,
       "cost": 5250,
       "moq": 1000,
@@ -1690,29 +1732,29 @@
       "orderMultiple": 1,
       "moqOrderUnit": 1000,
       "inventory": {
-        "total": 3153,
+        "total": 3145,
         "warehouses": {
-          "다산 중곡창고": 3067,
+          "다산 중곡창고": 3061,
           "갤러리아백화점": 0,
           "롯데백화점(위탁)": 0,
           "와이엔에스커머스": 0,
           "컬리 풀필먼트": 1,
-          "품고": 85,
+          "품고": 83,
           "현진이에프씨": 0,
           "SK네트웍스(티티컴)": 0
         },
-        "updatedAt": "2026-07-08",
-        "source": "재고현황_260707.xlsx",
+        "updatedAt": "2026-07-09",
+        "source": "재고현황_260708.xlsx",
         "updateType": "daily",
         "verified": true,
         "legacyStock": 1,
         "whTotal": 11,
-        "warehouseUpdatedAt": "2026-07-08",
+        "warehouseUpdatedAt": "2026-07-09",
         "warehouseStatus": "fresh"
       },
       "msaleLegacy": 12,
-      "stockUpdatedAt": "2026-07-08",
-      "stockBasis": "재고현황_260707.xlsx · 창고별 합산"
+      "stockUpdatedAt": "2026-07-09",
+      "stockBasis": "재고현황_260708.xlsx · 창고별 합산"
     }
   ],
   "costDetail": {
@@ -1771,15 +1813,15 @@
         ]
       ],
       "stock": {
-        "다산 중곡창고": 360,
+        "다산 중곡창고": 137,
         "갤러리아백화점": 0,
         "롯데백화점(위탁)": 0,
         "와이엔에스커머스": 0,
         "컬리 풀필먼트": 1,
-        "품고": 438,
+        "품고": 430,
         "현진이에프씨": 0,
         "SK네트웍스(티티컴)": 120,
-        "합계": 919
+        "합계": 688
       },
       "qtys": {
         "8차": 0,
@@ -1840,15 +1882,15 @@
         ]
       ],
       "stock": {
-        "다산 중곡창고": 1910,
+        "다산 중곡창고": 1222,
         "갤러리아백화점": 0,
         "롯데백화점(위탁)": 0,
         "와이엔에스커머스": 0,
         "컬리 풀필먼트": 1,
-        "품고": 291,
+        "품고": 250,
         "현진이에프씨": 0,
         "SK네트웍스(티티컴)": 0,
-        "합계": 2202
+        "합계": 1473
       },
       "qtys": {
         "8차": 0,
@@ -1909,7 +1951,7 @@
         ]
       ],
       "stock": {
-        "다산 중곡창고": 1570,
+        "다산 중곡창고": 574,
         "갤러리아백화점": 0,
         "롯데백화점(위탁)": 0,
         "와이엔에스커머스": 0,
@@ -1917,7 +1959,7 @@
         "품고": 1429,
         "현진이에프씨": 0,
         "SK네트웍스(티티컴)": 150,
-        "합계": 3149
+        "합계": 2153
       },
       "qtys": {
         "8차": 0,
@@ -1947,15 +1989,15 @@
         ]
       ],
       "stock": {
-        "다산 중곡창고": 3851,
+        "다산 중곡창고": 3705,
         "갤러리아백화점": 0,
         "롯데백화점(위탁)": 51,
         "와이엔에스커머스": 0,
         "컬리 풀필먼트": 3,
-        "품고": 299,
+        "품고": 297,
         "현진이에프씨": 0,
         "SK네트웍스(티티컴)": 69,
-        "합계": 4273
+        "합계": 4125
       },
       "qtys": {
         "3차": 0,
@@ -1979,7 +2021,7 @@
         ]
       ],
       "stock": {
-        "다산 중곡창고": 916,
+        "다산 중곡창고": 836,
         "갤러리아백화점": 39,
         "롯데백화점(위탁)": 71,
         "와이엔에스커머스": 0,
@@ -1987,7 +2029,7 @@
         "품고": 233,
         "현진이에프씨": 0,
         "SK네트웍스(티티컴)": 0,
-        "합계": 1274
+        "합계": 1194
       },
       "qtys": {
         "2차": 0,
@@ -2012,7 +2054,7 @@
         ]
       ],
       "stock": {
-        "다산 중곡창고": 1669,
+        "다산 중곡창고": 1660,
         "갤러리아백화점": 0,
         "롯데백화점(위탁)": 100,
         "와이엔에스커머스": 0,
@@ -2020,7 +2062,7 @@
         "품고": 264,
         "현진이에프씨": 0,
         "SK네트웍스(티티컴)": 0,
-        "합계": 2049
+        "합계": 2040
       },
       "qtys": {
         "1차": 0,
@@ -2044,15 +2086,15 @@
         ]
       ],
       "stock": {
-        "다산 중곡창고": 14719,
+        "다산 중곡창고": 14472,
         "갤러리아백화점": 0,
         "롯데백화점(위탁)": 0,
         "와이엔에스커머스": 0,
         "컬리 풀필먼트": 1,
-        "품고": 625,
+        "품고": 619,
         "현진이에프씨": 13512,
         "SK네트웍스(티티컴)": 24,
-        "합계": 28881
+        "합계": 28628
       },
       "qtys": {
         "3차": 0,
@@ -2075,15 +2117,15 @@
         ]
       ],
       "stock": {
-        "다산 중곡창고": 20844,
-        "갤러리아백화점": 33,
+        "다산 중곡창고": 20528,
+        "갤러리아백화점": 56,
         "롯데백화점(위탁)": 0,
         "와이엔에스커머스": 0,
         "컬리 풀필먼트": 2,
-        "품고": 692,
+        "품고": 691,
         "현진이에프씨": 8837,
         "SK네트웍스(티티컴)": 84,
-        "합계": 30492
+        "합계": 30198
       },
       "qtys": {
         "3차": 0,
@@ -2108,15 +2150,15 @@
         ]
       ],
       "stock": {
-        "다산 중곡창고": 1426,
+        "다산 중곡창고": 1122,
         "갤러리아백화점": 0,
         "롯데백화점(위탁)": 0,
         "와이엔에스커머스": 0,
         "컬리 풀필먼트": 3,
-        "품고": 1541,
+        "품고": 1529,
         "현진이에프씨": 0,
         "SK네트웍스(티티컴)": 60,
-        "합계": 3030
+        "합계": 2714
       },
       "qtys": {
         "1차": 0,
@@ -2141,15 +2183,15 @@
         ]
       ],
       "stock": {
-        "다산 중곡창고": 8585,
+        "다산 중곡창고": 8571,
         "갤러리아백화점": 0,
         "롯데백화점(위탁)": 0,
         "와이엔에스커머스": 0,
         "컬리 풀필먼트": 0,
-        "품고": 227,
+        "품고": 222,
         "현진이에프씨": 0,
         "SK네트웍스(티티컴)": 18,
-        "합계": 8830
+        "합계": 8811
       },
       "qtys": {
         "1차": 0,
@@ -2173,15 +2215,15 @@
         ]
       ],
       "stock": {
-        "다산 중곡창고": 5241,
+        "다산 중곡창고": 5174,
         "갤러리아백화점": 0,
         "롯데백화점(위탁)": 0,
         "와이엔에스커머스": 0,
         "컬리 풀필먼트": 0,
-        "품고": 794,
+        "품고": 792,
         "현진이에프씨": 0,
         "SK네트웍스(티티컴)": 72,
-        "합계": 6107
+        "합계": 6038
       },
       "qtys": {
         "2차": 0,
@@ -2204,15 +2246,15 @@
         ]
       ],
       "stock": {
-        "다산 중곡창고": 5682,
+        "다산 중곡창고": 5533,
         "갤러리아백화점": 0,
         "롯데백화점(위탁)": 0,
         "와이엔에스커머스": 0,
         "컬리 풀필먼트": 0,
-        "품고": 873,
+        "품고": 871,
         "현진이에프씨": 0,
         "SK네트웍스(티티컴)": 12,
-        "합계": 6567
+        "합계": 6416
       },
       "qtys": {
         "2차": 0
@@ -2234,15 +2276,15 @@
         ]
       ],
       "stock": {
-        "다산 중곡창고": 3552,
+        "다산 중곡창고": 3389,
         "갤러리아백화점": 0,
         "롯데백화점(위탁)": 0,
         "와이엔에스커머스": 0,
         "컬리 풀필먼트": 0,
-        "품고": 464,
+        "품고": 460,
         "현진이에프씨": 0,
         "SK네트웍스(티티컴)": 72,
-        "합계": 4088
+        "합계": 3921
       },
       "qtys": {
         "1차": 0,
@@ -2283,15 +2325,15 @@
         ]
       ],
       "stock": {
-        "다산 중곡창고": 1888,
+        "다산 중곡창고": 1883,
         "갤러리아백화점": 0,
         "롯데백화점(위탁)": 0,
         "와이엔에스커머스": 0,
         "컬리 풀필먼트": 1,
-        "품고": 720,
+        "품고": 708,
         "현진이에프씨": 0,
         "SK네트웍스(티티컴)": 120,
-        "합계": 2729
+        "합계": 2712
       },
       "qtys": {
         "9차": 0,
@@ -2317,7 +2359,7 @@
         ]
       ],
       "stock": {
-        "다산 중곡창고": 710,
+        "다산 중곡창고": 692,
         "갤러리아백화점": 0,
         "롯데백화점(위탁)": 0,
         "와이엔에스커머스": 0,
@@ -2325,7 +2367,7 @@
         "품고": 275,
         "현진이에프씨": 0,
         "SK네트웍스(티티컴)": 0,
-        "합계": 1002
+        "합계": 984
       },
       "qtys": {
         "5차": 0,
@@ -2359,15 +2401,15 @@
         ]
       ],
       "stock": {
-        "다산 중곡창고": 3067,
+        "다산 중곡창고": 3061,
         "갤러리아백화점": 0,
         "롯데백화점(위탁)": 0,
         "와이엔에스커머스": 0,
         "컬리 풀필먼트": 1,
-        "품고": 85,
+        "품고": 83,
         "현진이에프씨": 0,
         "SK네트웍스(티티컴)": 0,
-        "합계": 3153
+        "합계": 3145
       },
       "qtys": {
         "3차": 0,
@@ -2441,6 +2483,13 @@
         "source": "데일리",
         "file": "재고현황_260707.xlsx",
         "status": "정상 마감 재고"
+      },
+      {
+        "date": "2026-07-09",
+        "stock": 984,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
+        "status": "정상 마감 재고"
       }
     ],
     "주방세제 1L 리필": [
@@ -2477,6 +2526,13 @@
         "stock": 6567,
         "source": "데일리",
         "file": "재고현황_260707.xlsx",
+        "status": "정상 마감 재고"
+      },
+      {
+        "date": "2026-07-09",
+        "stock": 6416,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
         "status": "정상 마감 재고"
       }
     ],
@@ -2515,6 +2571,13 @@
         "source": "데일리",
         "file": "재고현황_260707.xlsx",
         "status": "정상 마감 재고"
+      },
+      {
+        "date": "2026-07-09",
+        "stock": 6038,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
+        "status": "정상 마감 재고"
       }
     ],
     "탈취제 어반베르데": [
@@ -2551,6 +2614,13 @@
         "stock": 4088,
         "source": "데일리",
         "file": "재고현황_260707.xlsx",
+        "status": "정상 마감 재고"
+      },
+      {
+        "date": "2026-07-09",
+        "stock": 3921,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
         "status": "정상 마감 재고"
       }
     ],
@@ -2589,6 +2659,13 @@
         "source": "데일리",
         "file": "재고현황_260707.xlsx",
         "status": "정상 마감 재고"
+      },
+      {
+        "date": "2026-07-09",
+        "stock": 1473,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
+        "status": "정상 마감 재고"
       }
     ],
     "다목적 용기세척제 스타터10정": [
@@ -2625,6 +2702,13 @@
         "stock": 3149,
         "source": "데일리",
         "file": "재고현황_260707.xlsx",
+        "status": "정상 마감 재고"
+      },
+      {
+        "date": "2026-07-09",
+        "stock": 2153,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
         "status": "정상 마감 재고"
       }
     ],
@@ -2663,6 +2747,13 @@
         "source": "데일리",
         "file": "재고현황_260707.xlsx",
         "status": "정상 마감 재고"
+      },
+      {
+        "date": "2026-07-09",
+        "stock": 688,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
+        "status": "정상 마감 재고"
       }
     ],
     "세탁조 클리너": [
@@ -2699,6 +2790,13 @@
         "stock": 2729,
         "source": "데일리",
         "file": "재고현황_260707.xlsx",
+        "status": "정상 마감 재고"
+      },
+      {
+        "date": "2026-07-09",
+        "stock": 2712,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
         "status": "정상 마감 재고"
       }
     ],
@@ -2737,6 +2835,13 @@
         "source": "데일리",
         "file": "재고현황_260707.xlsx",
         "status": "정상 마감 재고"
+      },
+      {
+        "date": "2026-07-09",
+        "stock": 3145,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
+        "status": "정상 마감 재고"
       }
     ],
     "캡슐세제 모닝머스크": [
@@ -2773,6 +2878,13 @@
         "stock": 30492,
         "source": "데일리",
         "file": "재고현황_260707.xlsx",
+        "status": "정상 마감 재고"
+      },
+      {
+        "date": "2026-07-09",
+        "stock": 30198,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
         "status": "정상 마감 재고"
       }
     ],
@@ -2811,6 +2923,13 @@
         "source": "데일리",
         "file": "재고현황_260707.xlsx",
         "status": "정상 마감 재고"
+      },
+      {
+        "date": "2026-07-09",
+        "stock": 4125,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
+        "status": "정상 마감 재고"
       }
     ],
     "캡슐세제 코튼가든": [
@@ -2847,6 +2966,13 @@
         "stock": 28881,
         "source": "데일리",
         "file": "재고현황_260707.xlsx",
+        "status": "정상 마감 재고"
+      },
+      {
+        "date": "2026-07-09",
+        "stock": 28628,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
         "status": "정상 마감 재고"
       }
     ],
@@ -2885,6 +3011,13 @@
         "source": "데일리",
         "file": "재고현황_260707.xlsx",
         "status": "정상 마감 재고"
+      },
+      {
+        "date": "2026-07-09",
+        "stock": 2040,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
+        "status": "정상 마감 재고"
       }
     ],
     "캡슐세제 퍼퓸미모사": [
@@ -2921,6 +3054,13 @@
         "stock": 1274,
         "source": "데일리",
         "file": "재고현황_260707.xlsx",
+        "status": "정상 마감 재고"
+      },
+      {
+        "date": "2026-07-09",
+        "stock": 1194,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
         "status": "정상 마감 재고"
       }
     ],
@@ -2959,6 +3099,13 @@
         "source": "데일리",
         "file": "재고현황_260707.xlsx",
         "status": "정상 마감 재고"
+      },
+      {
+        "date": "2026-07-09",
+        "stock": 2714,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
+        "status": "정상 마감 재고"
       }
     ],
     "욕실클리너 750ml": [
@@ -2996,13 +3143,29 @@
         "source": "데일리",
         "file": "재고현황_260707.xlsx",
         "status": "정상 마감 재고"
+      },
+      {
+        "date": "2026-07-09",
+        "stock": 8811,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
+        "status": "정상 마감 재고"
+      }
+    ],
+    "터블 선물세트 단상자": [
+      {
+        "date": "2026-07-09",
+        "stock": 2029,
+        "source": "데일리",
+        "file": "재고현황_260708.xlsx",
+        "status": "정상 마감 재고"
       }
     ]
   },
   "stockMeta": {
     "msaleMonth": "2026.05",
-    "dailyFile": "재고현황_260707.xlsx",
-    "dailyDate": "2026-07-08",
+    "dailyFile": "재고현황_260708.xlsx",
+    "dailyDate": "2026-07-09",
     "salesWindow": 3
   },
   "marketOverride": {
@@ -6107,108 +6270,6 @@
       "payState": "new",
       "notes": [],
       "creditHistory": []
-    },
-    {
-      "name": "동구밭",
-      "grade": "미평가",
-      "watch": "주의",
-      "risk": "MEDIUM",
-      "pay": "미정",
-      "payState": "new",
-      "status": "재무제표 업로드로 신규 추가",
-      "isNew": true,
-      "trend": [
-        {
-          "y": "23",
-          "s": 13125,
-          "o": null
-        },
-        {
-          "y": "24",
-          "s": 13206,
-          "o": null
-        },
-        {
-          "y": "25",
-          "s": 17396,
-          "o": null
-        }
-      ],
-      "finance": {
-        "2023": {
-          "asset": 11751,
-          "debt": null,
-          "equity": null,
-          "debtRatio": null
-        },
-        "2024": {
-          "asset": 12225,
-          "debt": null,
-          "equity": null,
-          "debtRatio": null
-        },
-        "2025": {
-          "asset": 12705,
-          "debt": null,
-          "equity": null,
-          "debtRatio": null
-        }
-      },
-      "notes": [],
-      "creditHistory": [],
-      "baseYear": "2025",
-      "debtRatio": null
-    },
-    {
-      "name": "한국미라클피플사",
-      "grade": "미평가",
-      "watch": "주의",
-      "risk": "MEDIUM",
-      "pay": "미정",
-      "payState": "new",
-      "status": "재무제표 업로드로 신규 추가",
-      "isNew": true,
-      "trend": [
-        {
-          "y": "23",
-          "s": 29814,
-          "o": null
-        },
-        {
-          "y": "24",
-          "s": 27597,
-          "o": null
-        },
-        {
-          "y": "25",
-          "s": 30381,
-          "o": null
-        }
-      ],
-      "finance": {
-        "2023": {
-          "asset": 22135,
-          "debt": null,
-          "equity": null,
-          "debtRatio": null
-        },
-        "2024": {
-          "asset": 19970,
-          "debt": null,
-          "equity": null,
-          "debtRatio": null
-        },
-        "2025": {
-          "asset": 20657,
-          "debt": null,
-          "equity": null,
-          "debtRatio": null
-        }
-      },
-      "notes": [],
-      "creditHistory": [],
-      "baseYear": "2025",
-      "debtRatio": null
     }
   ],
   "_reviewFileName": "review_20260626_123427.xlsx",
