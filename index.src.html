@@ -5628,10 +5628,9 @@ function renderCost(){
   // 묶음 발주 선택 영역
   const groups=DATA.costGroups||[];
   const grpBtns=[
-    `<button class="grpSeg ${costGroupSel==='all'?'on':''}" onclick="selectGroup('all')">전체</button>`,
-    ...groups.map(g=>`<button class="grpSeg ${costGroupSel===g.id?'on':''}" onclick="selectGroup('${g.id}')">📦 ${g.name.replace(' 발주','')}</button>`),
-    `<button class="grpSeg ${costGroupSel==='_individual'?'on':''}" onclick="selectGroup('_individual')">개별 품목</button>`
-  ].join('');
+    `<button class="grpSeg ${(costGroupSel==='all'||costGroupSel==='_individual')?'on':''}" onclick="selectGroup('all')">전체 품목</button>`,
+    ...groups.map(g=>`<button class="grpSeg ${costGroupSel===g.id?'on':''}" onclick="selectGroup('${g.id}')">📦 ${g.name.replace(' 발주','')}</button>`)
+  ].join('');   // '개별 품목' 제거 — '전체'와 완전 중복(동일 동작)이라 삭제
   const grpBar=EXTERNAL?'':`<div class="grpSelect"><span class="grpLabel">묶음 발주</span>${grpBtns}</div>`;  // v72: 팀 공유본에도 노출
 
   const selGroup=groups.find(g=>g.id===costGroupSel);
