@@ -85,6 +85,8 @@ tbody td{padding:12px 9px;border-bottom:1px solid var(--grid);font-size:12px;ver
 tbody tr.main{cursor:pointer}
 tbody tr.main:hover{background:#f7f9fc}
 tbody tr.done td{opacity:.62}
+/* [가독성] 재고 발주 표: 판매기준·재고·발주권장 3그룹 세로 구분선 (5=현재고, 7=발주타이밍 앞) */
+#stockBody tr td:nth-child(5),#stockBody tr td:nth-child(7){border-left:2px solid #e6eaf3}
 /* 위험 행 좌측 빨간 라인 (v9) */
 tbody tr.main.dangerrow td:first-child{box-shadow:inset 4px 0 0 var(--red)}
 tbody tr.main.dangerrow td{background:#fffbfa}
@@ -4937,16 +4939,19 @@ function renderStock(){
     }
   }
   // 필터 버튼(상태 + 카테고리)
-  const cats=[...new Set(DATA.stock.map(s=>s.cat))];
+  const cats=[...new Set(DATA.stock.map(s=>s.cat).filter(Boolean))];
   const f=document.getElementById('stockFilters');
-  if(f.children.length===0){
-    f.innerHTML=`<button class="fbtn on" data-sf="all">전체</button>`+
-      `<button class="fbtn" data-sf="now">지금 발주</button>`+
-      `<button class="fbtn" data-sf="soon">14일 내</button>`+
-      `<button class="fbtn" data-sf="ok">여유</button>`+
-      `<button class="fbtn" data-sf="na">판매 없음</button>`+
+  const sig='v2|'+cats.join('|');
+  if(f.dataset.sig!==sig){   // 카테고리 집합이 바뀌면 재생성(신규 품목 카테고리 자동 반영) · 활성 필터 유지
+    f.dataset.sig=sig;
+    const cur=stockFilter||'all', on=v=>cur===v?' on':'';
+    f.innerHTML=`<button class="fbtn${on('all')}" data-sf="all">전체</button>`+
+      `<button class="fbtn${on('now')}" data-sf="now">지금 발주</button>`+
+      `<button class="fbtn${on('soon')}" data-sf="soon">14일 내</button>`+
+      `<button class="fbtn${on('ok')}" data-sf="ok">여유</button>`+
+      `<button class="fbtn${on('na')}" data-sf="na">판매 없음</button>`+
       `<span class="fsep"></span>`+
-      cats.map(c=>`<button class="fbtn" data-sf="${c}">${c}</button>`).join('');
+      cats.map(c=>`<button class="fbtn${on(c)}" data-sf="${c}">${c}</button>`).join('');
   }
   document.getElementById('stockFooter').innerHTML=
     `월판매 평균 = 최근 설정개월(기본 3개월)의 월별 출고량 평균입니다. 월별 채널 3개월 추이는 판매 방향성 참고용으로 표시하며, 최근 3개월 평균에 중복 가산하지 않습니다. 데일리 현재고 감소 추이는 오늘 재고 업데이트 이력 기준 실제 재고 감소 속도이며, 유효 이력이 쌓이면 예상 소진일·권장 발주량에 우선 반영합니다. 예상 소진일 = 현재고 ÷ 발주 판단 적용 일판매. ROP(발주점) = 발주 판단 적용 일판매×(품목별 리드타임+안전버퍼). 권장발주 = 목표 보유 개월 기준으로 오늘 재고와 품목별 리드타임을 반영해 동적 재계산.<br>품목 행을 클릭하면 월평균 기준·월별 채널 3개월 추이·데일리 현재고 감소 추이·발주 판단 적용 기준별 예상 소진일과 근거, 발주 시뮬레이션, 데이터 이상치 경고를 확인할 수 있습니다.`;
