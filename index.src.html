@@ -7068,7 +7068,7 @@ document.getElementById('btnDailyAddSelected').onclick=async()=>{
     const nm=String(m.fileNm||'').replace(/\s*x\s*1개.*$/,'').trim();
     if(!nm || (DATA.stock||[]).some(s=>s.nm===nm)) return;   // 빈이름·중복 제외
     const wh=(m.wh&&Object.keys(m.wh).length)?m.wh:{};
-    const ns={ nm, cat:'기타', ch:'전채널', msale:0, msaleLegacy:0,
+    const ns={ nm, cat:(typeof salesCategory==='function'?salesCategory(nm):'기타'), ch:'전채널', msale:0, msaleLegacy:0,
       lead:30, cost:0, price:0, moq:1000, oem:'-', round:'',
       stockUnit:'EA', orderUnit:'EA', unitConversion:1, orderMultiple:1, moqOrderUnit:1000,
       targetMonths:1, skipItemMoq:true, rop:0, rec:0,
@@ -8165,7 +8165,7 @@ function salesCategory(nm){
   if(n.includes('한화')) return '기타';                              // 한화 OEM 등 자사 제품 아님 → 기타
   if(n.includes('세정티슈')||n.includes('물티슈')) return '세정티슈';    // 세정티슈 먼저 (다목적 세정티슈가 다목적용기세척제로 가지 않도록)
   if(n.includes('텀블러')||n.includes('용기세척')||n.includes('다목적')) return '다목적용기세척제';
-  if(n.includes('캡슐세제')) return '캡슐세제';
+  if(n.includes('캡슐')) return '캡슐세제';   // 캡슐세제 단품 + 캡슐 7종 세트 등 캡슐 묶음도 캡슐세제 (한화는 위에서 기타 처리)
   if(n.includes('탈취')) return '탈취제';
   if(n.includes('주방세제')) return '주방세제';
   if(n.includes('욕실')) return '욕실클리너';
