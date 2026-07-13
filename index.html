@@ -8971,11 +8971,11 @@ function salesDimHtml(sd, view){
   const items=salesDimYearDetail(sd, view, cy);                  // 올해 기준
   const cyTotal=items.reduce((s,x)=>s+x.amt,0)||1;
   const rows=items.slice(0,30).map(x=>{
-    const cells=cyMonths.map(mo=>{ const v=x.byMonth[cy+'-'+mo]; return `<td>${v?salesWon(Math.round(v/1e4))+'만':'-'}</td>`; }).join('');
+    const cells=cyMonths.map(mo=>{ const v=x.byMonth[cy+'-'+mo]; const mt=(ymObj[cy]&&ymObj[cy][mo])||0; const p=(v&&mt)?(v/mt*100):0; return `<td>${v?salesWon(Math.round(v/1e4))+'만<div style="font-size:9px;color:#8a93a8;font-weight:600">'+p.toFixed(1)+'%</div>':'-'}</td>`; }).join('');
     const pct=(x.amt/cyTotal*100).toFixed(1);
     return `<tr><td>${x.nm}</td>${cells}<td><b>${salesEok(x.amt)}</b></td><td>${pct}%</td></tr>`;
   }).join('');
-  const totRow=`<tr class="tot"><td>합계</td>${cyMonths.map(mo=>`<td>${salesWon(Math.round(((ymObj[cy]&&ymObj[cy][mo])||0)/1e4))}만</td>`).join('')}<td>${salesEok(cyTotal)}</td><td>100%</td></tr>`;
+  const totRow=`<tr class="tot"><td>합계</td>${cyMonths.map(mo=>`<td>${salesWon(Math.round(((ymObj[cy]&&ymObj[cy][mo])||0)/1e4))}만<div style="font-size:9px;color:#8a93a8">100%</div></td>`).join('')}<td>${salesEok(cyTotal)}</td><td>100%</td></tr>`;
   // [v81] 대분류 분류 관리 바 (채널은 ERP '거래처 구분' 열로 자동 집계 — 수동 분류 불필요)
   let classifyBar='';
   if(view==='group'){
@@ -8992,7 +8992,7 @@ function salesDimHtml(sd, view){
     <div class="salesSec"><h4>${label}별 매출 비율 <span class="secSub">${cy} 기준</span></h4>${chartBox('salesDimDonut',260)}</div>
     <div class="salesSec"><h4>${label}별 월별 추이 <span class="secSub">상위 5 · 최근 12개월</span></h4>${chartBox('salesDimLine',260)}</div>
   </div>
-  <div class="salesSec"><h4>${label}별 상세 <span class="secSub">${cy} 월별 매출(만원)·합계·비중</span></h4>
+  <div class="salesSec"><h4>${label}별 상세 <span class="secSub">${cy} · 월 셀 = 매출(만원) + 그 달 내 비중(%) · 합계 · 연간 비중</span></h4>
     <div class="salesTblWrap"><table class="salesTbl"><thead><tr><th>${label}</th>${cyMonths.map(mo=>`<th>${mo}월</th>`).join('')}<th>${cy} 합계</th><th>비중</th></tr></thead>
     <tbody>${rows}${totRow}</tbody></table></div></div>`;
 }
