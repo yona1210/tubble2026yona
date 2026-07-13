@@ -9475,6 +9475,7 @@ function handleReviewUpload(file){
         DATA._reviewFileName=file.name;
         const agg=parseReviewWorkbook(wb); agg.fileName=file.name;
         DATA.reviewData=agg;
+        reviewPeriod.from=''; reviewPeriod.to='';   // 새 업로드는 기간을 전체 범위(최신 달 포함)로 리셋 — 이전 기간(예: 2026-06)이 남아 최신 달이 빠지는 문제 방지
         if(typeof markDirty==='function') markDirty();
         toast(`리뷰 데이터 반영 완료 — ${salesWon(agg.total)}건 · 평균 ${agg.avg.toFixed(2)}점`);
         renderReview();
