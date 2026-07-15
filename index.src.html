@@ -953,11 +953,12 @@ tr.main.arch:hover{opacity:1}
 .complaintGridWide{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
 .complaintGridWide .salesSec{margin-bottom:0}
 /* [v75] 품목별 주요 리뷰 · 인사이트 카드 */
-.riGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
-.riCard{background:#fff;border:1px solid #e7eaf2;border-radius:10px;padding:13px 14px;display:flex;flex-direction:column;gap:9px}
+.riGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.riCard{background:#fff;border:1px solid #e7eaf2;border-radius:8px;padding:12px 13px;display:flex;flex-direction:column;gap:8px;min-width:0;cursor:pointer}
 .riCard.warn{border-color:#f0d2cd;box-shadow:inset 3px 0 0 #D64541}
-.riCardHead{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.riCardName{font-size:13.5px;font-weight:800;color:var(--navy)}
+.riCard:hover{border-color:#cfd8f0;background:#fbfcff}
+.riCardHead{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.riCardName{font-size:13px;font-weight:800;color:var(--navy);line-height:1.35;word-break:keep-all}
 .riCardMeta{font-size:11px;color:#7a8194;white-space:nowrap}
 .riStar{color:#f0a500;font-weight:800}
 .riSenti{height:7px;border-radius:4px;overflow:hidden;display:flex;background:#eef1f7}
@@ -968,6 +969,22 @@ tr.main.arch:hover{opacity:1}
 .riChips{display:flex;flex-wrap:wrap;gap:5px}
 .riChip{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#eef1fc;color:#3f57ef}
 .riChip.neg{background:#fbeeed;color:#C0392B}
+.riSignal{font-size:10px;font-weight:850;padding:3px 8px;border-radius:999px;background:#eef1fc;color:#3f57ef;white-space:nowrap}
+.riSignal.warn{background:#fbeeed;color:#C0392B}
+.riTopbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.riModeSeg{display:inline-flex;gap:3px;padding:3px;background:#f1f3f8;border:1px solid #e1e6f0;border-radius:8px}
+.riModeSeg button{border:0;background:transparent;color:#687086;font-size:11px;font-weight:800;padding:6px 10px;border-radius:6px;cursor:pointer;font-family:inherit}
+.riModeSeg button.on{background:#fff;color:var(--navy);box-shadow:0 1px 2px rgba(30,39,97,.08)}
+.riModeSeg button:hover{color:var(--blue)}
+.riModeHint{font-size:11px;color:#8a93a8;font-weight:700}
+.riMetrics{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.riMetric{background:#fafbfd;border:1px solid #eef1f7;border-radius:7px;padding:7px 8px;min-width:0}
+.riMetric b{display:block;font-size:14px;color:#2d3448;line-height:1.05;font-variant-numeric:tabular-nums}
+.riMetric span{display:block;margin-top:3px;font-size:9.5px;color:#8a93a8;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.riQuoteGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.riQuote{font-size:10.5px;line-height:1.42;color:#4b5264;background:#fafbfd;border-left:3px solid #1E9E63;border-radius:6px;padding:7px 8px;min-height:44px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.riQuote.neg{border-left-color:#D64541}
+.riQuote .qtag{display:block;font-size:9px;font-weight:850;color:#8a93a8;margin-bottom:2px}
 .riRevs{display:flex;flex-direction:column;gap:6px}
 .riRev{font-size:11px;line-height:1.45;padding:7px 9px;border-radius:7px;background:#f7f9fc;border-left:3px solid #1E9E63}
 .riRev.neg{border-left-color:#D64541}
@@ -980,7 +997,7 @@ tr.main.arch:hover{opacity:1}
 .riSubH{font-size:12px;font-weight:800;color:var(--navy);margin-bottom:8px}
 .riMiniBar{display:inline-flex;width:120px;height:8px;border-radius:4px;overflow:hidden;background:#eef1f7;vertical-align:middle}
 .riMiniBar i{display:block;height:100%}
-.riSelBar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.riSelBar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;max-height:96px;overflow:auto;padding-right:3px}
 .riSelChip{font-size:11.5px;font-weight:600;padding:6px 11px;border:1px solid #dde3ef;border-radius:18px;background:#fff;color:#5f6470;cursor:pointer;font-family:inherit;transition:all .12s}
 .riSelChip b{color:#9aa1b2;font-weight:700;margin-left:3px}
 .riSelChip:hover{border-color:var(--blue);color:var(--navy)}
@@ -1001,7 +1018,12 @@ tr.main.arch:hover{opacity:1}
 .riClickTbl tbody tr:hover{background:#f5f7fc}
 .riClickTbl tbody tr.on{background:#eef1fc;box-shadow:inset 3px 0 0 var(--blue)}
 .riClickTbl tbody tr.on td:first-child{font-weight:800;color:var(--navy)}
-@media(max-width:760px){.riDetailGrid{grid-template-columns:1fr}.riMiniBar{width:80px}.riStarVal{width:96px}}
+.reviewCompactFold{background:#fff;border:1px solid #dde3ef;border-radius:8px;margin:12px 0;overflow:hidden;box-shadow:none}
+.reviewCompactFold>summary{cursor:pointer;list-style:none;padding:12px 14px;font-size:12px;font-weight:850;color:var(--navy);background:#fafbfd}
+.reviewCompactFold>summary::before{content:'▸ ';color:#8a93a8}
+.reviewCompactFold[open]>summary::before{content:'▾ '}
+.reviewCompactFold .reviewCompactBody{padding:0 14px 14px}
+@media(max-width:760px){.riGrid{grid-template-columns:1fr}.riDetailGrid,.riQuoteGrid{grid-template-columns:1fr}.riMiniBar{width:80px}.riStarVal{width:96px}.riMetrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .complaintNote{font-size:11px;color:#5f6470;margin-top:8px;line-height:1.48}
 .reviewInsightLine{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
 .reviewInsightLine .ri{border-left:3px solid #dfe6f2;background:#fafbfd;border-radius:6px;padding:9px 10px;font-size:11px;color:#5f6470;line-height:1.4}
@@ -9339,6 +9361,7 @@ function salesBreakdownHtml(sd, view){
 // ===== [v62] 리뷰 분석 대시보드 =====
 let reviewFilter = {senti:'', cat:'', month:''};   // 리뷰 목록 필터 (감정/품목/월)
 let reviewItemSel = '';                   // [v76] 품목 세부 분석에서 선택된 품목
+let reviewItemMode = 'focus';              // [v82] 품목 인사이트 빠른 필터
 let reviewMonthSel = '';                   // [v77] 월별 추이 분석에서 선택된 월
 let reviewPeriod = {from:'', to:''};     // 고객 리뷰 인사이트 기간 필터
 
@@ -9584,14 +9607,22 @@ function reviewTopicTopHtml(rd){
 
 // [v76] 리뷰 HTML escape
 function reviewEsc(s){ return String(s||'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+function reviewAttr(s){ return reviewEsc(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function reviewShort(s,n=82){
+  s=String(s||'').replace(/\s+/g,' ').trim();
+  return s.length>n?s.slice(0,n-1)+'…':s;
+}
 // [v76] 품목(터블 제품군)별 집계 — 건수·평점분포·감성·주제·감정·리뷰목록
 function reviewItemAgg(list){
   const G={};
   (list||[]).forEach(r=>{
     const k=r.cat||'기타', rate=Number(r.rate||0); if(!rate) return;
-    const g=G[k]||(G[k]={name:k,cnt:0,sum:0,pos:0,neu:0,neg:0,dist:{1:0,2:0,3:0,4:0,5:0},posTopic:{},negTopic:{},emo:{},list:[]});
+    const g=G[k]||(G[k]={name:k,cnt:0,sum:0,pos:0,neu:0,neg:0,photo:0,best:0,dist:{1:0,2:0,3:0,4:0,5:0},posTopic:{},negTopic:{},emo:{},months:{},list:[]});
     g.list.push(r); g.cnt++; g.sum+=rate; g.dist[Math.round(rate)]=(g.dist[Math.round(rate)]||0)+1;
     if(rate>=4)g.pos++; else if(rate===3)g.neu++; else g.neg++;
+    if(r.photo) g.photo++;
+    if(r.best) g.best++;
+    if(r.ym) g.months[r.ym]=(g.months[r.ym]||0)+1;
     (r.topics||[]).forEach(t=>{ if(rate>=4)g.posTopic[t]=(g.posTopic[t]||0)+1; if(rate<=3)g.negTopic[t]=(g.negTopic[t]||0)+1; });
     if(rate<=3 && r.emo)g.emo[r.emo]=(g.emo[r.emo]||0)+1;
   });
@@ -9619,6 +9650,93 @@ function reviewItemInsightText(g){
   }
   return {html, strengths, concernTop, flag};
 }
+function reviewItemActionText(g,ins){
+  const avg=g.cnt?g.sum/g.cnt:0;
+  const negPct=g.cnt?Math.round(g.neg/g.cnt*100):0;
+  const posPct=g.cnt?Math.round(g.pos/g.cnt*100):0;
+  if(ins.flag) return {label:'개선 우선', cls:'warn', text:`${ins.concernTop[0]} 언급을 먼저 확인`};
+  if(avg>=4.35 && posPct>=80) return {label:'강점 확대', cls:'', text:`${ins.strengths[0]||'만족 포인트'}를 상세페이지에 전면 배치`};
+  if(negPct>=8) return {label:'주의 관찰', cls:'warn', text:'낮은 평점 리뷰를 주 1회 확인'};
+  return {label:'안정 유지', cls:'', text:'현재 강점을 유지하며 표본 확대'};
+}
+function reviewItemFocusScore(g,ins){
+  const avg=g.cnt?g.sum/g.cnt:0;
+  const negPct=g.cnt?g.neg/g.cnt*100:0;
+  const posPct=g.cnt?g.pos/g.cnt*100:0;
+  return (ins.flag?90:0)+(negPct>=8?35:0)+(avg>=4.35&&posPct>=80?25:0)+Math.min(28,g.cnt/8);
+}
+function reviewItemOverviewHtml(rd){
+  const cs=reviewInsightStats(rd);
+  const items=reviewItemAgg(cs.list);
+  if(!items.length) return '';
+  const total=cs.total||1;
+  const sc=r=>(r.best?100:0)+(r.photo?14:0)+Math.min(28,(r.body||'').length/7);
+  const enriched=items.map(g=>{
+    const ins=reviewItemInsightText(g);
+    const act=reviewItemActionText(g,ins);
+    const avg=g.cnt?g.sum/g.cnt:0;
+    const posPct=g.cnt?Math.round(g.pos/g.cnt*100):0;
+    const negPct=g.cnt?Math.round(g.neg/g.cnt*100):0;
+    return {g,ins,act,avg,posPct,negPct,focus:reviewItemFocusScore(g,ins)};
+  });
+  const MODES=[
+    ['focus','우선 볼 품목'],
+    ['risk','개선 신호'],
+    ['strong','강점 품목'],
+    ['volume','리뷰 많은 순']
+  ];
+  if(!MODES.some(([m])=>m===reviewItemMode)) reviewItemMode='focus';
+  let shown=enriched.slice();
+  if(reviewItemMode==='risk') shown=shown.filter(x=>x.ins.flag||x.negPct>=8).sort((a,b)=>(b.negPct-a.negPct)||b.focus-a.focus);
+  else if(reviewItemMode==='strong') shown=shown.filter(x=>x.avg>=4.2&&x.posPct>=75).sort((a,b)=>(b.posPct-a.posPct)||b.g.cnt-a.g.cnt);
+  else if(reviewItemMode==='volume') shown=shown.sort((a,b)=>b.g.cnt-a.g.cnt);
+  else shown=shown.sort((a,b)=>b.focus-a.focus);
+  const cards=shown.slice(0,6).map(({g,ins,act,avg,posPct,negPct})=>{
+    const neuPct=Math.max(0,100-posPct-negPct);
+    const share=(g.cnt/total*100).toFixed(1);
+    const good=g.list.filter(r=>r.rate>=4&&r.body).sort((a,b)=>sc(b)-sc(a))[0];
+    const bad=g.list.filter(r=>r.rate<=3&&r.body).sort((a,b)=>(a.rate-b.rate)||((b.body||'').length-(a.body||'').length))[0];
+    const chips=ins.strengths.slice(0,2).map(t=>`<span class="riChip">${reviewEsc(t)}</span>`).join('')+(ins.concernTop?`<span class="riChip neg">${reviewEsc(ins.concernTop[0])}</span>`:'');
+    return `<div class="riCard${ins.flag?' warn':''}" data-rireviewitem="${reviewAttr(g.name)}" title="클릭하면 아래 품목 세부 분석으로 연결됩니다">
+      <div class="riCardHead">
+        <div class="riCardName">${reviewEsc(g.name)}</div>
+        <span class="riSignal ${act.cls}">${act.label}</span>
+      </div>
+      <div class="riMetrics">
+        <div class="riMetric"><b>★${avg.toFixed(2)}</b><span>평균 평점</span></div>
+        <div class="riMetric"><b>${salesWon(g.cnt)}</b><span>리뷰 수</span></div>
+        <div class="riMetric"><b>${share}%</b><span>전체 비중</span></div>
+      </div>
+      <div class="riSenti" title="긍정·중립·부정 비중">
+        <i style="width:${posPct}%;background:#1E9E63"></i><i style="width:${neuPct}%;background:#E59A1C"></i><i style="width:${negPct}%;background:#D64541"></i>
+      </div>
+      <div class="riInsight">${ins.html}<div class="riChips" style="margin-top:7px">${chips}</div></div>
+      <div class="riQuoteGrid">
+        <div class="riQuote"><span class="qtag">대표 호평</span>${good?reviewEsc(reviewShort(good.body,74)):'표본 없음'}</div>
+        <div class="riQuote neg"><span class="qtag">확인할 리뷰</span>${bad?reviewEsc(reviewShort(bad.body,74)):'낮은 평점 없음'}</div>
+      </div>
+      <div class="riCardMeta">${act.text} · 포토 ${reviewInsightRate(g.photo,g.cnt)}%</div>
+    </div>`;
+  }).join('');
+  const modeButtons=MODES.map(([m,label])=>`<button class="${reviewItemMode===m?'on':''}" data-ritemmode="${m}">${label}</button>`).join('');
+  const emptyCards=cards || `<div class="salesEmpty">선택한 조건에 맞는 품목이 없습니다. 다른 보기로 전환해 보세요.</div>`;
+  const rows=enriched.map(({g,ins,act,avg,posPct,negPct})=>{
+    const top=ins.strengths.concat(ins.concernTop?[ins.concernTop[0]]:[]).slice(0,3).map(reviewEsc).join(' · ')||'-';
+    return `<tr data-rireviewitem="${reviewAttr(g.name)}"><td style="text-align:left">${reviewEsc(g.name)}</td><td class="r"><b>${salesWon(g.cnt)}</b></td><td class="r">★${avg.toFixed(2)}</td><td class="r" style="color:#1E9E63">${posPct}%</td><td class="r" style="color:#C0392B">${negPct}%</td><td>${act.label}</td><td style="text-align:left">${top}</td></tr>`;
+  }).join('');
+  return `<div class="salesSec">
+    <h4>품목별 리뷰 인사이트 <span class="secSub">강점·주의 신호·대표 리뷰를 품목별로 요약</span></h4>
+    <div class="riTopbar">
+      <div class="riModeSeg">${modeButtons}</div>
+      <div class="riModeHint">표시 ${Math.min(6,shown.length)}개 · 전체 ${items.length}개 품목</div>
+    </div>
+    <div class="riGrid">${emptyCards}</div>
+    <details class="reviewCompactFold">
+      <summary>전체 품목 요약표 보기</summary>
+      <div class="reviewCompactBody"><div class="salesTblWrap"><table class="salesTbl riClickTbl"><thead><tr><th style="text-align:left">품목</th><th class="r">리뷰 수</th><th class="r">평균</th><th class="r">긍정</th><th class="r">부정</th><th>상태</th><th style="text-align:left">주요 신호</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+    </details>
+  </div>`;
+}
 // [v76] ① 리뷰 분포 개요 — 총건수 / 품목별 건수·비율 / 월별 추이·품목 구성
 function reviewVolumeHtml(rd){
   const cs=reviewInsightStats(rd);
@@ -9635,8 +9753,11 @@ function reviewVolumeHtml(rd){
       <div><div class="riSubH">품목별 리뷰 수 · 비율</div>${chartBox('reviewItemCountBar',Math.max(210,items.length*28+50))}</div>
       <div><div class="riSubH">품목별 리뷰 비중</div>${chartBox('reviewItemShareDonut',Math.max(210,items.length*28+50))}</div>
     </div>
-    <div class="salesTblWrap" style="margin-top:12px"><table class="salesTbl"><thead><tr><th>품목</th><th class="r">리뷰 수</th><th class="r">비율</th><th class="r">평균</th><th>긍정·중립·부정</th></tr></thead>
-      <tbody>${rows}<tr class="tot"><td>합계</td><td class="r"><b>${salesWon(total)}</b></td><td class="r">100%</td><td class="r">★${cs.avg.toFixed(2)}</td><td></td></tr></tbody></table></div>
+    <details class="reviewCompactFold">
+      <summary>품목별 분포 표 보기</summary>
+      <div class="reviewCompactBody"><div class="salesTblWrap"><table class="salesTbl"><thead><tr><th>품목</th><th class="r">리뷰 수</th><th class="r">비율</th><th class="r">평균</th><th>긍정·중립·부정</th></tr></thead>
+        <tbody>${rows}<tr class="tot"><td>합계</td><td class="r"><b>${salesWon(total)}</b></td><td class="r">100%</td><td class="r">★${cs.avg.toFixed(2)}</td><td></td></tr></tbody></table></div></div>
+    </details>
   </div>`;
 }
 // [v77] 월별 집계 — 월별 총건수/평점/감성 + 월별 품목 구성
@@ -9719,7 +9840,7 @@ function reviewItemDrilldownHtml(rd){
   const revLine=(r,cls)=>`<div class="riRev ${cls}"><span class="rstar">★${r.rate}</span><span class="rq">${reviewEsc(r.body)}${r.photo?' 📷':''}</span><span class="rm">${reviewEsc(r.user)} · ${reviewEsc(r.date)}${r.best?' · 베스트':''}</span></div>`;
   const mainHtml=mainRevs.length?mainRevs.map(r=>revLine(r,'pos')).join(''):'<div class="salesEmpty" style="padding:4px 0">대표 리뷰 없음</div>';
   const badHtml=badRevs.length?badRevs.map(r=>revLine(r,'neg')).join(''):'<div class="salesEmpty" style="padding:4px 0">선택 기간에 낮은 평점 리뷰가 없습니다 👍</div>';
-  return `<div class="salesSec"><h4>품목 세부 분석 <span class="secSub">품목을 선택하면 평점 분포·주요 리뷰·종합 인사이트를 봅니다</span></h4>
+  return `<div class="salesSec" id="reviewItemDetail"><h4>품목 세부 분석 <span class="secSub">품목을 선택하면 평점 분포·주요 리뷰·종합 인사이트를 봅니다</span></h4>
     <div class="riSelBar">${chips}</div>
     <div class="riDetailHead"><span class="riDetailName">${reviewEsc(g.name)}</span><span class="riDetailMeta"><span class="riStar">★${(g.sum/g.cnt).toFixed(2)}</span> · ${salesWon(g.cnt)}건 · 전체의 ${total?(g.cnt/total*100).toFixed(1):'0'}%</span></div>
     <div class="riInsight" style="margin-bottom:12px">💡 <b>종합 인사이트</b> — ${ins.html}${chipHtml?`<div class="riChips" style="margin-top:7px">${chipHtml}</div>`:''}</div>
@@ -9741,6 +9862,12 @@ function reviewDetailFoldHtml(rd){
   return `<details class="reviewDetailFold">
     <summary>실제 리뷰 목록 펼쳐보기</summary>
     <div class="reviewDetailBody">${reviewListHtml(rd)}</div>
+  </details>`;
+}
+function reviewAnalysisFoldHtml(rd){
+  return `<details class="reviewDetailFold" id="reviewAnalysisFold">
+    <summary>차트·추이 상세 분석 펼쳐보기</summary>
+    <div class="reviewDetailBody">${reviewDistHtml(rd)+reviewVolumeHtml(rd)+reviewMonthlyHtml(rd)+reviewTopicTopHtml(rd)+reviewCatTopicHtml(rd)}</div>
   </details>`;
 }
 
@@ -9785,8 +9912,8 @@ function renderReview(){
     <div class="salesKpi"><span class="kpiIco">${kpiIcon('cam')}</span><div class="v">${photoPct}%</div><div class="l">포토리뷰 비중</div><div class="sub">전체 ${salesWon(cs.total)}건 중</div></div>`;
     drawKpiSpark('reviewSparkKpi', (rd.months||[]).slice(-12).map(m=>rd.month[m]?rd.month[m].cnt:0), '#1E9E63');
   }
-  // [v74] 5단 드릴다운: ①핵심요약 ②평점·감정 분포 ③품목 분포 ④월별 추이 ⑤주제 TOP ⑥품목 세부 ⑦품목별 주제표 ⑧리뷰목록(fold)
-  body.innerHTML = reviewInsightDashboardHtml(rd)+reviewDistHtml(rd)+reviewVolumeHtml(rd)+reviewMonthlyHtml(rd)+reviewTopicTopHtml(rd)+reviewItemDrilldownHtml(rd)+reviewCatTopicHtml(rd)+reviewDetailFoldHtml(rd);
+  // [v82] 기본 화면은 판단 카드 중심으로 압축하고 차트/원문은 접힘 영역으로 이동
+  body.innerHTML = reviewInsightDashboardHtml(rd)+reviewItemOverviewHtml(rd)+reviewItemDrilldownHtml(rd)+reviewAnalysisFoldHtml(rd)+reviewDetailFoldHtml(rd);
   bindReviewFilters();
   drawReviewCharts(rd);
   queueVisibleTabLayoutSync();
@@ -10005,8 +10132,10 @@ function reviewCatTopicHtml(rd){
     const top3=Object.entries(tm).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([tp,c])=>`${tp} <span style="color:#8a93a8">(${salesWon(c)})</span>`).join(' · ')||'-';
     return `<tr><td>${cat}</td><td>${salesWon(rd.category[cat].cnt)}</td><td style="text-align:left">${top3}</td></tr>`;
   }).join('');
-  return `<div class="salesSec"><h4>품목별 리뷰 주요 내용 (언급 많은 주제 TOP3)</h4>
-    <div class="salesTblWrap"><table class="salesTbl"><thead><tr><th>카테고리</th><th>리뷰 수</th><th style="text-align:left">주요 주제 (언급 건수)</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  return `<details class="reviewCompactFold">
+    <summary>품목별 주요 주제 표 보기</summary>
+    <div class="reviewCompactBody"><div class="salesTblWrap"><table class="salesTbl"><thead><tr><th>카테고리</th><th>리뷰 수</th><th style="text-align:left">주요 주제 (언급 건수)</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+  </details>`;
 }
 
 function reviewCatHtml(rd){
@@ -10049,18 +10178,23 @@ function bindReviewFilters(){
   document.querySelectorAll('#reviewSentiSeg .svTab').forEach(b=>{
     b.onclick=()=>{ reviewFilter.senti=b.dataset.rsenti; renderReview(); };
   });
+  document.querySelectorAll('[data-ritemmode]').forEach(b=>{
+    b.onclick=()=>{ reviewItemMode=b.dataset.ritemmode||'focus'; renderReview(); };
+  });
   const sel=document.getElementById('reviewCatSel');
   if(sel) sel.onchange=()=>{ reviewFilter.cat=sel.value; renderReview(); };
   const msel=document.getElementById('reviewListMonthSel');
   if(msel) msel.onchange=()=>{ reviewFilter.month=msel.value; renderReview(); };
   // [v76] 품목 세부 분석 선택 칩
   document.querySelectorAll('[data-rireviewitem]').forEach(b=>{
-    b.onclick=()=>{ reviewItemSel=b.dataset.rireviewitem; renderReview(); };
+    b.onclick=()=>{ reviewItemSel=b.dataset.rireviewitem; renderReview(); setTimeout(()=>{ const el=document.getElementById('reviewItemDetail'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },30); };
   });
   // [v77] 월별 추이 분석 — 월 행 클릭
   document.querySelectorAll('[data-rmonth]').forEach(tr=>{
     tr.onclick=()=>{ reviewMonthSel=tr.dataset.rmonth; renderReview(); };
   });
+  const af=document.getElementById('reviewAnalysisFold');
+  if(af) af.ontoggle=()=>{ if(af.open && DATA.reviewData){ setTimeout(()=>{ drawReviewCharts(DATA.reviewData); queueVisibleTabLayoutSync(); },30); } };
 }
 (function bindReviewUpload(){
   const up=document.getElementById('reviewUploadBtn'), fi=document.getElementById('reviewFileInput');
