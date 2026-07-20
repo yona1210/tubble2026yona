@@ -5076,9 +5076,15 @@ function roundMiniChart(rounds,color){
     svg+=`<line x1="${pad.l}" y1="${yy}" x2="${W-pad.r}" y2="${yy}" stroke="#eee"/><text x="${pad.l-5}" y="${yy+3}" font-size="8" fill="#aaa" text-anchor="end">${val.toLocaleString()}</text>`;}
   const pts=vals.map((v,i)=>`${x(i)},${y(v)}`).join(' ');
   svg+=`<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2"/>`;
-  ROUNDS.forEach((r,i)=>{const last=i===ROUNDS.length-1;
+  // x축 라벨: 차수가 많으면 겹치므로 일정 간격으로 솎고, 괄호(수량 tier)는 제거(전체 라벨은 위 표에 있음)
+  const n=ROUNDS.length;
+  const every=Math.max(1,Math.ceil(24*(n-1)/cw));  // 라벨 폭(~24px) 기준 최소 간격 확보
+  ROUNDS.forEach((r,i)=>{const last=i===n-1;
     svg+=`<circle cx="${x(i)}" cy="${y(vals[i])}" r="${last?3.5:2.2}" fill="${last?dark:color}"/>`;
-    svg+=`<text x="${x(i)}" y="${H-8}" font-size="7.5" fill="#aaa" text-anchor="middle">${r}</text>`;
+    if(last || (i%every===0 && i<=n-1-every)){  // 마지막 차수는 항상 표시(다른 라벨과 겹치지 않게 간격 확보)
+      const lbl=String(r).replace(/\s*\([^)]*\)\s*/g,'');
+      svg+=`<text x="${x(i)}" y="${H-8}" font-size="7.5" fill="#aaa" text-anchor="middle">${lbl}</text>`;
+    }
     if(last)svg+=`<text x="${x(i)}" y="${y(vals[i])-7}" font-size="9" font-weight="700" fill="${dark}" text-anchor="middle">${vals[i].toLocaleString()}</text>`;
   });
   svg+='</svg>';
