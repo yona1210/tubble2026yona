@@ -11145,7 +11145,17 @@ function openPlanningEdit(id){
   .repInfoBar .riMain b{color:var(--navy)} .repInfoBar b{color:var(--navy)}
   .repInfoBar .riNote{color:#7a8194;font-size:11.5px}
   .repInfoBar .repSrcEdit{border:none;background:#eef1f7;color:#5a6478;border-radius:6px;cursor:pointer;font-size:11px;padding:2px 6px;margin-left:2px}
-  .repInfoBar .repSrcEdit:hover{background:#dfe6f7;color:var(--navy)}`;
+  .repInfoBar .repSrcEdit:hover{background:#dfe6f7;color:var(--navy)}
+  .repFunRow{display:flex;align-items:stretch;gap:10px;margin-bottom:6px}
+  .repFunTag{flex:0 0 128px;display:flex;align-items:center;font-size:12px;color:#3a3d47}
+  .repFunTag b{color:var(--navy);margin-left:3px}
+  .repFunBar{flex:1;display:flex;gap:3px;min-height:58px;border-radius:8px;overflow:hidden;min-width:0}
+  .repFunSeg{color:#fff;padding:8px 11px;display:flex;flex-direction:column;justify-content:center;min-width:0;overflow:hidden}
+  .repFunSeg .rfLabel{font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:.96}
+  .repFunSeg .rfPct{font-size:18px;font-weight:800;line-height:1.15}
+  .repFunSeg .rfCnt{font-size:10.5px;opacity:.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .repFunConnect{font-size:11px;color:#9aa1b2;margin:2px 0 6px 138px}
+  @media(max-width:760px){.repFunTag{flex-basis:76px;font-size:11px}.repFunSeg{padding:6px 8px}.repFunSeg .rfPct{font-size:14px}.repFunConnect{margin-left:0}}`;
   var st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
   if(!document.getElementById('tab-repurchase')){
     var ref=document.getElementById('tab-planning');
@@ -11559,6 +11569,25 @@ function repurInfoBarHtml(rd){
     +'<span class="riNote"><b>전체 재구매율</b> = 위 <b>전체 기간</b> 동안 같은 '+custWord+'(고객키 「'+keyCol+'」)가 <b>2건 이상 주문</b>한 비율 — 특정 기간이 아닌 <b>전체 누적 기준</b> · 주문 식별 '+(rd.orderKeyBasis||'-')+'</span>'
     +'</div>';
 }
+function repurFunnelHtml(rd){
+  var o=rd.overall||{}, sc=rd.sameCross||{};
+  var total=o.totalCustomers||0; if(!total) return '';
+  var repeat=o.repeatCustomers||0, single=Math.max(0,total-repeat);
+  var same=sc.sameProd||0, cross=sc.crossOnly||0, repSum=(same+cross)||repeat||1;
+  var custW=rd.isB2B?'거래처':'고객';
+  var pct=function(n,d){ return d?(n/d*100):0; };
+  var seg=function(label,n,ofN,color,sub){
+    return '<div class="repFunSeg" style="flex:'+Math.max(pct(n,ofN),0.001)+' 1 0;background:'+color+'" title="'+pEsc(label)+' '+n.toLocaleString('ko-KR')+'명">'
+      +'<div class="rfLabel">'+pEsc(label)+'</div><div class="rfPct">'+pct(n,ofN).toFixed(1)+'%</div>'
+      +'<div class="rfCnt">'+n.toLocaleString('ko-KR')+'명'+(sub?' · '+sub:'')+'</div></div>';
+  };
+  var bar1='<div class="repFunBar">'+seg('재구매 '+custW,repeat,total,CC.blue,'')+seg('1회 구매 후 이탈',single,total,'#9aa1b2','')+'</div>';
+  var bar2='<div class="repFunBar">'+seg('동일 품목 재구매',same,repSum,CC.blue,'전체 '+pct(same,total).toFixed(1)+'%')+seg('타 품목만 재구매',cross,repSum,CC.gold,'전체 '+pct(cross,total).toFixed(1)+'%')+'</div>';
+  return '<div class="salesSec"><h4>재구매 고객 구성 <span class="secSub">전체 → 재구매 → 동일/타품목 · 각 단계 분모가 다릅니다</span></h4>'
+    +'<div class="repFunRow"><div class="repFunTag">전체 '+custW+'<b>'+total.toLocaleString('ko-KR')+'명</b></div>'+bar1+'</div>'
+    +'<div class="repFunConnect">↳ 위 <b style="color:var(--navy)">재구매 '+custW+' '+repeat.toLocaleString('ko-KR')+'명</b>만 다시 아래로 세분 (분모=재구매 고객)</div>'
+    +'<div class="repFunRow"><div class="repFunTag">재구매 '+custW+'<b>'+repeat.toLocaleString('ko-KR')+'명</b></div>'+bar2+'</div></div>';
+}
 function repurAccBarHtml(rd){
   var b=(rd.batches||[]);
   var chips=b.map(function(x){ return '<span class="repBatch">'+pEsc(x.name)+' <span style="color:#9aa1b2">'+(x.uploaded||'')+' · '+((x.lines||0)).toLocaleString('ko-KR')+'건</span> <button class="repBatchDel" title="이 업로드 제거" onclick="repurDeleteBatch('+x.id+')">×</button></span>'; }).join('');
@@ -11623,7 +11652,7 @@ function renderRepurchase(){
   var charts='<div class="salesSec"><h4>재구매 분석 <span class="secSub">구매횟수 분포 · 품목별 재구매율 · 월별 추이</span></h4>'
     +'<div class="repChartGrid"><div>'+chartBox('repDist',240)+'</div><div>'+chartBox('repProd',240)+'</div></div>'
     +'<div style="margin-top:10px">'+chartBox('repMonthly',220)+'</div></div>';
-  body.innerHTML = kpi + repurInfoBarHtml(rd) + repurAdvancedKpiHtml(rd) + repurAccBarHtml(rd) + repurMapBarHtml(rd) + charts + repurCohortHtml(rd) + repurAdvancedChartsHtml(rd) + repurProdTableHtml(rd) + repurCrossSellHtml(rd);
+  body.innerHTML = kpi + repurInfoBarHtml(rd) + repurAdvancedKpiHtml(rd) + repurAccBarHtml(rd) + repurMapBarHtml(rd) + repurFunnelHtml(rd) + charts + repurCohortHtml(rd) + repurAdvancedChartsHtml(rd) + repurProdTableHtml(rd) + repurCrossSellHtml(rd);
   drawRepurchaseCharts(rd);
   if(typeof queueVisibleTabLayoutSync==='function') queueVisibleTabLayoutSync();
 }
