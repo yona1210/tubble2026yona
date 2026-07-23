@@ -1807,6 +1807,7 @@ body{padding-bottom:48px}
     <button class="tabbtn" data-tab="sales"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg><span>매출 대시보드</span></button>
     <button class="tabbtn" data-tab="planning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg><span>상품기획</span></button>
     <button class="tabbtn" data-tab="review"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><span>고객 리뷰</span></button>
+    <button class="tabbtn" data-tab="repurchase"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg><span>재구매율</span></button>
     <button class="tabbtn" data-tab="mfr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M7 18h.01"/><path d="M12 18h.01"/><path d="M17 18h.01"/></svg><span>제조사 관리</span></button>
     <button class="tabbtn" data-tab="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg><span>한눈에 보기</span></button>
   </nav>
@@ -3875,6 +3876,10 @@ function exportExternal(){
   // 출시 SKU 민감정보(원가·발주량·담당자·메모·제조사명) 제거 — 일정/공정/대기처만
   if(safe.sku) safe.sku=safe.sku.map(s=>({type:s.type,nm:s.nm,br:s.br,launch:s.launch,mfr:'',
     waiting:s.waiting,risk:s.risk,st9:s.st9,d9:s.d9,memo:''}));
+  // 가격정책: 원가·마진 제거(판매가만 유지) / FAQ: 내부용 제거 / 재구매율: 고객·매출 지표 완전 삭제
+  if(safe.pricePolicy && Array.isArray(safe.pricePolicy.items)) safe.pricePolicy.items=safe.pricePolicy.items.map(x=>{ const y=Object.assign({},x); delete y.cost; return y; });
+  if(safe.faq && Array.isArray(safe.faq.items)) safe.faq.items=safe.faq.items.filter(x=>x.cat!=='내부');
+  delete safe.repurchase;
   safe.viewonly=true; safe.external=true;
   safe.leadtime=LEADTIME.slice();
   exportHtml(safe,`터블_관리시스템_외부공유_${fmt(NOW)}.html`,'외부 공유본 저장됨 — 원가·매입·재고·거래처 데이터 완전 제거',true);
@@ -6430,6 +6435,7 @@ document.querySelector('.tabnav').onclick=async e=>{
   const tmfr=document.getElementById('tab-mfr'); if(tmfr) tmfr.style.display = t==='mfr'?'block':'none';
   const thome=document.getElementById('tab-home'); if(thome) thome.style.display = t==='home'?'block':'none';
   const tplan=document.getElementById('tab-planning'); if(tplan) tplan.style.display = t==='planning'?'block':'none';
+  const trep=document.getElementById('tab-repurchase'); if(trep) trep.style.display = t==='repurchase'?'block':'none';
   renderTabContent(t);
 };
 
@@ -6447,6 +6453,7 @@ function renderTabContent(t,opts){
   if(t==='mfr' && typeof renderManufacturer==='function') renderManufacturer();
   if(t==='home' && typeof renderHome==='function') renderHome();
   if(t==='planning' && typeof renderPlanning==='function') renderPlanning();
+  if(t==='repurchase' && typeof renderRepurchase==='function') renderRepurchase();
   if(!opts.skipChrome){
     if(typeof placeCommonbar==='function') placeCommonbar(t);
     if(typeof syncEditToolbar==='function') syncEditToolbar(t);
@@ -6504,6 +6511,7 @@ function placeCommonbar(tab){
     review:'#tab-review > .toolbar',
     mfr:'#tab-mfr > .toolbar',
     planning:'#tab-planning > .toolbar',
+    repurchase:'#tab-repurchase > .toolbar',
     home:'#tab-home > .toolbar'
   };
   const host=document.querySelector(hostMap[tab]);
@@ -8371,7 +8379,7 @@ function syncVisibleTabLayout(){
   root.style.maxWidth='100%';
   root.style.minWidth='0';
   root.style.overflowX='hidden';
-  root.querySelectorAll('#stockCharts,#costBody,#marketBody,#salesBody,#reviewBody,#mfrBody,.toolbar,.bar,.statusbar,.kpis,.salesKpis,.chartGrid2,.complaintGrid,.complaintGridWide,.todayGrid,.mfrDetGrid,.bundleGrid,.issueList,.simOut,.gGrid,.previewSummary,.salesSec,.mCard,.complaintHero,.reviewDetailFold,.todayCol,.costdetail,.gCard,.ciCard,.bundleCard,.issuePanel,.reportNote,.previewNote,.orderReportSummary').forEach(el=>{
+  root.querySelectorAll('#stockCharts,#costBody,#marketBody,#salesBody,#reviewBody,#mfrBody,#repurchaseBody,.toolbar,.bar,.statusbar,.kpis,.salesKpis,.chartGrid2,.repChartGrid,.complaintGrid,.complaintGridWide,.todayGrid,.mfrDetGrid,.bundleGrid,.issueList,.simOut,.gGrid,.previewSummary,.salesSec,.mCard,.complaintHero,.reviewDetailFold,.todayCol,.costdetail,.gCard,.ciCard,.bundleCard,.issuePanel,.reportNote,.previewNote,.orderReportSummary').forEach(el=>{
     el.style.width='100%';
     el.style.maxWidth='100%';
     el.style.minWidth='0';
@@ -10698,7 +10706,7 @@ function planEok(v){ return (v/1e8).toFixed(2)+'억'; }
   if(!document.getElementById('tab-planning')){
     var ref=document.getElementById('tab-mfr');
     var div=document.createElement('div'); div.id='tab-planning'; div.style.display='none';
-    div.innerHTML='<div class="toolbar"><button class="tbtn accent" onclick="openPlanningEdit(null)">+ 아이디어 추가</button>'
+    div.innerHTML='<div class="toolbar"><button class="tbtn accent" id="planAddBtn" onclick="openPlanningEdit(null)">+ 아이디어 추가</button>'
       +'<span class="salesMeta" id="planMeta" style="margin-left:6px"></span></div><div id="planningBody"></div>';
     if(ref&&ref.parentNode) ref.parentNode.insertBefore(div, ref.nextSibling);
     else { var w=document.querySelector('.wrap'); if(w) w.appendChild(div); }
@@ -10718,35 +10726,228 @@ function planEok(v){ return (v/1e8).toFixed(2)+'억'; }
       {id:10,brand:'키친플래그',nm:'타포린 분리수거함 3단',cat:'수납·정리',stage:'아이디어',owner:'이현아',target:'2027.04',tgt:'좁은 주방 1~2인',concept:'접이식 3단 분리수거 정리함',diff:'접이식·방수 타포린',bench:'이케아·코멧',market:3,profit:3,feas:4,syn:3,price:24900,cost:9000,qty:2000}
     ]};
   }
+  // [가격정책] 데이터 init — 없을 때만 재고 품목에서 시드
+  if(!DATA.pricePolicy || !Array.isArray(DATA.pricePolicy.items)){
+    var _ppSeed=[];
+    try{
+      (DATA.stock||[]).slice(0,12).forEach(function(s,i){
+        var own=+s.price||0;
+        var cst=(typeof getCurrentCost==='function'?(getCurrentCost(s.nm,0)||0):0)|| (+s.cost||0);
+        _ppSeed.push({id:i+1, brand:'터블', nm:s.nm, cost:cst, ch:{'쿠팡':{n:own,s:0},'네이버':{n:own,s:0},'자사몰':{n:own,s:0}}, map:0, memo:''});
+      });
+    }catch(e){}
+    DATA.pricePolicy={ seq:_ppSeed.length+1, rules:'· 할인가는 정상가의 최대 30%까지, 그 이상 인하는 대표 승인 후 진행.\n· 최저광고가(MAP) 미만 판매 금지 — 채널 위반 적발 시 시정 요청.\n· 신제품 출시 후 첫 4주는 정상가 유지(런칭 프로모션은 정상가 유지 + 쿠폰으로 대응).\n· 채널 간 판매가 격차는 5% 이내로 관리.', items:_ppSeed };
+  }
+  // [FAQ] 데이터 init — 없을 때만 대표 Q&A 시드
+  if(!DATA.faq || !Array.isArray(DATA.faq.items)){
+    DATA.faq={ seq:6, items:[
+      {id:1,cat:'고객',q:'배송은 얼마나 걸리나요?',a:'평일 오후 2시 이전 결제 건은 당일 출고되며, 보통 1~2일 내 수령하실 수 있습니다. 지역·택배사 사정에 따라 하루 정도 더 소요될 수 있습니다.'},
+      {id:2,cat:'고객',q:'교환·반품은 어떻게 하나요?',a:'수령 후 7일 이내, 미개봉·미사용 상태라면 교환·반품이 가능합니다. 주문하신 채널의 문의하기 또는 고객센터로 접수해 주세요. 단순 변심의 경우 왕복 배송비가 부과될 수 있습니다.'},
+      {id:3,cat:'고객',q:'제품 사용법이 궁금해요.',a:'제품 상세페이지와 패키지 뒷면의 사용 안내를 참고해 주세요. 추가로 궁금한 점은 고객센터로 문의해 주시면 도움드리겠습니다.'},
+      {id:4,cat:'내부',q:'발주 권장수량은 어디서 확인하나요?',a:'[재고·발주] 탭의 발주 의사결정 카드에서 품목별 권장 발주수량과 산출 근거(월판매·리드타임·안전재고)를 확인합니다.'},
+      {id:5,cat:'내부',q:'원가 차수를 수정하면 어디에 반영되나요?',a:'[원가·매입] 탭에서 최신 차수 생산원가를 수정하면 재고·발주 탭의 매입액·원가율에 즉시 반영됩니다.'}
+    ]};
+  }
 })();
 // [v79] 상품기획 시드 완료 후, 홈이 활성이면 재렌더(상품기획 카운트 반영)
 try{ if(typeof activeTabName==='function' && activeTabName()==='home' && typeof renderHome==='function') renderHome(); }catch(e){}
 function renderPlanning(){
   var body=document.getElementById('planningBody'); if(!body) return;
   var all=(DATA.planning&&DATA.planning.ideas)||[];
-  var ideas = planBrandFilter==='전체' ? all : all.filter(function(o){return (o.brand||'터블')===planBrandFilter;});
-  var meta=document.getElementById('planMeta'); if(meta) meta.textContent=all.length+'개 아이디어 (터블 '+all.filter(function(o){return (o.brand||'터블')==='터블';}).length+' · 키친플래그 '+all.filter(function(o){return o.brand==='키친플래그';}).length+') · 카드 클릭 편집';
-  // [v74] 브랜드 필터 + 뷰 전환을 한 컨트롤바로 — 같은 아이디어 3중 스택 → 선택 뷰 1개만 표시
-  var PLAN_VIEWS=[['board','파이프라인 보드'],['priority','우선순위 평가'],['concept','컨셉·수익성']];
+  // [v74] 브랜드/분류 필터 + 뷰 전환을 한 컨트롤바로 · [+가격정책·FAQ] 뷰 확장
+  var PLAN_VIEWS=[['board','파이프라인 보드'],['priority','우선순위 평가'],['concept','컨셉·수익성'],['pricePolicy','가격정책'],['faq','FAQ']];
   if(!PLAN_VIEWS.some(function(v){return v[0]===planView;})) planView='board';
-  var ctrlBar='<div class="salesSec" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;margin-bottom:12px">'
-    +'<span style="font-size:12px;font-weight:700;color:var(--navy)">브랜드</span><div class="salesViewSeg" style="margin:0">'
-    +['전체'].concat(PLAN_BRANDS).map(function(b){ var c=b==='전체'?all.length:all.filter(function(o){return (o.brand||'터블')===b;}).length; return '<button class="svTab'+(planBrandFilter===b?' on':'')+'" onclick="setPlanBrand(\''+b+'\')">'+b+' ('+c+')</button>'; }).join('')
-    +'</div>'
-    +'<span style="font-size:12px;font-weight:700;color:var(--navy);margin-left:auto">보기</span><div class="salesViewSeg" style="margin:0">'
+  // 툴바 추가버튼 뷰별 스왑
+  var addBtn=document.getElementById('planAddBtn');
+  if(addBtn){
+    if(planView==='pricePolicy'){ addBtn.textContent='+ 품목 추가'; addBtn.onclick=function(){openPricePolicyEdit(null);}; }
+    else if(planView==='faq'){ addBtn.textContent='+ Q&A 추가'; addBtn.onclick=function(){openFaqEdit(null);}; }
+    else { addBtn.textContent='+ 아이디어 추가'; addBtn.onclick=function(){openPlanningEdit(null);}; }
+  }
+  var meta=document.getElementById('planMeta');
+  var viewSeg='<span style="font-size:12px;font-weight:700;color:var(--navy);margin-left:auto">보기</span><div class="salesViewSeg" style="margin:0">'
     +PLAN_VIEWS.map(function(v){ return '<button class="svTab'+(planView===v[0]?' on':'')+'" onclick="setPlanView(\''+v[0]+'\')">'+v[1]+'</button>'; }).join('')
-    +'</div></div>';
-  var byStage={}; PLAN_STAGES.forEach(function(s){byStage[s]=0;}); ideas.forEach(function(o){byStage[o.stage]=(byStage[o.stage]||0)+1;});
-  var top=ideas.slice().sort(function(a,b){return planScore(b)-planScore(a);})[0];
-  var avgScore=ideas.length?(ideas.reduce(function(s,o){return s+planScore(o);},0)/ideas.length):0;
-  var revActive=ideas.filter(function(o){return ['기획확정','개발중','출시준비'].indexOf(o.stage)>=0;}).reduce(function(s,o){return s+(o.price*o.qty||0);},0);
-  var kpi='<div class="kpis">'
-    +'<div class="kpi accent"><div class="v">'+ideas.length+'</div><div class="l">기획 아이디어</div><div class="sub">파이프라인 전체</div></div>'
-    +'<div class="kpi"><div class="v">'+((byStage['개발중']||0)+(byStage['출시준비']||0))+'</div><div class="l">개발·출시준비</div><div class="sub">곧 출시</div></div>'
-    +'<div class="kpi"><div class="v">'+(ideas.length?avgScore.toFixed(1):'-')+'</div><div class="l">평균 종합점수</div><div class="sub">20점 만점 · 최고 '+(top?planScore(top):0)+(top?' ('+pEsc(top.nm)+')':'')+'</div></div>'
-    +'<div class="kpi"><div class="v">'+planEok(revActive)+'</div><div class="l">진행 건 월 예상매출</div><div class="sub">기획확정+개발+출시준비</div></div></div>';
-  var view = planView==='priority' ? planPriorityHtml(ideas) : planView==='concept' ? planConceptHtml(ideas) : planBoardHtml(ideas);
+    +'</div>';
+  var leftFilter='', kpi='', view='';
+  if(planView==='faq'){
+    var fi=(DATA.faq&&DATA.faq.items)||[];
+    if(meta) meta.textContent=fi.length+'개 Q&A · 고객 '+fi.filter(function(x){return x.cat==='고객';}).length+' · 내부 '+fi.filter(function(x){return x.cat==='내부';}).length+' · 카드 클릭 편집';
+    var FCATS=['전체','고객','내부']; if(FCATS.indexOf(planFaqCat)<0) planFaqCat='전체';
+    leftFilter='<span style="font-size:12px;font-weight:700;color:var(--navy)">분류</span><div class="salesViewSeg" style="margin:0">'
+      +FCATS.map(function(c){ var cnt=c==='전체'?fi.length:fi.filter(function(x){return x.cat===c;}).length; return '<button class="svTab'+(planFaqCat===c?' on':'')+'" onclick="setPlanFaqCat(\''+c+'\')">'+c+' ('+cnt+')</button>'; }).join('')
+      +'</div>';
+    kpi=faqKpiHtml(); view=planFaqHtml();
+  } else if(planView==='pricePolicy'){
+    var pit=(DATA.pricePolicy&&DATA.pricePolicy.items)||[];
+    if(meta) meta.textContent=pit.length+'개 품목 · 채널별 판매가·마진 관리 · 행 클릭 편집';
+    leftFilter='<span style="font-size:12px;font-weight:700;color:var(--navy)">브랜드</span><div class="salesViewSeg" style="margin:0">'
+      +['전체'].concat(PLAN_BRANDS).map(function(b){ var c=priceItemsByBrand(b).length; return '<button class="svTab'+(planBrandFilter===b?' on':'')+'" onclick="setPlanBrand(\''+b+'\')">'+b+' ('+c+')</button>'; }).join('')
+      +'</div>';
+    kpi=pricePolicyKpiHtml(); view=planPricePolicyHtml();
+  } else {
+    var ideas = planBrandFilter==='전체' ? all : all.filter(function(o){return (o.brand||'터블')===planBrandFilter;});
+    if(meta) meta.textContent=all.length+'개 아이디어 (터블 '+all.filter(function(o){return (o.brand||'터블')==='터블';}).length+' · 키친플래그 '+all.filter(function(o){return o.brand==='키친플래그';}).length+') · 카드 클릭 편집';
+    leftFilter='<span style="font-size:12px;font-weight:700;color:var(--navy)">브랜드</span><div class="salesViewSeg" style="margin:0">'
+      +['전체'].concat(PLAN_BRANDS).map(function(b){ var c=b==='전체'?all.length:all.filter(function(o){return (o.brand||'터블')===b;}).length; return '<button class="svTab'+(planBrandFilter===b?' on':'')+'" onclick="setPlanBrand(\''+b+'\')">'+b+' ('+c+')</button>'; }).join('')
+      +'</div>';
+    var byStage={}; PLAN_STAGES.forEach(function(s){byStage[s]=0;}); ideas.forEach(function(o){byStage[o.stage]=(byStage[o.stage]||0)+1;});
+    var top=ideas.slice().sort(function(a,b){return planScore(b)-planScore(a);})[0];
+    var avgScore=ideas.length?(ideas.reduce(function(s,o){return s+planScore(o);},0)/ideas.length):0;
+    var revActive=ideas.filter(function(o){return ['기획확정','개발중','출시준비'].indexOf(o.stage)>=0;}).reduce(function(s,o){return s+(o.price*o.qty||0);},0);
+    kpi='<div class="kpis">'
+      +'<div class="kpi accent"><div class="v">'+ideas.length+'</div><div class="l">기획 아이디어</div><div class="sub">파이프라인 전체</div></div>'
+      +'<div class="kpi"><div class="v">'+((byStage['개발중']||0)+(byStage['출시준비']||0))+'</div><div class="l">개발·출시준비</div><div class="sub">곧 출시</div></div>'
+      +'<div class="kpi"><div class="v">'+(ideas.length?avgScore.toFixed(1):'-')+'</div><div class="l">평균 종합점수</div><div class="sub">20점 만점 · 최고 '+(top?planScore(top):0)+(top?' ('+pEsc(top.nm)+')':'')+'</div></div>'
+      +'<div class="kpi"><div class="v">'+planEok(revActive)+'</div><div class="l">진행 건 월 예상매출</div><div class="sub">기획확정+개발+출시준비</div></div></div>';
+    view = planView==='priority' ? planPriorityHtml(ideas) : planView==='concept' ? planConceptHtml(ideas) : planBoardHtml(ideas);
+  }
+  var ctrlBar='<div class="salesSec" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;margin-bottom:12px">'+leftFilter+viewSeg+'</div>';
   body.innerHTML = kpi + ctrlBar + view;
+}
+// ===== [가격정책] 뷰 =====
+function priceItemsByBrand(b){ var it=(DATA.pricePolicy&&DATA.pricePolicy.items)||[]; return b==='전체'?it:it.filter(function(x){return (x.brand||'터블')===b;}); }
+function ppMargin(o){ var own=(o.ch&&o.ch['자사몰']&&+o.ch['자사몰'].n)||0, cost=+o.cost||0; return (own>0&&cost>0)?((own-cost)/own*100):null; }
+function ppMarginColor(m){ return m==null?'#aaa':(m>=40?'#1E9E63':m>=25?'#E59A1C':'#C0392B'); }
+function ppChCell(c){ if(!c) return '-'; var n=+c.n||0, s=+c.s||0; if(!n&&!s) return '-'; if(s>0&&s<n) return planNum(n)+' <span style="color:#C0392B">→ '+planNum(s)+'</span>'; return planNum(n); }
+function pricePolicyKpiHtml(){
+  var items=priceItemsByBrand(planBrandFilter);
+  var withM=items.map(ppMargin).filter(function(m){return m!=null;});
+  var avg=withM.length?(withM.reduce(function(a,b){return a+b;},0)/withM.length):null;
+  var lowest=null; items.forEach(function(o){ var m=ppMargin(o); if(m!=null&&(lowest==null||m<lowest.m)) lowest={m:m,nm:o.nm}; });
+  var onSale=items.filter(function(o){ return o.ch&&['쿠팡','네이버','자사몰'].some(function(k){ return o.ch[k]&&+o.ch[k].s>0 && +o.ch[k].s < (+o.ch[k].n||0); }); }).length;
+  return '<div class="kpis">'
+    +'<div class="kpi accent"><div class="v">'+items.length+'</div><div class="l">관리 품목</div><div class="sub">'+pEsc(planBrandFilter)+'</div></div>'
+    +'<div class="kpi"><div class="v" style="color:'+ppMarginColor(avg)+'">'+(avg!=null?avg.toFixed(0)+'%':'-')+'</div><div class="l">평균 마진율</div><div class="sub">자사몰 정상가 기준</div></div>'
+    +'<div class="kpi"><div class="v" style="color:'+ppMarginColor(lowest?lowest.m:null)+'">'+(lowest?lowest.m.toFixed(0)+'%':'-')+'</div><div class="l">최저 마진</div><div class="sub">'+(lowest?pEsc(lowest.nm):'-')+'</div></div>'
+    +'<div class="kpi"><div class="v">'+onSale+'</div><div class="l">할인 진행</div><div class="sub">채널 할인가 설정 품목</div></div></div>';
+}
+function planPricePolicyHtml(){
+  var items=priceItemsByBrand(planBrandFilter);
+  var rows=items.map(function(o){
+    var m=ppMargin(o), mc=ppMarginColor(m), bcol=PLAN_BRANDCOLOR[o.brand||'터블']||'#868a96';
+    return '<tr onclick="openPricePolicyEdit('+o.id+')" style="cursor:pointer">'
+      +'<td class="l"><span class="planCatBadge" style="background:'+bcol+';color:#fff">'+pEsc(o.brand||'터블')+'</span> '+pEsc(o.nm)+'</td>'
+      +'<td class="r">'+(+o.cost?planNum(o.cost)+'원':'-')+'</td>'
+      +'<td class="c"><b style="color:'+mc+'">'+(m!=null?m.toFixed(0)+'%':'-')+'</b></td>'
+      +'<td class="r">'+ppChCell(o.ch&&o.ch['쿠팡'])+'</td>'
+      +'<td class="r">'+ppChCell(o.ch&&o.ch['네이버'])+'</td>'
+      +'<td class="r">'+ppChCell(o.ch&&o.ch['자사몰'])+'</td>'
+      +'<td class="r">'+(+o.map?planNum(o.map)+'원':'<span style="color:#c4c8d2">미설정</span>')+'</td>'
+      +'<td class="l" style="color:#7a8194">'+pEsc(o.memo||'')+'</td></tr>';
+  }).join('')||'<tr><td colspan="8" style="text-align:center;color:#aaa;padding:16px">등록된 품목이 없습니다 — [+ 품목 추가]</td></tr>';
+  var rules=(DATA.pricePolicy&&DATA.pricePolicy.rules)||'';
+  var rulesCard='<div class="salesSec" style="margin-top:14px"><h4>가격 정책 규칙 <span class="secSub">할인·최저가·승인 기준</span> <button class="tbtn" style="float:right;font-size:11px;padding:4px 10px" onclick="openPricePolicyRules()">편집</button></h4>'
+    +'<div class="pdText" style="white-space:pre-wrap">'+(rules?pEsc(rules):'등록된 정책 규칙이 없습니다 — [편집]에서 입력하세요')+'</div></div>';
+  return '<div class="salesSec"><h4>채널별 판매가 · 마진 <span class="secSub">쿠팡·네이버·자사몰 정상가/할인가 · 행 클릭 편집</span></h4>'
+    +'<div class="salesTblWrap"><table class="salesTbl planTbl"><thead><tr><th class="l">품목</th><th class="r">원가</th><th class="c">마진</th><th class="r">쿠팡</th><th class="r">네이버</th><th class="r">자사몰</th><th class="r">최저가(MAP)</th><th class="l">메모</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'
+    +rulesCard;
+}
+function openPricePolicyEdit(id){
+  if(!DATA.pricePolicy) return;
+  var defBrand=(planBrandFilter&&planBrandFilter!=='전체')?planBrandFilter:'터블';
+  var o = id? (DATA.pricePolicy.items||[]).find(function(x){return x.id===id;}) : {id:null,brand:defBrand,nm:'',cost:0,ch:{'쿠팡':{n:0,s:0},'네이버':{n:0,s:0},'자사몰':{n:0,s:0}},map:0,memo:''};
+  if(!o) return;
+  var old=document.getElementById('ppEditModal'); if(old) old.remove();
+  var sel=function(opts,v){return opts.map(function(c){return '<option value="'+c+'"'+(c===v?' selected':'')+'>'+c+'</option>';}).join('');};
+  var num=function(label,key,val){return '<div class="efield"><label>'+label+'</label><input id="pp_'+key+'" type="number" value="'+(val!=null&&val!==''?val:'')+'"></div>';};
+  var ch=function(k){ return (o.ch&&o.ch[k])||{n:0,s:0}; };
+  var m=document.createElement('div'); m.id='ppEditModal'; m.className='modal open';
+  m.innerHTML='<div class="mbox" style="max-width:600px;width:100%;padding:22px;max-height:88vh;overflow:auto">'
+    +'<h3>'+(id?'가격정책 편집':'새 품목 가격정책')+'</h3>'
+    +'<div class="efgrid"><div class="efield"><label>브랜드</label><select id="pp_brand">'+sel(PLAN_BRANDS,o.brand||'터블')+'</select></div>'
+    +'<div class="efield"><label>품목명</label><input id="pp_nm" value="'+pEsc(o.nm||'')+'"></div></div>'
+    +'<div class="efgrid">'+num('원가(원)','cost',o.cost)+num('최저광고가 MAP(원)','map',o.map)+'</div>'
+    +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin:8px 0 3px">채널별 정상가 / 할인가 (원)</div>'
+    +'<div class="efgrid">'+num('쿠팡 정상','coupang_n',ch('쿠팡').n)+num('쿠팡 할인','coupang_s',ch('쿠팡').s)+'</div>'
+    +'<div class="efgrid">'+num('네이버 정상','naver_n',ch('네이버').n)+num('네이버 할인','naver_s',ch('네이버').s)+'</div>'
+    +'<div class="efgrid">'+num('자사몰 정상','own_n',ch('자사몰').n)+num('자사몰 할인','own_s',ch('자사몰').s)+'</div>'
+    +'<div class="efield"><label>메모</label><input id="pp_memo" value="'+pEsc(o.memo||'')+'"></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px">'
+    +(id?'<button class="tbtn danger" id="ppDel">삭제</button>':'<span></span>')
+    +'<div style="display:flex;gap:8px"><button class="tbtn" id="ppCancel">취소</button><button class="tbtn primary" id="ppSave">저장</button></div></div></div>';
+  document.body.appendChild(m);
+  m.querySelector('#ppCancel').onclick=function(){m.remove();};
+  if(id){ var del=m.querySelector('#ppDel'); if(del) del.onclick=function(){ DATA.pricePolicy.items=DATA.pricePolicy.items.filter(function(x){return x.id!==id;}); m.remove(); if(typeof markDirty==='function')markDirty(); renderPlanning(); }; }
+  m.querySelector('#ppSave').onclick=function(){
+    var g=function(k){return document.getElementById('pp_'+k);};
+    var v={ brand:g('brand').value, nm:g('nm').value.trim(), cost:+g('cost').value||0, map:+g('map').value||0,
+      ch:{'쿠팡':{n:+g('coupang_n').value||0,s:+g('coupang_s').value||0},'네이버':{n:+g('naver_n').value||0,s:+g('naver_s').value||0},'자사몰':{n:+g('own_n').value||0,s:+g('own_s').value||0}},
+      memo:g('memo').value.trim() };
+    if(!v.nm){ if(typeof toast==='function')toast('품목명을 입력하세요'); return; }
+    if(id){ var idx=DATA.pricePolicy.items.findIndex(function(x){return x.id===id;}); if(idx>=0) DATA.pricePolicy.items[idx]=Object.assign({},DATA.pricePolicy.items[idx],v); }
+    else { if(!DATA.pricePolicy.seq) DATA.pricePolicy.seq=(DATA.pricePolicy.items.reduce(function(mx,x){return Math.max(mx,x.id||0);},0)+1); v.id=DATA.pricePolicy.seq++; DATA.pricePolicy.items.push(v); }
+    m.remove(); if(typeof markDirty==='function')markDirty(); renderPlanning();
+  };
+}
+function openPricePolicyRules(){
+  if(!DATA.pricePolicy) return;
+  var old=document.getElementById('ppRulesModal'); if(old) old.remove();
+  var m=document.createElement('div'); m.id='ppRulesModal'; m.className='modal open';
+  m.innerHTML='<div class="mbox" style="max-width:560px;width:100%;padding:22px">'
+    +'<h3>가격 정책 규칙 편집</h3>'
+    +'<textarea id="ppRulesTa" rows="8" style="width:100%;resize:vertical;font-family:inherit;font-size:12.5px;line-height:1.6;padding:10px 12px;border:1px solid #d6dbe7;border-radius:8px">'+pEsc((DATA.pricePolicy.rules)||'')+'</textarea>'
+    +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="tbtn" id="ppRulesCancel">취소</button><button class="tbtn primary" id="ppRulesSave">저장</button></div></div>';
+  document.body.appendChild(m);
+  m.querySelector('#ppRulesCancel').onclick=function(){m.remove();};
+  m.querySelector('#ppRulesSave').onclick=function(){ DATA.pricePolicy.rules=document.getElementById('ppRulesTa').value; m.remove(); if(typeof markDirty==='function')markDirty(); renderPlanning(); };
+}
+// ===== [FAQ] 뷰 =====
+var planFaqCat='전체';
+var planFaqQuery='';
+function setPlanFaqCat(c){ planFaqCat=c; renderPlanning(); }
+function setPlanFaqQuery(v){ planFaqQuery=v; var b=document.getElementById('faqListBox'); if(b) b.innerHTML=faqListInner(); }
+function faqKpiHtml(){
+  var fi=(DATA.faq&&DATA.faq.items)||[];
+  return '<div class="kpis">'
+    +'<div class="kpi accent"><div class="v">'+fi.length+'</div><div class="l">전체 Q&A</div><div class="sub">고객 + 내부</div></div>'
+    +'<div class="kpi"><div class="v">'+fi.filter(function(x){return x.cat==='고객';}).length+'</div><div class="l">고객 CS</div><div class="sub">문의 대응용</div></div>'
+    +'<div class="kpi"><div class="v">'+fi.filter(function(x){return x.cat==='내부';}).length+'</div><div class="l">내부 운영</div><div class="sub">업무 지식</div></div></div>';
+}
+function faqListInner(){
+  var fi=(DATA.faq&&DATA.faq.items)||[];
+  var q=(planFaqQuery||'').trim().toLowerCase();
+  var list=fi.filter(function(x){ return planFaqCat==='전체'||x.cat===planFaqCat; })
+             .filter(function(x){ return !q || (String(x.q||'').toLowerCase().indexOf(q)>=0 || String(x.a||'').toLowerCase().indexOf(q)>=0); });
+  if(!list.length) return '<div style="color:#aaa;font-size:12px;padding:16px;text-align:center">해당하는 Q&A가 없습니다.</div>';
+  return list.map(function(x){
+    var badge=x.cat==='내부'?'<span class="planCatBadge" style="background:#9B59B6;color:#fff">내부</span>':'<span class="planCatBadge" style="background:#3355FF;color:#fff">고객</span>';
+    return '<details class="faqItem" style="background:#fff;border:1px solid #e7eaf2;border-radius:10px;padding:10px 14px;margin-bottom:8px">'
+      +'<summary style="cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--navy);list-style:none">'
+      +badge+'<span style="flex:1">'+pEsc(x.q)+'</span>'
+      +'<button class="tbtn" style="font-size:10.5px;padding:3px 8px" onclick="event.preventDefault();event.stopPropagation();openFaqEdit('+x.id+')">편집</button></summary>'
+      +'<div style="font-size:12.5px;line-height:1.65;color:#3a3d47;margin-top:9px;padding-top:9px;border-top:1px dashed #e3e7f1;white-space:pre-wrap">'+pEsc(x.a||'')+'</div></details>';
+  }).join('');
+}
+function planFaqHtml(){
+  return '<div class="salesSec"><h4>자주 묻는 질문 <span class="secSub">질문 클릭 → 답변 펼침 · [편집]으로 수정</span></h4>'
+    +'<input type="text" placeholder="질문·답변 검색…" value="'+pEsc(planFaqQuery||'')+'" oninput="setPlanFaqQuery(this.value)" style="width:100%;max-width:340px;font-size:12.5px;padding:8px 11px;border:1px solid #d6dbe7;border-radius:8px;margin-bottom:12px">'
+    +'<div id="faqListBox">'+faqListInner()+'</div></div>';
+}
+function openFaqEdit(id){
+  if(!DATA.faq) return;
+  var o = id? (DATA.faq.items||[]).find(function(x){return x.id===id;}) : {id:null,cat:'고객',q:'',a:''};
+  if(!o) return;
+  var old=document.getElementById('faqEditModal'); if(old) old.remove();
+  var sel=function(opts,v){return opts.map(function(c){return '<option value="'+c+'"'+(c===v?' selected':'')+'>'+c+'</option>';}).join('');};
+  var m=document.createElement('div'); m.id='faqEditModal'; m.className='modal open';
+  m.innerHTML='<div class="mbox" style="max-width:560px;width:100%;padding:22px;max-height:88vh;overflow:auto">'
+    +'<h3>'+(id?'Q&A 편집':'새 Q&A')+'</h3>'
+    +'<div class="efield"><label>분류</label><select id="fq_cat">'+sel(['고객','내부'],o.cat||'고객')+'</select></div>'
+    +'<div class="efield"><label>질문</label><input id="fq_q" value="'+pEsc(o.q||'')+'"></div>'
+    +'<div class="efield"><label>답변</label><textarea id="fq_a" rows="5" style="width:100%;resize:vertical;font-family:inherit;font-size:12.5px;line-height:1.6;padding:9px 11px;border:1px solid #d6dbe7;border-radius:8px">'+pEsc(o.a||'')+'</textarea></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px">'
+    +(id?'<button class="tbtn danger" id="fqDel">삭제</button>':'<span></span>')
+    +'<div style="display:flex;gap:8px"><button class="tbtn" id="fqCancel">취소</button><button class="tbtn primary" id="fqSave">저장</button></div></div></div>';
+  document.body.appendChild(m);
+  m.querySelector('#fqCancel').onclick=function(){m.remove();};
+  if(id){ var del=m.querySelector('#fqDel'); if(del) del.onclick=function(){ DATA.faq.items=DATA.faq.items.filter(function(x){return x.id!==id;}); m.remove(); if(typeof markDirty==='function')markDirty(); renderPlanning(); }; }
+  m.querySelector('#fqSave').onclick=function(){
+    var v={ cat:document.getElementById('fq_cat').value, q:document.getElementById('fq_q').value.trim(), a:document.getElementById('fq_a').value.trim() };
+    if(!v.q){ if(typeof toast==='function')toast('질문을 입력하세요'); return; }
+    if(id){ var idx=DATA.faq.items.findIndex(function(x){return x.id===id;}); if(idx>=0) DATA.faq.items[idx]=Object.assign({},DATA.faq.items[idx],v); }
+    else { if(!DATA.faq.seq) DATA.faq.seq=(DATA.faq.items.reduce(function(mx,x){return Math.max(mx,x.id||0);},0)+1); v.id=DATA.faq.seq++; DATA.faq.items.push(v); }
+    m.remove(); if(typeof markDirty==='function')markDirty(); renderPlanning();
+  };
 }
 function planBoardHtml(ideas){
   var cols=PLAN_STAGES.map(function(stg){
@@ -10905,6 +11106,7 @@ function openPlanningEdit(id){
     market:['시장·전략','시장 동향과 카테고리 전략'],
     sales:['매출 대시보드','채널별 매출과 성과 지표'],
     review:['고객 리뷰','고객 리뷰와 평점 분석'],
+    repurchase:['재구매율','고객 재구매율 분석 · 주문 엑셀 업로드'],
     mfr:['제조사 관리','제조사별 발주·생산 현황 관리']
   };
   function setTitle(t){
@@ -10920,6 +11122,578 @@ function openPlanningEdit(id){
   var on=document.querySelector('.tabbtn.on');
   if(on) setTitle(on.dataset.tab);
 })();
+</script>
+
+<script>
+/* ===== 재구매율 탭 — 주문 엑셀 업로드 → 재구매율 자동 계산 (매출/리뷰 탭 미러) ===== */
+(function initRepurchase(){
+  var css=`.repChartGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:760px){.repChartGrid{grid-template-columns:1fr}}
+  .repMapBar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;background:#f4f6fb;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px}
+  .repMapBar .repMapTitle{font-weight:800;color:var(--navy)}
+  .repMapBar .repMapCol{color:#5f6470;display:inline-flex;align-items:center;gap:5px}
+  .repMapBar .repMapCol select{font-size:11.5px;padding:3px 6px;border:1px solid #d6dbe7;border-radius:6px;background:#fff;max-width:160px}
+  .repMapBar .repMapStatic b{color:var(--navy)}
+  .repMapBar .repWarn{color:#9a4b00;background:#fff5e6;border:1px solid #ffd9a0;border-radius:8px;padding:4px 10px;font-size:11.5px;font-weight:700}
+  .repMapBar .repWarn b{color:#C0392B}
+  .repAccBar{display:flex;align-items:center;flex-wrap:wrap;gap:7px 10px;background:#eef4ff;border:1px solid #d8e2fb;border-radius:10px;padding:9px 14px;margin-bottom:10px;font-size:12px}
+  .repAccBar .repMapTitle{font-weight:800;color:var(--navy)}
+  .repBatch{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid #d8e2fb;border-radius:14px;padding:3px 6px 3px 11px;font-size:11.5px;color:#3a3d47}
+  .repBatch .repBatchDel{border:none;background:#eef1f7;color:#7a8194;border-radius:50%;width:17px;height:17px;line-height:1;cursor:pointer;font-size:12px;padding:0}
+  .repBatch .repBatchDel:hover{background:#ffd9d2;color:#C0392B}
+  .repInfoBar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 18px;background:#fff;border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:8px;padding:9px 14px;margin-bottom:10px;font-size:12.5px;color:#3a3d47}
+  .repInfoBar .riMain b{color:var(--navy)} .repInfoBar b{color:var(--navy)}
+  .repInfoBar .riNote{color:#7a8194;font-size:11.5px}
+  .repInfoBar .repSrcEdit{border:none;background:#eef1f7;color:#5a6478;border-radius:6px;cursor:pointer;font-size:11px;padding:2px 6px;margin-left:2px}
+  .repInfoBar .repSrcEdit:hover{background:#dfe6f7;color:var(--navy)}`;
+  var st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
+  if(!document.getElementById('tab-repurchase')){
+    var ref=document.getElementById('tab-planning');
+    var div=document.createElement('div'); div.id='tab-repurchase'; div.style.display='none';
+    div.innerHTML='<div class="toolbar"><button class="tbtn accent" id="repUpBtn">⬆ 주문 엑셀 추가 업로드</button>'
+      +'<button class="tbtn" id="repNameMapBtn" onclick="openRepurNameMap()" style="margin-left:4px">품목명 매핑</button>'
+      +'<input type="file" id="repFileInput" accept=".xlsx,.xls,.csv" style="display:none">'
+      +'<span class="salesMeta" id="repMeta" style="margin-left:6px"></span></div><div id="repurchaseBody"></div>';
+    if(ref&&ref.parentNode) ref.parentNode.insertBefore(div, ref.nextSibling);
+    else { var w=document.querySelector('.wrap'); if(w) w.appendChild(div); }
+    var up=document.getElementById('repUpBtn'), fi=document.getElementById('repFileInput');
+    if(up&&fi){ up.onclick=function(){ fi.click(); }; fi.onchange=function(e){ if(e.target.files[0]) handleRepurchaseUpload(e.target.files[0]); e.target.value=''; }; }
+  }
+})();
+
+var _lastRepurRows=null;   // 이번 세션 마지막 업로드 원본행(세션 메모리만 — DATA엔 미저장, 재매핑용)
+var _repurHeaders=[];      // 감지된 헤더
+var _repurMap=null;        // 현재 컬럼 매핑 {cust,date,prod,qty,amt,ord} = 열 인덱스(-1=미사용)
+var _lastBatchId=null;     // 이번 세션 마지막 업로드 배치 id(재매핑 시 해당 배치 교체용)
+var _lastBatchName='';     // 이번 세션 마지막 업로드 파일명
+var repurCrossIdx=0;       // 크로스셀 조회에서 선택된 기준 품목 인덱스
+var repurProdSort='buyers';// 품목별 재구매 상세 표 정렬 기준
+
+var REPUR_CANDS={
+  cust:['거래처','거래처번호','거래처코드','거래처명','회원id','회원번호','구매자id','구매자번호','주문자id','주문자아이디','아이디','구매자','주문자','주문자명','고객id','고객번호','고객','고객명','연락처','휴대폰','전화','전화번호','이메일','수령인','수취인'],
+  date:['매출일','주문일','주문일자','결제일','결제일자','일자','날짜','date','판매일','거래일'],
+  prod:['품명','상품명','품목','품목명','상품','제품명','제품','productname','product','옵션명'],
+  qty :['수량','판매수량','주문수량','qty','quantity'],
+  amt :['원화판매금액','판매금액','결제금액','주문금액','금액','매출액','상품금액','amount','price'],
+  ord :['매출번호','주문번호','주문id','주문아이디','orderno','orderid','전표번호','거래번호']
+};
+function repurNorm(v){ return (typeof normName==='function'?normName(v):String(v||'').toLowerCase().replace(/\s+/g,'')); }
+function repurDetectCol(headers, cands){
+  var H=(headers||[]).map(function(x){return repurNorm(x);});
+  for(var i=0;i<cands.length;i++){ var idx=H.indexOf(repurNorm(cands[i])); if(idx>=0) return idx; }
+  for(var j=0;j<cands.length;j++){ var c=repurNorm(cands[j]); if(!c) continue; for(var k=0;k<H.length;k++){ if(H[k] && (H[k].indexOf(c)>=0||c.indexOf(H[k])>=0)) return k; } }
+  return -1;
+}
+function repurNum(v){ if(typeof v==='number') return v; var n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
+function repurPct(v){ return (Math.round((+v||0)*10)/10).toFixed(1)+'%'; }
+function repurMoney(v){ v=+v||0; if(v>=1e8) return (v/1e8).toFixed(2)+'억'; if(v>=1e4) return Math.round(v/1e4).toLocaleString('ko-KR')+'만'; return Math.round(v).toLocaleString('ko-KR'); }
+function repurToday(){ try{ return new Date().toISOString().slice(0,10); }catch(e){ return (DATA.meta&&DATA.meta.updated)||''; } }
+function repurYM(v){
+  if(v==null||v==='') return '';
+  if(typeof v==='number' && v>20000 && v<80000){ try{ var d=new Date(Math.round((v-25569)*86400*1000)); if(!isNaN(d.getTime())) return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0'); }catch(e){} }
+  var s=String(v); var m=s.match(/(\d{4})[.\-\/]\s*(\d{1,2})/); if(m) return m[1]+'-'+String(+m[2]).padStart(2,'0');
+  return s.length>=7?s.slice(0,7):'';
+}
+// 전체 날짜 정규화(YYYY-MM-DD) — 구매 기간 표시용(사전식 비교로 min/max 가능)
+function repurDate(v){
+  if(v==null||v==='') return '';
+  if(typeof v==='number' && v>20000 && v<80000){ try{ var d=new Date(Math.round((v-25569)*86400*1000)); if(!isNaN(d.getTime())) return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0'); }catch(e){} }
+  var s=String(v); var m=s.match(/(\d{4})[.\-\/]\s*(\d{1,2})[.\-\/]\s*(\d{1,2})/);
+  if(m) return m[1]+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0');
+  return repurYM(v);
+}
+function parseRepurchaseWorkbook(wb){
+  var ws=wb.Sheets[wb.SheetNames[0]];
+  var arr=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  if(!arr||!arr.length) return {error:'빈 시트입니다.'};
+  var headerRow=-1, headers=[];
+  for(var r=0;r<Math.min(arr.length,15);r++){
+    var row=(arr[r]||[]).map(function(x){return String(x==null?'':x);});
+    var hit=0; ['cust','date','prod'].forEach(function(key){ if(repurDetectCol(row, REPUR_CANDS[key])>=0) hit++; });
+    if(hit>=2){ headerRow=r; headers=row; break; }
+  }
+  if(headerRow<0) return {error:'주문 데이터 헤더(고객·일자·품명)를 찾지 못했습니다 — 컬럼명을 확인해 주세요.'};
+  var rows=arr.slice(headerRow+1).filter(function(rw){ return rw && rw.some(function(c){return c!==''&&c!=null;}); });
+  var map={ cust:repurDetectCol(headers,REPUR_CANDS.cust), date:repurDetectCol(headers,REPUR_CANDS.date), prod:repurDetectCol(headers,REPUR_CANDS.prod), qty:repurDetectCol(headers,REPUR_CANDS.qty), amt:repurDetectCol(headers,REPUR_CANDS.amt), ord:repurDetectCol(headers,REPUR_CANDS.ord) };
+  if(map.cust<0){ for(var i=0;i<headers.length;i++){ if(headers[i]){ map.cust=i; break; } } }
+  return { headers:headers, rows:rows, map:map };
+}
+// 고객 식별자 해시(PII 원문 미저장 — 같은 고객은 항상 같은 해시로 기간 넘어 연결)
+function repurHash(s){ s=String(s); var h=2166136261; for(var i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return (h>>>0).toString(36); }
+// 누적 저장소 컨테이너 보장 (acc=주문라인 압축배열 / prods=품명표 / batches=업로드 이력)
+function ensureRepurStore(){
+  if(!DATA.repurchase || !Array.isArray(DATA.repurchase.acc)){ DATA.repurchase={ acc:[], prods:[], batches:[], batchSeq:1 }; }
+  if(!Array.isArray(DATA.repurchase.prods)) DATA.repurchase.prods=[];
+  if(!Array.isArray(DATA.repurchase.batches)) DATA.repurchase.batches=[];
+  if(!DATA.repurchase.batchSeq) DATA.repurchase.batchSeq=1;
+  return DATA.repurchase;
+}
+// 원본행 → 압축 주문라인 [c,o,ym,pIdx,amt,qty] (품명은 store.prods에 인덱싱)
+function repurBuildLines(rows, headers, map, store){
+  var hasOrd=map.ord>=0, hasDate=map.date>=0;
+  var pIndex={}; store.prods.forEach(function(nm,i){ pIndex[nm]=i; });
+  var lines=[]; var dMin='', dMax='';
+  (rows||[]).forEach(function(r){
+    var custRaw=String(map.cust>=0?r[map.cust]:'').trim(); if(!custRaw) return;
+    var c=repurHash(custRaw);
+    var dRaw=hasDate?r[map.date]:''; var dateStr=String(dRaw).trim();
+    var dnorm=repurDate(dRaw); if(dnorm){ if(!dMin||dnorm<dMin)dMin=dnorm; if(!dMax||dnorm>dMax)dMax=dnorm; }
+    var okey=hasOrd?String(r[map.ord]).trim():''; if(!okey) okey='D'+dateStr;   // 주문키(고객 스코프는 c로 이미 구분)
+    var prod=String(map.prod>=0?r[map.prod]:'').trim();
+    var pIdx=-1; if(prod){ if(pIndex[prod]==null){ pIndex[prod]=store.prods.length; store.prods.push(prod); } pIdx=pIndex[prod]; }
+    var amt=repurNum(map.amt>=0?r[map.amt]:0), qty=repurNum(map.qty>=0?r[map.qty]:0);
+    lines.push([c, okey, dnorm, pIdx, amt, qty]);   // [2]=전체 날짜(YYYY-MM-DD) — 주기/기간별 분석용
+  });
+  return { lines:lines, hasOrd:hasOrd, hasDate:hasDate, custName:(map.cust>=0?(headers[map.cust]||''):''), dateMin:dMin, dateMax:dMax };
+}
+// 누적 병합 — 주문라인(c|o|pIdx|amt|qty) 기준 중복제거 → 재업로드 이중집계 방지. acc라인은 [c,o,ym,pIdx,amt,qty,batchId]
+function repurMerge(store, lines, batchId){
+  var seen={}; store.acc.forEach(function(L){ seen[L[0]+''+L[1]+''+L[3]+''+L[4]+''+L[5]]=1; });
+  var added=0;
+  lines.forEach(function(L){ var k=L[0]+''+L[1]+''+L[3]+''+L[4]+''+L[5]; if(seen[k]) return; seen[k]=1; store.acc.push([L[0],L[1],L[2],L[3],L[4],L[5],batchId]); added++; });
+  return added;
+}
+function repurDayNum(dstr){ if(!dstr) return null; var p=String(dstr).split('-'); if(p.length<2) return null; var y=+p[0], mo=+p[1], da=p.length>=3?+p[2]:1; if(!y||!mo) return null; var t=Date.UTC(y,mo-1,da||1); return isNaN(t)?null:Math.floor(t/86400000); }
+// 누적 acc 전체에서 집계 재계산 (acc라인: [c,o,date,pIdx,amt,qty,batchId])
+function computeRepurchaseFromAcc(store){
+  var acc=store.acc||[], prods=store.prods||[];
+  // [품목명 매핑] 원본 품명 → 표시 품목명(그룹). 개별 매핑 우선 → 키워드 규칙 → 원본. 같은 표시명끼리 하나의 품목으로 합쳐 집계. 표시 시점 적용(재업로드 불필요)
+  var nameMap=store.nameMap||{}, nameRules=store.nameRules||[];
+  var resolveNm=function(raw){
+    var ex=nameMap[raw]; if(ex&&String(ex).trim()) return String(ex).trim();
+    var nr=repurNorm(raw);
+    for(var i=0;i<nameRules.length;i++){ var kw=repurNorm(nameRules[i].kw||''); if(kw && nr.indexOf(kw)>=0){ var to=String(nameRules[i].to||'').trim(); if(to) return to; } }
+    return raw;
+  };
+  var groupName=[], groupIndex={}, gidOf=[];
+  prods.forEach(function(raw,pi){ var disp=resolveNm(raw); var gi=groupIndex[disp]; if(gi==null){ gi=groupName.length; groupIndex[disp]=gi; groupName.push(disp); } gidOf[pi]=gi; });
+  var custOrders={};   // c -> { okey -> {d, amt, prods:{gid}} }
+  var prodMap={}, monthCust={}, maxDay=null;
+  acc.forEach(function(L){
+    var c=L[0], o=L[1], d=L[2]||'', pIdx=L[3], amt=+L[4]||0, qty=+L[5]||0;
+    var gid=(pIdx>=0 && gidOf[pIdx]!=null)?gidOf[pIdx]:-1;
+    var co=custOrders[c]||(custOrders[c]={});
+    var od=co[o]; if(!od){ od=co[o]={d:d, amt:0, prods:{}}; } if(d && (!od.d || d<od.d)) od.d=d;
+    od.amt+=amt; if(gid>=0) od.prods[gid]=1;
+    var ym=d.slice(0,7); if(ym){ (monthCust[ym]=monthCust[ym]||{})[c]=1; }
+    var dn=repurDayNum(d); if(dn!=null && (maxDay==null||dn>maxDay)) maxDay=dn;
+    if(gid>=0){ var pm=prodMap[gid]||(prodMap[gid]={buyers:{},rep:{},revenue:0,qty:0}); pm.buyers[c]=1; pm.revenue+=amt; pm.qty+=qty; (pm.rep[c]=pm.rep[c]||{})[o]=1; }
+  });
+  var custs=Object.keys(custOrders), total=custs.length, totalOrders=0;
+  var counts=[], allIntervals=[], firstGaps=[];
+  var sumFirstAmt=0, firstAmtN=0, sumRepeatAmt=0, repeatOrderN=0, sumAllAmt=0;
+  var sameProdRepeaters=0, crossOnlyRepeaters=0;
+  var pAgg={}, coBuy={};     // 품목별 {buyers,same,cross} · 크로스셀 co-buy 매트릭스(pIdx a<->b)
+  var COHW=90, cohorts={};   // 첫 구매 월별 코호트: 90일 이내 재구매율(관측창 확보된 고객만)
+  custs.forEach(function(c){
+    var os=Object.keys(custOrders[c]).map(function(o){return custOrders[c][o];});
+    os.sort(function(a,b){ var da=repurDayNum(a.d), db=repurDayNum(b.d); if(da==null&&db==null)return 0; if(da==null)return 1; if(db==null)return -1; return da-db; });
+    counts.push(os.length); totalOrders+=os.length;
+    if(os.length){ sumFirstAmt+=os[0].amt; firstAmtN++; sumAllAmt+=os[0].amt; }
+    for(var i=1;i<os.length;i++){ sumRepeatAmt+=os[i].amt; repeatOrderN++; sumAllAmt+=os[i].amt; var g=repurDayNum(os[i].d), pg=repurDayNum(os[i-1].d); if(g!=null&&pg!=null&&g>=pg) allIntervals.push(g-pg); }
+    if(os.length>=2){ var g1=repurDayNum(os[1].d), g0=repurDayNum(os[0].d); firstGaps.push((g1!=null&&g0!=null&&g1>=g0)?(g1-g0):null);
+      var seenP={}, repeatedProd=false;
+      os.forEach(function(od){ var keys=Object.keys(od.prods), hitPrior=false; keys.forEach(function(pk){ if(seenP[pk]) hitPrior=true; }); if(hitPrior) repeatedProd=true; keys.forEach(function(pk){ seenP[pk]=1; }); });
+      if(repeatedProd) sameProdRepeaters++; else crossOnlyRepeaters++;
+    }
+    // 품목별 동일/타상품 재구매 + 크로스셀 co-buy (재구매 고객 기준)
+    var prodOrders={}; os.forEach(function(od){ Object.keys(od.prods).forEach(function(p){ prodOrders[p]=(prodOrders[p]||0)+1; }); });
+    var dp=Object.keys(prodOrders), isRepeat=os.length>=2;
+    dp.forEach(function(p){ var pa=pAgg[p]||(pAgg[p]={buyers:0,single:0,sameOnly:0,sameCross:0,crossOnly:0}); pa.buyers++;
+      if(!isRepeat){ pa.single++; }
+      else { var mulP=prodOrders[p]>=2, other=dp.length>=2;
+        if(mulP&&!other) pa.sameOnly++; else if(mulP&&other) pa.sameCross++; else if(!mulP&&other) pa.crossOnly++; else pa.sameOnly++; }
+    });
+    if(isRepeat && dp.length>=2 && dp.length<=60){ for(var a=0;a<dp.length;a++){ for(var b=a+1;b<dp.length;b++){ var ka=dp[a],kb=dp[b]; (coBuy[ka]=coBuy[ka]||{})[kb]=(coBuy[ka][kb]||0)+1; (coBuy[kb]=coBuy[kb]||{})[ka]=(coBuy[kb][ka]||0)+1; } } }
+    // 첫 구매 코호트(월) — 90일 관측창 확보된 고객만 분모, 90일 내 재구매 여부
+    if(os.length){ var fDay=repurDayNum(os[0].d), fMonth=(os[0].d||'').slice(0,7);
+      if(fMonth && fDay!=null){ var ch=cohorts[fMonth]||(cohorts[fMonth]={size:0,obs:0,rep:0}); ch.size++;
+        if(maxDay!=null && (fDay+COHW)<=maxDay){ ch.obs++;
+          var rw=false; for(var k=1;k<os.length;k++){ var dk=repurDayNum(os[k].d); if(dk!=null && dk>fDay && dk<=fDay+COHW){ rw=true; break; } }
+          if(rw) ch.rep++;
+        }
+      }
+    }
+  });
+  var cohortSeries=Object.keys(cohorts).sort().map(function(m){ var ch=cohorts[m]; return {ym:m, size:ch.size, obs:ch.obs, rep:ch.rep, rate:ch.obs?ch.rep/ch.obs*100:null}; });
+  var repeat=counts.filter(function(n){return n>=2;}).length;
+  var avgOrders=total?counts.reduce(function(a,b){return a+b;},0)/total:0;
+  var dist=[{label:'1회',n:0},{label:'2회',n:0},{label:'3회',n:0},{label:'4회+',n:0}];
+  counts.forEach(function(n){ if(n>=4)dist[3].n++; else if(n===3)dist[2].n++; else if(n===2)dist[1].n++; else dist[0].n++; });
+  var avgCycle=allIntervals.length?allIntervals.reduce(function(a,b){return a+b;},0)/allIntervals.length:null;
+  var sIv=allIntervals.slice().sort(function(a,b){return a-b;}); var medCycle=sIv.length?sIv[Math.floor(sIv.length/2)]:null;
+  var W=[[30,'1개월'],[60,'2개월'],[90,'3개월'],[180,'6개월'],[365,'12개월']];
+  var windowRates=W.map(function(w){ var cnt=firstGaps.filter(function(g){return g!=null&&g<=w[0];}).length; return {days:w[0], label:w[1], n:cnt, rate:total?cnt/total*100:0}; });
+  var cycleDist=[{label:'~1개월',n:0},{label:'1~2개월',n:0},{label:'2~3개월',n:0},{label:'3~6개월',n:0},{label:'6~12개월',n:0},{label:'12개월+',n:0}];
+  allIntervals.forEach(function(g){ if(g<=30)cycleDist[0].n++; else if(g<=60)cycleDist[1].n++; else if(g<=90)cycleDist[2].n++; else if(g<=180)cycleDist[3].n++; else if(g<=365)cycleDist[4].n++; else cycleDist[5].n++; });
+  var byProduct=Object.keys(pAgg).map(function(pi){ var pa=pAgg[pi], pm=prodMap[pi]||{revenue:0,qty:0};
+    var same=pa.sameOnly+pa.sameCross, cross=pa.sameCross+pa.crossOnly, repeatB=pa.sameOnly+pa.sameCross+pa.crossOnly;
+    var type = repeatB===0 ? '일회성 위주' : (pa.sameOnly>=(pa.sameCross+pa.crossOnly) ? '동일제품 충성형' : '교차구매 확장형');
+    return {pi:+pi, nm:groupName[pi]||('품목'+pi), buyers:pa.buyers, repeatBuyers:same, rate:pa.buyers?same/pa.buyers*100:0, crossBuyers:cross, crossRate:pa.buyers?cross/pa.buyers*100:0,
+      single:pa.single, singleRate:pa.buyers?pa.single/pa.buyers*100:0, sameOnly:pa.sameOnly, sameCross:pa.sameCross, crossOnly:pa.crossOnly, type:type, revenue:pm.revenue, qty:pm.qty}; }).sort(function(a,b){return b.buyers-a.buyers;}).slice(0,20);
+  // 크로스셀 — 상위 40개 품목별로, 그 구매자가 함께 재구매한 품목 Top12(전체 품명·비율)
+  var topForCross=Object.keys(pAgg).map(function(pi){return {pi:+pi, buyers:pAgg[pi].buyers};}).sort(function(a,b){return b.buyers-a.buyers;}).slice(0,40);
+  var crossSell=topForCross.map(function(p){ var partners=coBuy[p.pi]||{}; var arr=Object.keys(partners).map(function(k){return {nm:groupName[k]||('품목'+k), n:partners[k], rate:p.buyers?partners[k]/p.buyers*100:0};}).sort(function(a,b){return b.n-a.n;}).slice(0,12); return {nm:groupName[p.pi]||('품목'+p.pi), buyers:p.buyers, partners:arr}; });
+  var yms=Object.keys(monthCust).sort(); var seen={};
+  var monthly=yms.map(function(ym){ var active=Object.keys(monthCust[ym]); var returning=0; active.forEach(function(c){ if(seen[c]) returning++; }); active.forEach(function(c){ seen[c]=true; }); return {ym:ym, active:active.length, returning:returning, rate:active.length?returning/active.length*100:0}; });
+  return {
+    overall:{ totalCustomers:total, repeatCustomers:repeat, repurchaseRate:total?repeat/total*100:0, avgOrders:avgOrders, totalOrders:totalOrders },
+    dist:dist, byProduct:byProduct, monthly:monthly, crossSell:crossSell,
+    avgCycle:avgCycle, medCycle:medCycle, cycleDist:cycleDist, windowRates:windowRates,
+    cohortSeries:cohortSeries, cohortWindow:COHW,
+    sameCross:{ sameProd:sameProdRepeaters, crossOnly:crossOnlyRepeaters, repeatCust:repeat },
+    amounts:{ firstAOV:firstAmtN?sumFirstAmt/firstAmtN:0, repeatAOV:repeatOrderN?sumRepeatAmt/repeatOrderN:0, overallAOV:totalOrders?sumAllAmt/totalOrders:0, hasAmount:sumAllAmt>0 }
+  };
+}
+function recomputeRepurAgg(){
+  var store=ensureRepurStore(); var agg=computeRepurchaseFromAcc(store);
+  store.overall=agg.overall; store.dist=agg.dist; store.byProduct=agg.byProduct; store.monthly=agg.monthly; store.uploaded=repurToday();
+  store.avgCycle=agg.avgCycle; store.medCycle=agg.medCycle; store.cycleDist=agg.cycleDist; store.windowRates=agg.windowRates; store.sameCross=agg.sameCross; store.amounts=agg.amounts;
+  store.cohortSeries=agg.cohortSeries; store.cohortWindow=agg.cohortWindow; store.crossSell=agg.crossSell;
+  var pf='', pt='';
+  (store.batches||[]).forEach(function(b){ if(b.dateMin && (!pf||b.dateMin<pf))pf=b.dateMin; if(b.dateMax && (!pt||b.dateMax>pt))pt=b.dateMax; });
+  store.periodFrom=pf; store.periodTo=pt;
+}
+function handleRepurchaseUpload(file){
+  if(typeof ensureXlsx!=='function'){ if(typeof toast==='function')toast('엑셀 라이브러리를 사용할 수 없습니다'); return; }
+  ensureXlsx(function(){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      try{
+        var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+        var p=parseRepurchaseWorkbook(wb);
+        if(p.error){ if(typeof toast==='function')toast(p.error); return; }
+        _lastRepurRows=p.rows; _repurHeaders=p.headers; _repurMap=p.map;
+        _lastBatchId=null;                       // 새 업로드 → 새 배치로 누적
+        _lastBatchName=(file&&file.name)||('업로드');
+        var added=applyRepurUpload();
+        if(typeof toast==='function')toast('누적 완료 · 신규 '+added.toLocaleString('ko-KR')+'건 추가 (총 '+(DATA.repurchase.acc.length).toLocaleString('ko-KR')+'건)');
+      }catch(err){ if(typeof toast==='function')toast('파일 처리 실패: '+err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+}
+// 현재 세션 마지막 업로드를 누적 반영 (신규 배치 or 재매핑 시 기존 배치 교체)
+function applyRepurUpload(){
+  if(!_lastRepurRows||!_repurMap) return 0;
+  var store=ensureRepurStore();
+  var built=repurBuildLines(_lastRepurRows,_repurHeaders,_repurMap,store);
+  if(_lastBatchId!=null){ store.acc=store.acc.filter(function(L){return L[6]!==_lastBatchId;}); }  // 재매핑: 기존 배치 제거 후 재삽입
+  var bid = _lastBatchId!=null ? _lastBatchId : store.batchSeq++;
+  _lastBatchId=bid;
+  var added=repurMerge(store, built.lines, bid);
+  var bm=store.batches.filter(function(b){return b.id===bid;})[0];
+  if(!bm){ bm={id:bid, name:_lastBatchName||('업로드 '+bid), uploaded:repurToday(), lines:added, rows:_lastRepurRows.length, dateMin:built.dateMin, dateMax:built.dateMax}; store.batches.push(bm); }
+  else { bm.lines=added; bm.rows=_lastRepurRows.length; bm.uploaded=repurToday(); bm.dateMin=built.dateMin; bm.dateMax=built.dateMax; }
+  store.custColName=built.custName; store.isB2B=/거래처/.test(built.custName);
+  store.orderKeyBasis=built.hasOrd?'주문번호':'고객+일자';
+  store.insufficient=(!built.hasOrd && !built.hasDate);
+  if(store.sourceLabel==null) store.sourceLabel = store.isB2B?'거래처(B2B)':'브랜드 스토어';
+  store.mapping={ cust:built.custName, date:_repurMap.date>=0?_repurHeaders[_repurMap.date]:'', prod:_repurMap.prod>=0?_repurHeaders[_repurMap.prod]:'', ord:_repurMap.ord>=0?_repurHeaders[_repurMap.ord]:'', amt:_repurMap.amt>=0?_repurHeaders[_repurMap.amt]:'', qty:_repurMap.qty>=0?_repurHeaders[_repurMap.qty]:'' };
+  recomputeRepurAgg();
+  if(typeof markDirty==='function')markDirty();
+  renderRepurchase();
+  return added;
+}
+function setRepurMapCol(which,idx){ if(!_repurMap) return; if(which==='cust' && +idx<0){ if(typeof toast==='function')toast('고객키는 필수입니다'); return; } _repurMap[which]=+idx; applyRepurUpload(); }
+function repurResetAll(){
+  var doIt=function(){ DATA.repurchase={acc:[],prods:[],batches:[],batchSeq:1}; _lastBatchId=null; _lastRepurRows=null; if(typeof markDirty==='function')markDirty(); renderRepurchase(); if(typeof toast==='function')toast('누적 데이터 초기화됨'); };
+  if(typeof askConfirm==='function'){ askConfirm('누적된 재구매율 데이터를 모두 초기화할까요?\n(업로드 이력·집계가 모두 삭제됩니다)',{okText:'초기화',cancelText:'취소',title:'누적 초기화'}).then(function(ok){ if(ok===true) doIt(); }); }
+  else if(!window.confirm || window.confirm('누적 데이터를 초기화할까요?')) doIt();
+}
+function repurDeleteBatch(id){
+  var store=ensureRepurStore();
+  store.acc=store.acc.filter(function(L){return L[6]!==id;});
+  store.batches=store.batches.filter(function(b){return b.id!==id;});
+  if(_lastBatchId===id){ _lastBatchId=null; _lastRepurRows=null; }
+  recomputeRepurAgg();
+  if(typeof markDirty==='function')markDirty();
+  renderRepurchase();
+  if(typeof toast==='function')toast('해당 업로드 제거됨');
+}
+function repurEmptyHtml(){
+  return '<div class="salesSec" style="text-align:center;padding:40px 20px">'
+    +'<div style="font-size:40px;margin-bottom:8px">🔁</div>'
+    +'<h4 style="justify-content:center">주문 엑셀을 업로드하면 재구매율을 자동 계산합니다</h4>'
+    +'<div style="font-size:12.5px;color:#7a8194;line-height:1.75;max-width:560px;margin:6px auto 16px">'
+    +'주문 데이터(<b>고객/주문자 · 주문일자 · 품명</b> 컬럼 포함)를 업로드하세요. 주문번호가 있으면 더 정확합니다.<br>'
+    +'<b>기간별로 나눠 올려도 리셋되지 않고 계속 누적</b>됩니다(같은 주문은 중복 제거). 컬럼명은 자동 인식하며 업로드 후 매핑을 조정할 수 있습니다.<br>'
+    +'<span style="color:#9aa1b2">※ 개별 고객정보(연락처·이메일)는 해시로만 처리해 원문을 저장하지 않고, 집계값만 보관합니다.</span></div>'
+    +'<button class="tbtn accent" onclick="document.getElementById(\'repUpBtn\').click()">⬆ 주문 엑셀 업로드</button></div>';
+}
+function repurMapBarHtml(rd){
+  var canRemap=!!(_lastRepurRows && _repurHeaders && _repurHeaders.length && _repurMap);
+  var warns='';
+  if(rd.isB2B) warns+='<span class="repWarn">⚠ 고객키가 거래처 단위 — 결과는 <b>거래처 재발주율</b>입니다(소비자 재구매율 아님)</span>';
+  if(rd.insufficient) warns+='<span class="repWarn">⚠ 주문일자·주문번호가 모두 없어 구매횟수를 구분할 수 없습니다 — 컬럼을 지정하세요</span>';
+  var cols;
+  if(canRemap){
+    var mk=function(label,which,req){
+      var opts=(req?'':'<option value="-1">(없음)</option>')+_repurHeaders.map(function(h,i){ return '<option value="'+i+'"'+(_repurMap[which]===i?' selected':'')+'>'+pEsc(h||('열'+(i+1)))+'</option>'; }).join('');
+      return '<label class="repMapCol">'+label+' <select onchange="setRepurMapCol(\''+which+'\',this.value)">'+opts+'</select></label>';
+    };
+    cols=mk('고객키','cust',true)+mk('주문일자','date',false)+mk('품명','prod',false)+mk('주문번호','ord',false)+mk('금액','amt',false);
+  } else {
+    var m=rd.mapping||{};
+    cols='<span class="repMapStatic">고객키 <b>'+pEsc(m.cust||'-')+'</b></span>'
+      +'<span class="repMapStatic">주문일자 <b>'+pEsc(m.date||'-')+'</b></span>'
+      +'<span class="repMapStatic">품명 <b>'+pEsc(m.prod||'-')+'</b></span>'
+      +'<span class="repMapStatic">주문번호 <b>'+pEsc(m.ord||'(없음 · 고객+일자 기준)')+'</b></span>'
+      +'<span style="color:#9aa1b2">· 매핑 변경은 재업로드 후 가능</span>';
+  }
+  return '<div class="repMapBar"><span class="repMapTitle">컬럼 매핑</span>'+cols+warns+'</div>';
+}
+function repurTypeBadge(t){ var c=t==='동일제품 충성형'?'#1E9E63':t==='교차구매 확장형'?'#3355FF':'#C0392B'; return '<span style="font-size:10.5px;font-weight:700;color:'+c+';background:'+c+'1a;padding:1px 8px;border-radius:9px;white-space:nowrap">'+pEsc(t)+'</span>'; }
+function repurProdSortList(bp){ var a=bp.slice();
+  if(repurProdSort==='same') a.sort(function(x,y){return y.rate-x.rate;});
+  else if(repurProdSort==='cross') a.sort(function(x,y){return y.crossRate-x.crossRate;});
+  else if(repurProdSort==='single') a.sort(function(x,y){return y.singleRate-x.singleRate;});
+  else a.sort(function(x,y){return y.buyers-x.buyers;});
+  return a;
+}
+function setRepurProdSort(mode){ repurProdSort=mode; var box=document.getElementById('repProdTblBox'); if(box&&DATA.repurchase) box.innerHTML=repurProdTableInner(DATA.repurchase); }
+function repurProdTableInner(rd){
+  var bp=repurProdSortList(rd.byProduct||[]);
+  var rows=bp.map(function(p){
+    var rc=p.rate>=30?'#1E9E63':p.rate>=15?'#E59A1C':'#C0392B';
+    var cc=(p.crossRate||0)>=30?'#1E9E63':(p.crossRate||0)>=15?'#E59A1C':'#C0392B';
+    return '<tr><td class="l">'+pEsc(p.nm)+'</td><td class="r">'+p.buyers.toLocaleString('ko-KR')+'</td>'
+      +'<td class="c"><b style="color:'+rc+'">'+p.rate.toFixed(0)+'%</b><div style="font-size:10px;color:#9aa1b2">'+p.repeatBuyers.toLocaleString('ko-KR')+'명</div></td>'
+      +'<td class="c"><b style="color:'+cc+'">'+(p.crossRate!=null?p.crossRate.toFixed(0):'-')+'%</b><div style="font-size:10px;color:#9aa1b2">'+(p.crossBuyers||0).toLocaleString('ko-KR')+'명</div></td>'
+      +'<td class="c" style="color:#7a8194">'+(p.singleRate!=null?p.singleRate.toFixed(0):'-')+'%</td>'
+      +'<td class="c">'+repurTypeBadge(p.type)+'</td></tr>';
+  }).join('')||'<tr><td colspan="6" style="text-align:center;color:#aaa;padding:14px">품목 데이터 없음</td></tr>';
+  var seg=[['buyers','구매고객순'],['same','동일재구매율순'],['cross','타상품재구매율순'],['single','일회성순']];
+  var segHtml='<div class="salesViewSeg" style="margin:0 0 10px">'+seg.map(function(s){return '<button class="svTab'+(repurProdSort===s[0]?' on':'')+'" onclick="setRepurProdSort(\''+s[0]+'\')">'+s[1]+'</button>';}).join('')+'</div>';
+  return segHtml+'<div class="salesTblWrap"><table class="salesTbl planTbl"><thead><tr><th class="l">품목</th><th class="r">구매고객</th><th class="c">동일상품 재구매율</th><th class="c">타상품 재구매율</th><th class="c">일회성</th><th class="c">성향</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function repurProdTableHtml(rd){
+  var bp=rd.byProduct||[];
+  var summ='';
+  if(bp.length>=2){ var byRate=bp.slice().sort(function(a,b){return b.rate-a.rate;}); var hi=byRate[0], lo=byRate[byRate.length-1];
+    summ='<div style="font-size:12px;color:#3a3d47;margin-bottom:8px">동일상품 재구매율 <b style="color:#1E9E63">최고</b> '+pEsc(hi.nm)+' <b>'+hi.rate.toFixed(0)+'%</b> · <b style="color:#C0392B">최저</b> '+pEsc(lo.nm)+' <b>'+lo.rate.toFixed(0)+'%</b> <span style="color:#9aa1b2">(구매고객 상위 '+bp.length+'개 품목 중)</span></div>';
+  }
+  return '<div class="salesSec"><h4>품목별 재구매 상세 <span class="secSub">동일=그 품목 재구매 · 타상품=다른 품목도 재구매 · 일회성=1회 구매 후 이탈 · 정렬 가능</span></h4>'
+    +summ+'<div id="repProdTblBox">'+repurProdTableInner(rd)+'</div></div>';
+}
+function repurCrossSellListHtml(item){
+  if(!item) return '';
+  var rows=(item.partners||[]).map(function(q,i){
+    return '<tr><td class="c">'+(i+1)+'</td><td class="l">'+pEsc(q.nm)+'</td><td class="r">'+q.n.toLocaleString('ko-KR')+'명</td><td class="c"><b>'+q.rate.toFixed(0)+'%</b></td></tr>';
+  }).join('')||'<tr><td colspan="4" style="text-align:center;color:#aaa;padding:12px">함께 재구매한 품목이 없습니다</td></tr>';
+  return '<div style="font-size:12px;color:#7a8194;margin-bottom:6px"><b style="color:var(--navy)">'+pEsc(item.nm)+'</b> 구매고객 '+item.buyers.toLocaleString('ko-KR')+'명 중, 다른 주문에서 함께 재구매한 품목</div>'
+    +'<div class="salesTblWrap"><table class="salesTbl planTbl"><thead><tr><th class="c">순위</th><th class="l">함께 재구매한 품목</th><th class="r">교차구매 고객</th><th class="c">비율</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function setRepurCross(idx){ repurCrossIdx=+idx||0; var cs=(DATA.repurchase&&DATA.repurchase.crossSell)||[]; var box=document.getElementById('repCrossBox'); if(box) box.innerHTML=repurCrossSellListHtml(cs[repurCrossIdx]); }
+// 품목명 매핑 편집 — 원본 긴 품명 → 운영 품목명(짧게). 키워드 규칙(일괄) + 개별 매핑. 같은 표시명은 하나로 합침
+function repurAddRuleRow(kw, to){
+  var box=document.getElementById('repRuleBox'); if(!box) return;
+  var row=document.createElement('div'); row.className='repRuleRow'; row.style.cssText='display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:5px';
+  row.innerHTML='<input class="repRuleKw" placeholder="원본 품명에 포함될 키워드 (예: 캡슐세제)" value="'+pEsc(kw||'')+'" style="font-size:11.5px;padding:5px 8px;border:1px solid #d6dbe7;border-radius:6px">'
+    +'<input class="repRuleTo" list="repNameSug" placeholder="표시 품목명 (예: 트루클린 캡슐세제)" value="'+pEsc(to||'')+'" style="font-size:11.5px;padding:5px 8px;border:1px solid #d6dbe7;border-radius:6px">'
+    +'<button type="button" class="tbtn" style="padding:3px 9px" onclick="this.parentNode.remove()">×</button>';
+  box.appendChild(row);
+}
+function openRepurNameMap(){
+  var store=ensureRepurStore();
+  var prods=store.prods||[]; if(!prods.length){ if(typeof toast==='function')toast('먼저 주문 엑셀을 업로드하세요'); return; }
+  var cnt={}; (store.acc||[]).forEach(function(L){ var pi=L[3]; if(pi>=0) cnt[pi]=(cnt[pi]||0)+1; });
+  var order=prods.map(function(nm,i){return {i:i,nm:nm,c:cnt[i]||0};}).sort(function(a,b){return b.c-a.c;});
+  var nameMap=store.nameMap||{}, nameRules=store.nameRules||[];
+  var sug=[]; try{ (DATA.stock||[]).forEach(function(s){ if(s.nm) sug.push(s.nm); }); ((DATA.pricePolicy&&DATA.pricePolicy.items)||[]).forEach(function(x){ if(x.nm) sug.push(x.nm); }); }catch(e){}
+  sug=sug.filter(function(v,i,a){return a.indexOf(v)===i;});
+  var dl='<datalist id="repNameSug">'+sug.map(function(s){return '<option value="'+pEsc(s)+'">';}).join('')+'</datalist>';
+  var rowsHtml=order.map(function(o){
+    return '<div style="display:grid;grid-template-columns:1fr 210px;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid #eef1f7">'
+      +'<div style="font-size:11.5px;color:#3a3d47;word-break:break-all">'+pEsc(o.nm)+' <span style="color:#9aa1b2">('+o.c.toLocaleString('ko-KR')+')</span></div>'
+      +'<input class="repNmIn" data-raw="'+pEsc(o.nm)+'" list="repNameSug" value="'+pEsc(nameMap[o.nm]||'')+'" placeholder="비우면 규칙/원본 적용" style="font-size:11.5px;padding:5px 8px;border:1px solid #d6dbe7;border-radius:6px"></div>';
+  }).join('');
+  var old=document.getElementById('repNameMapModal'); if(old) old.remove();
+  var m=document.createElement('div'); m.id='repNameMapModal'; m.className='modal open';
+  m.innerHTML='<div class="mbox" style="max-width:740px;width:100%;padding:20px;max-height:90vh;display:flex;flex-direction:column">'
+    +'<h3>품목명 매핑</h3>'
+    +'<div style="font-size:11.5px;color:#7a8194;margin-bottom:10px">긴 원본 품명을 운영 품목명으로 정리합니다. <b>같은 표시명을 쓰면 하나의 품목으로 합쳐 집계</b>됩니다. 사이즈·향 변형은 키워드 규칙으로 한 번에 묶고, 세트/묶음은 개별로 고유 이름을 주세요.</div>'
+    +dl
+    +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:5px">① 키워드 규칙 <span style="font-weight:400;color:#9aa1b2">— 원본 품명에 키워드가 있으면 자동으로 그 품목명으로 (변형 일괄 처리에 유용)</span></div>'
+    +'<div id="repRuleBox" style="margin-bottom:6px"></div>'
+    +'<button type="button" class="tbtn" id="repAddRule" style="font-size:11px;padding:4px 10px;margin-bottom:12px">+ 규칙 추가</button>'
+    +'<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:5px">② 개별 매핑 <span style="font-weight:400;color:#9aa1b2">— 규칙보다 우선. 세트·예외 품목을 직접 지정 (비우면 규칙/원본)</span></div>'
+    +'<div style="overflow:auto;flex:1;min-height:120px;border:1px solid #eef1f7;border-radius:8px;padding:8px 10px">'+rowsHtml+'</div>'
+    +'<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button class="tbtn" id="repNmCancel">취소</button><button class="tbtn primary" id="repNmSave">저장 · 적용</button></div></div>';
+  document.body.appendChild(m);
+  if(nameRules.length) nameRules.forEach(function(r){ repurAddRuleRow(r.kw, r.to); }); else repurAddRuleRow('','');
+  m.querySelector('#repAddRule').onclick=function(){ repurAddRuleRow('',''); };
+  m.querySelector('#repNmCancel').onclick=function(){m.remove();};
+  m.querySelector('#repNmSave').onclick=function(){
+    var rules=[]; m.querySelectorAll('.repRuleRow').forEach(function(r){ var kw=r.querySelector('.repRuleKw').value.trim(), to=r.querySelector('.repRuleTo').value.trim(); if(kw&&to) rules.push({kw:kw,to:to}); });
+    var map={}; m.querySelectorAll('.repNmIn').forEach(function(inp){ var raw=inp.getAttribute('data-raw'), v=inp.value.trim(); if(v) map[raw]=v; });
+    store.nameRules=rules; store.nameMap=map; recomputeRepurAgg(); if(typeof markDirty==='function')markDirty(); m.remove(); renderRepurchase(); if(typeof toast==='function')toast('품목명 매핑 적용됨 (규칙 '+rules.length+' · 개별 '+Object.keys(map).length+')');
+  };
+}
+function repurCrossSellHtml(rd){
+  var cs=(rd.crossSell||[]).filter(function(x){return x.partners&&x.partners.length;});
+  if(!cs.length) return '';
+  if(repurCrossIdx>=cs.length || repurCrossIdx<0) repurCrossIdx=0;
+  var opts=cs.map(function(x,i){return '<option value="'+i+'"'+(i===repurCrossIdx?' selected':'')+'>'+pEsc(x.nm)+' (구매 '+x.buyers.toLocaleString('ko-KR')+'명)</option>';}).join('');
+  return '<div class="salesSec"><h4>크로스셀 조회 <span class="secSub">기준 품목 선택 → 그 구매자가 다른 주문에서 함께 재구매한 품목</span></h4>'
+    +'<div style="margin-bottom:10px"><span style="font-size:12px;font-weight:700;color:var(--navy);margin-right:6px">기준 품목</span>'
+    +'<select id="repCrossSel" onchange="setRepurCross(this.value)" style="font-size:12.5px;padding:6px 10px;border:1px solid #d6dbe7;border-radius:8px;max-width:100%;min-width:260px">'+opts+'</select></div>'
+    +'<div id="repCrossBox">'+repurCrossSellListHtml(cs[repurCrossIdx])+'</div></div>';
+}
+function repurEditSource(){
+  var store=ensureRepurStore();
+  var v=(typeof window.prompt==='function')?window.prompt('데이터 출처/기준 라벨 (예: 브랜드 스토어, 스마트스토어, 쿠팡)', store.sourceLabel||''):null;
+  if(v!=null){ store.sourceLabel=String(v).trim(); if(typeof markDirty==='function')markDirty(); renderRepurchase(); }
+}
+function repurInfoBarHtml(rd){
+  var basis = rd.isB2B ? '거래처 단위' : '구매자 ID 단위';
+  var src = rd.sourceLabel || (rd.isB2B?'거래처(B2B)':'브랜드 스토어');
+  var custWord = rd.isB2B?'거래처':'구매자';
+  var keyCol = (rd.mapping&&rd.mapping.cust)?pEsc(rd.mapping.cust):'-';
+  var pf=rd.periodFrom||'', pt=rd.periodTo||'', days='';
+  if(pf&&pt){ var d1=repurDayNum(pf), d2=repurDayNum(pt); if(d1!=null&&d2!=null&&d2>=d1) days=' ('+(d2-d1+1).toLocaleString('ko-KR')+'일)'; }
+  var period=(pf||pt)?(pEsc(pf||'?')+' ~ '+pEsc(pt||'?')+days):'기간 정보 없음 (주문일자 컬럼 확인 필요)';
+  return '<div class="repInfoBar">'
+    +'<span class="riMain">📌 <b>'+pEsc(src)+'</b> · <b>'+basis+'</b> 재구매율 <button class="repSrcEdit" title="출처/기준 라벨 편집" onclick="repurEditSource()">✎</button></span>'
+    +'<span>🗓 구매 기간 <b>'+period+'</b></span>'
+    +'<span class="riNote"><b>전체 재구매율</b> = 위 <b>전체 기간</b> 동안 같은 '+custWord+'(고객키 「'+keyCol+'」)가 <b>2건 이상 주문</b>한 비율 — 특정 기간이 아닌 <b>전체 누적 기준</b> · 주문 식별 '+(rd.orderKeyBasis||'-')+'</span>'
+    +'</div>';
+}
+function repurAccBarHtml(rd){
+  var b=(rd.batches||[]);
+  var chips=b.map(function(x){ return '<span class="repBatch">'+pEsc(x.name)+' <span style="color:#9aa1b2">'+(x.uploaded||'')+' · '+((x.lines||0)).toLocaleString('ko-KR')+'건</span> <button class="repBatchDel" title="이 업로드 제거" onclick="repurDeleteBatch('+x.id+')">×</button></span>'; }).join('');
+  var big=(rd.acc&&rd.acc.length>150000)?'<span class="repWarn" style="color:#9a4b00">⚠ 누적 데이터가 많습니다('+rd.acc.length.toLocaleString('ko-KR')+'건) — 필요 시 [누적 초기화]</span>':'';
+  return '<div class="repAccBar"><span class="repMapTitle">누적 업로드 ('+b.length+'개 파일)</span>'+(chips||'<span style="color:#9aa1b2">없음</span>')+big
+    +'<button class="tbtn" style="margin-left:auto;font-size:11px;padding:4px 10px" onclick="repurResetAll()">누적 초기화</button></div>';
+}
+function repurAdvancedKpiHtml(rd){
+  var cyc = rd.avgCycle!=null? Math.round(rd.avgCycle).toLocaleString('ko-KR')+'일' : '-';
+  var med = rd.medCycle!=null? '연속 구매 간격 · 중앙값 '+Math.round(rd.medCycle).toLocaleString('ko-KR')+'일' : '연속 구매 간격 (표본 부족)';
+  var am=rd.amounts||{}, sc=rd.sameCross||{}, scTot=(sc.sameProd||0)+(sc.crossOnly||0);
+  var aovDelta=(am.hasAmount&&am.firstAOV>0)?((am.repeatAOV-am.firstAOV)/am.firstAOV*100):null;
+  var deltaHtml=aovDelta!=null?('<span style="color:'+(aovDelta>=0?'#1E9E63':'#C0392B')+';font-weight:700">'+(aovDelta>=0?'▲ +':'▼ ')+Math.abs(aovDelta).toFixed(0)+'%</span>'):'';
+  return '<div class="kpis" style="margin-top:2px">'
+    +'<div class="kpi"><div class="v">'+cyc+'</div><div class="l">평균 재구매 주기</div><div class="sub">'+med+'</div></div>'
+    +'<div class="kpi"><div class="v">'+(am.hasAmount?repurMoney(am.firstAOV):'-')+'</div><div class="l">첫 구매 객단가</div><div class="sub">첫 주문 평균금액</div></div>'
+    +'<div class="kpi"><div class="v">'+(am.hasAmount?repurMoney(am.repeatAOV):'-')+'</div><div class="l">재구매 객단가</div><div class="sub">'+(am.hasAmount?('첫 구매 대비 '+deltaHtml):'금액 컬럼 없음')+'</div></div>'
+    +'<div class="kpi"><div class="v">'+(scTot?Math.round((sc.sameProd||0)/scTot*100)+'%':'-')+'</div><div class="l">동일 품목 재구매 비중</div><div class="sub">재구매 고객 중</div></div></div>';
+}
+function repurAdvancedChartsHtml(rd){
+  return '<div class="salesSec"><h4>재구매 주기 · 유형 분석 <span class="secSub">기간별 누적 재구매율 · 동일/타품목 · 주기 분포</span></h4>'
+    +'<div class="repChartGrid"><div>'+chartBox('repWindow',240)+'</div><div>'+chartBox('repSameCross',240)+'</div></div>'
+    +'<div style="margin-top:10px">'+chartBox('repCycleDist',220)+'</div></div>';
+}
+// 첫 구매 코호트별 재구매율 추이 — "어느 시점 유입 고객이 재구매를 더/덜 하는지" + 상승/하락 추세
+function repurCohortTrend(series){
+  var v=(series||[]).filter(function(x){return x.rate!=null && x.obs>=3;});   // 표본 3명 미만 코호트 제외
+  if(v.length<2) return null;
+  var n=v.length, sx=0,sy=0,sxy=0,sxx=0;
+  v.forEach(function(x,i){ sx+=i; sy+=x.rate; sxy+=i*x.rate; sxx+=i*i; });
+  var slope=(n*sxy-sx*sy)/((n*sxx-sx*sx)||1);
+  var totalChange=slope*(n-1);
+  return { first:v[0], last:v[v.length-1], slope:slope, totalChange:totalChange,
+    dir: totalChange>2?'상승':totalChange<-2?'하락':'보합' };
+}
+function repurCohortHtml(rd){
+  var series=(rd.cohortSeries||[]).filter(function(x){return x.rate!=null;});
+  var win=rd.cohortWindow||90;
+  if(series.length<2) return '<div class="salesSec"><h4>재구매율 추이 (첫 구매 코호트) <span class="secSub">최근 '+win+'일 관측창이 확보된 월만 표시</span></h4>'
+    +'<div style="color:#7a8194;font-size:12px;padding:10px">추세를 낼 만한 기간이 아직 부족합니다 (주문일자 컬럼·누적 데이터 확인).</div></div>';
+  var t=repurCohortTrend(rd.cohortSeries);
+  var note='';
+  if(t){ var col=t.dir==='상승'?'#1E9E63':t.dir==='하락'?'#C0392B':'#E59A1C';
+    note='<div style="font-size:12.5px;color:#3a3d47;margin-bottom:8px">첫 구매 '+win+'일 이내 재구매율 추세: '
+      +'<b>'+pEsc(t.first.ym)+' '+t.first.rate.toFixed(0)+'%</b> → <b>'+pEsc(t.last.ym)+' '+t.last.rate.toFixed(0)+'%</b> '
+      +'· <b style="color:'+col+'">'+t.dir+' ('+(t.totalChange>=0?'+':'')+t.totalChange.toFixed(0)+'%p)</b></div>';
+  }
+  return '<div class="salesSec"><h4>재구매율 추이 (첫 구매 코호트) <span class="secSub">유입 월별 · '+win+'일 이내 재구매율 · 관측창 확보 월만</span></h4>'
+    +note+'<div>'+chartBox('repCohort',240)+'</div></div>';
+}
+function renderRepurchase(){
+  var body=document.getElementById('repurchaseBody'); if(!body) return;
+  var rd=DATA.repurchase, meta=document.getElementById('repMeta');
+  if(!rd || !rd.overall || !rd.overall.totalCustomers){ if(meta) meta.textContent=''; body.innerHTML=repurEmptyHtml(); return; }
+  var o=rd.overall;
+  if(meta) meta.textContent=(rd.batches?rd.batches.length:0)+'개 파일 누적 · '+(rd.isB2B?'거래처':'구매자')+' '+o.totalCustomers.toLocaleString('ko-KR')+' · 주문 '+o.totalOrders.toLocaleString('ko-KR')+'건'+((rd.periodFrom||rd.periodTo)?(' · 기간 '+(rd.periodFrom||'?')+'~'+(rd.periodTo||'?')):'');
+  var kpi='<div class="kpis">'
+    +'<div class="kpi accent"><div class="v">'+repurPct(o.repurchaseRate)+'</div><div class="l">전체 재구매율</div><div class="sub">전체 기간 · 2회 이상 구매 고객 비율'+((rd.periodFrom||rd.periodTo)?('<br>'+(rd.periodFrom||'?')+' ~ '+(rd.periodTo||'?')):'')+'</div></div>'
+    +'<div class="kpi"><div class="v">'+o.totalCustomers.toLocaleString('ko-KR')+'</div><div class="l">총 '+(rd.isB2B?'거래처':'고객')+'수</div><div class="sub">주문 '+o.totalOrders.toLocaleString('ko-KR')+'건</div></div>'
+    +'<div class="kpi"><div class="v">'+o.repeatCustomers.toLocaleString('ko-KR')+'</div><div class="l">재구매 '+(rd.isB2B?'거래처':'고객')+'수</div><div class="sub">2회 이상 구매</div></div>'
+    +'<div class="kpi"><div class="v">'+o.avgOrders.toFixed(2)+'</div><div class="l">평균 구매횟수</div><div class="sub">'+(rd.isB2B?'거래처':'고객')+'당 주문 수</div></div></div>';
+  var charts='<div class="salesSec"><h4>재구매 분석 <span class="secSub">구매횟수 분포 · 품목별 재구매율 · 월별 추이</span></h4>'
+    +'<div class="repChartGrid"><div>'+chartBox('repDist',240)+'</div><div>'+chartBox('repProd',240)+'</div></div>'
+    +'<div style="margin-top:10px">'+chartBox('repMonthly',220)+'</div></div>';
+  body.innerHTML = kpi + repurInfoBarHtml(rd) + repurAdvancedKpiHtml(rd) + repurAccBarHtml(rd) + repurMapBarHtml(rd) + charts + repurCohortHtml(rd) + repurAdvancedChartsHtml(rd) + repurProdTableHtml(rd) + repurCrossSellHtml(rd);
+  drawRepurchaseCharts(rd);
+  if(typeof queueVisibleTabLayoutSync==='function') queueVisibleTabLayoutSync();
+}
+// 막대 위/끝에 값(%·건수) 라벨 직접 표기 — 차트를 안 봐도 수치 확인
+function repurValueLabel(opts){ opts=opts||{}; var suf=opts.suffix||'', fmt=opts.fmt||function(v){return Math.round(v*10)/10;};
+  return { id:'repVL_'+(opts.id||''), afterDatasetsDraw:function(chart){
+    var ds=chart.data.datasets[0]; if(!ds) return; var meta=chart.getDatasetMeta(0); if(!meta||meta.hidden) return;
+    var ctx=chart.ctx, horiz=chart.options.indexAxis==='y', area=chart.chartArea;
+    ctx.save(); ctx.font="700 10px Pretendard,'Apple SD Gothic Neo',sans-serif"; ctx.textBaseline='middle';
+    (meta.data||[]).forEach(function(bar,i){ var v=ds.data[i]; if(v==null)return; var txt=''+fmt(v)+suf, tw=ctx.measureText(txt).width;
+      if(horiz){ if(bar.x+5+tw>area.right){ ctx.textAlign='right'; ctx.fillStyle='#fff'; ctx.fillText(txt, bar.x-6, bar.y); } else { ctx.textAlign='left'; ctx.fillStyle='#5a6175'; ctx.fillText(txt, bar.x+5, bar.y); } }
+      else { ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.fillStyle='#5a6175'; ctx.fillText(txt, bar.x, bar.y-2); ctx.textBaseline='middle'; }
+    }); ctx.restore();
+  } };
+}
+function drawRepurchaseCharts(rd){
+  if(!window.Chart){ var b=document.getElementById('repurchaseBody'); if(b) b.insertAdjacentHTML('afterbegin','<div style="color:#c0392b;font-size:12px">Chart.js가 로드되지 않았습니다 — 새로고침하세요</div>'); return; }
+  var dist=rd.dist||[]; var distTot=dist.reduce(function(a,b){return a+b.n;},0)||1;
+  makeChart('repDist',{ type:'doughnut',
+    data:{ labels:dist.map(function(d){return d.label;}), datasets:[{ data:dist.map(function(d){return d.n;}), backgroundColor:seriesColors(dist.length), borderWidth:2, borderColor:'#fff' }] },
+    options:{ cutout:'62%', plugins:{ legend:{position:isNarrow()?'bottom':'right', labels:{font:{size:isNarrow()?9.5:10.5}}},
+      centerText:{text:repurPct(rd.overall.repurchaseRate), sub:'재구매율', size:isNarrow()?15:19},
+      title:{display:true,text:'구매횟수 분포'},
+      tooltip:{callbacks:{label:function(c){ return ' '+dist[c.dataIndex].label+': '+Number(c.parsed).toLocaleString('ko-KR')+'명 ('+(c.parsed/distTot*100).toFixed(1)+'%)'; }}} } } });
+  var bp=(rd.byProduct||[]).slice(0,10);
+  makeChart('repProd',{ type:'bar',
+    data:{ labels:bp.map(function(p){return clipLabel(p.nm,isNarrow()?8:14);}), datasets:[{ label:'재구매율', data:bp.map(function(p){return Math.round(p.rate*10)/10;}), backgroundColor:seriesColors(bp.length), borderRadius:4 }] },
+    options:{ indexAxis:'y', plugins:{legend:{display:false}, barValueLabel:false, title:{display:true,text:'품목별 동일상품 재구매율 (상위 10)'},
+      tooltip:{callbacks:{ title:function(c){return bp[c[0].dataIndex].nm;}, label:function(c){ var p=bp[c.dataIndex]; return ' 동일상품 재구매율 '+p.rate.toFixed(0)+'% (재구매 '+p.repeatBuyers.toLocaleString('ko-KR')+' / 구매 '+p.buyers.toLocaleString('ko-KR')+'명)'; }}}},
+      scales:{ x:{grid:{color:CC.grid}, ticks:{callback:function(v){return v+'%';}}, min:0, max:100 }, y:{grid:{display:false}} } }, plugins:[repurValueLabel({suffix:'%',id:'prod'})] });
+  var mon=rd.monthly||[]; var mtype=lineOrBar(mon.map(function(m){return m.ym;}));
+  makeChart('repMonthly',{ type:mtype,
+    data:{ labels:mon.map(function(m){return m.ym;}), datasets:[{ label:'재구매율', data:mon.map(function(m){return Math.round(m.rate*10)/10;}),
+      borderColor:CC.blue, backgroundColor:mtype==='bar'?CC.blue:'rgba(51,85,255,.08)', borderRadius:mtype==='bar'?4:0, fill:mtype==='line', tension:.3, pointRadius:3, borderWidth:2 }] },
+    options:{ plugins:{legend:{display:false}, title:{display:true,text:'월별 재구매율 (재방문 고객 비중)'},
+      tooltip:{callbacks:{label:function(c){ var m=mon[c.dataIndex]; return ' '+m.rate.toFixed(0)+'% (재방문 '+m.returning.toLocaleString('ko-KR')+' / 활성 '+m.active.toLocaleString('ko-KR')+'명)'; }}}},
+      scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, suggestedMax:100, grid:{color:CC.grid}, ticks:{callback:function(v){return v+'%';}}} } } });
+  // 기간별 누적 재구매율 (첫 구매 → 2번째 구매까지 걸린 기간)
+  var wr=rd.windowRates||[];
+  makeChart('repWindow',{ type:'bar',
+    data:{ labels:wr.map(function(w){return w.label+' 이내';}), datasets:[{ label:'재구매율', data:wr.map(function(w){return Math.round(w.rate*10)/10;}), backgroundColor:CC.blue, borderRadius:5 }] },
+    options:{ plugins:{legend:{display:false}, title:{display:true,text:'기간별 누적 재구매율 (첫 구매 후)'},
+      tooltip:{callbacks:{label:function(c){ var w=wr[c.dataIndex]; return ' '+w.rate.toFixed(1)+'% ('+w.n.toLocaleString('ko-KR')+'명)'; }}}},
+      scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, grid:{color:CC.grid}, ticks:{callback:function(v){return v+'%';}}} } }, plugins:[repurValueLabel({suffix:'%',id:'win'})] });
+  // 재구매 유형 — 동일 품목 vs 타 품목
+  var sc=rd.sameCross||{}; var scData=[sc.sameProd||0, sc.crossOnly||0]; var scTot=(scData[0]+scData[1])||1;
+  makeChart('repSameCross',{ type:'doughnut',
+    data:{ labels:['동일 품목 재구매','타 품목만 재구매'], datasets:[{ data:scData, backgroundColor:[CC.blue,CC.gold], borderWidth:2, borderColor:'#fff' }] },
+    options:{ cutout:'62%', plugins:{ legend:{position:isNarrow()?'bottom':'right'},
+      centerText:{text:Math.round(scData[0]/scTot*100)+'%', sub:'동일품목', size:isNarrow()?15:19},
+      title:{display:true,text:'재구매 유형 (재구매 고객 기준)'},
+      tooltip:{callbacks:{label:function(c){ return ' '+c.label+': '+Number(c.parsed).toLocaleString('ko-KR')+'명 ('+(c.parsed/scTot*100).toFixed(1)+'%)'; }}} } } });
+  // 재구매 주기 분포 (연속 구매 간격)
+  var cd=rd.cycleDist||[];
+  makeChart('repCycleDist',{ type:'bar',
+    data:{ labels:cd.map(function(x){return x.label;}), datasets:[{ label:'건수', data:cd.map(function(x){return x.n;}), backgroundColor:CC.blueL, borderRadius:5 }] },
+    options:{ plugins:{legend:{display:false}, title:{display:true,text:'재구매 주기 분포 (연속 구매 간격)'},
+      tooltip:{callbacks:{label:function(c){ return ' '+Number(c.parsed).toLocaleString('ko-KR')+'건'; }}}},
+      scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, grid:{color:CC.grid}, ticks:{precision:0}} } }, plugins:[repurValueLabel({id:'cyc', fmt:function(v){return Number(v).toLocaleString('ko-KR');}})] });
+  // 첫 구매 코호트별 재구매율 추이 (관측창 확보 월만)
+  var cohS=(rd.cohortSeries||[]).filter(function(x){return x.rate!=null;});
+  if(cohS.length){ var ct=cohS.length<=1?'bar':'line';
+    makeChart('repCohort',{ type:ct,
+      data:{ labels:cohS.map(function(x){return x.ym;}), datasets:[{ label:(rd.cohortWindow||90)+'일내 재구매율', data:cohS.map(function(x){return Math.round(x.rate*10)/10;}),
+        borderColor:CC.green, backgroundColor:ct==='bar'?CC.green:'rgba(39,174,96,.10)', borderRadius:ct==='bar'?4:0, fill:ct==='line', tension:.3, pointRadius:3, borderWidth:2 }] },
+      options:{ plugins:{legend:{display:false}, title:{display:true,text:'첫 구매 코호트별 '+(rd.cohortWindow||90)+'일내 재구매율'},
+        tooltip:{callbacks:{label:function(c){ var x=cohS[c.dataIndex]; return ' '+x.rate.toFixed(1)+'% (재구매 '+x.rep.toLocaleString('ko-KR')+' / 관측 '+x.obs.toLocaleString('ko-KR')+'명, 코호트 '+x.size.toLocaleString('ko-KR')+'명)'; }}}},
+        scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, grid:{color:CC.grid}, ticks:{callback:function(v){return v+'%';}}} } }, plugins:[repurValueLabel({suffix:'%',id:'coh'})] });
+  }
+}
 </script>
 
 </body></html>
