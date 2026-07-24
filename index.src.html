@@ -11607,11 +11607,14 @@ function repurAdvancedKpiHtml(rd){
   var am=rd.amounts||{}, sc=rd.sameCross||{}, scTot=(sc.sameProd||0)+(sc.crossOnly||0);
   var aovDelta=(am.hasAmount&&am.firstAOV>0)?((am.repeatAOV-am.firstAOV)/am.firstAOV*100):null;
   var deltaHtml=aovDelta!=null?('<span style="color:'+(aovDelta>=0?'#1E9E63':'#C0392B')+';font-weight:700">'+(aovDelta>=0?'▲ +':'▼ ')+Math.abs(aovDelta).toFixed(0)+'%</span>'):'';
-  return '<div class="kpis" style="margin-top:2px">'
-    +'<div class="kpi"><div class="v">'+cyc+'</div><div class="l">평균 재구매 주기</div><div class="sub">'+med+'</div></div>'
-    +'<div class="kpi"><div class="v">'+(am.hasAmount?repurMoney(am.firstAOV):'-')+'</div><div class="l">첫 구매 객단가</div><div class="sub">첫 주문 평균금액</div></div>'
-    +'<div class="kpi"><div class="v">'+(am.hasAmount?repurMoney(am.repeatAOV):'-')+'</div><div class="l">재구매 객단가</div><div class="sub">'+(am.hasAmount?('첫 구매 대비 '+deltaHtml):'금액 컬럼 없음')+'</div></div>'
-    +'<div class="kpi"><div class="v">'+(scTot?Math.round((sc.sameProd||0)/scTot*100)+'%':'-')+'</div><div class="l">동일 품목 재구매 비중</div><div class="sub">재구매 고객 중</div></div></div>';
+  var cards='<div class="kpi"><div class="v">'+cyc+'</div><div class="l">평균 재구매 주기</div><div class="sub">'+med+'</div></div>';
+  if(am.hasAmount){   // 금액 컬럼이 있을 때만 객단가(AOV) 표시
+    cards+='<div class="kpi"><div class="v">'+repurMoney(am.firstAOV)+'</div><div class="l">첫 구매 객단가</div><div class="sub">첫 주문 평균금액</div></div>'
+      +'<div class="kpi"><div class="v">'+repurMoney(am.repeatAOV)+'</div><div class="l">재구매 객단가</div><div class="sub">첫 구매 대비 '+deltaHtml+'</div></div>';
+  }
+  cards+='<div class="kpi"><div class="v">'+(scTot?Math.round((sc.sameProd||0)/scTot*100)+'%':'-')+'</div><div class="l">동일 품목 재구매 비중</div><div class="sub">재구매 고객 중</div></div>';
+  var note=am.hasAmount?'':'<div style="font-size:11px;color:#9aa1b2;margin:2px 0 8px 2px">※ 업로드 데이터에 금액 컬럼이 없어 객단가(AOV)는 계산에서 제외했습니다.</div>';
+  return '<div class="kpis" style="margin-top:2px">'+cards+'</div>'+note;
 }
 // 첫 구매 코호트별 재구매율 추이 — "어느 시점 유입 고객이 재구매를 더/덜 하는지" + 상승/하락 추세
 function repurCohortTrend(series){
