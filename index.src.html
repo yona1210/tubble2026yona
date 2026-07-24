@@ -11818,7 +11818,7 @@ function drawRepurchaseCharts(rd){
       borderColor:CC.blue, backgroundColor:mtype==='bar'?CC.blue:'rgba(51,85,255,.08)', borderRadius:mtype==='bar'?4:0, fill:mtype==='line', tension:.3, pointRadius:3, borderWidth:2 }] },
     options:{ plugins:{legend:{display:false}, title:{display:true,text:'월별 재구매율 (그 달 결제고객 중 재구매 · 네이버 기준)'},
       tooltip:{callbacks:{label:function(c){ var m=mon[c.dataIndex]; return ' '+m.rate.toFixed(1)+'% (재구매 '+m.returning.toLocaleString('ko-KR')+' / 결제고객 '+m.active.toLocaleString('ko-KR')+'명)'; }}}},
-      scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, suggestedMax:100, grid:{color:CC.grid}, ticks:{callback:function(v){return v+'%';}}} } } });
+      scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, suggestedMax:100, grid:{color:CC.grid}, ticks:{callback:function(v){return v+'%';}}} } }, plugins:[repurValueLabel({suffix:'%',id:'mon'})] });
   // 기간별 누적 재구매율 (첫 구매 → 2번째 구매까지 걸린 기간)
   var wr=rd.windowRates||[];
   makeChart('repWindow',{ type:'bar',
