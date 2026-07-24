@@ -11726,31 +11726,38 @@ function repurCohortHtml(rd){
 }
 function setRepurView(v){ repurView=v; renderRepurchase(); }
 // [요약] 심화 KPI + 퍼널 + 구매횟수 분포
-// [요약] 자동 진단 · 추천 액션 — 지표를 읽어 인사이트 생성
+// [요약] 자동 진단 · 추천 액션 — 지표를 읽어 인사이트 카드 생성
 function repurInsightsHtml(rd){
   var o=rd.overall||{}, sc=rd.sameCross||{}, bp=(rd.byProduct||[]);
   var w90=null; (rd.windowRates||[]).forEach(function(w){ if(w.days===90) w90=w; });
   var conv90=w90?w90.rate:null, cyc=rd.avgCycle, rr=o.repurchaseRate||0;
   var scTot=(sc.sameProd||0)+(sc.crossOnly||0), sameShare=scTot?(sc.sameProd/scTot*100):null;
   var ct=repurCohortTrend((rd.cohortByWindow||{})[90]);
-  var diag=[], act=[];
-  if(rr<15) diag.push('전체 재구매율 <b>'+rr.toFixed(1)+'%</b> — 신규 획득 위주로 재구매 기반이 얇습니다.');
-  else if(rr<30) diag.push('전체 재구매율 <b>'+rr.toFixed(1)+'%</b> — 재구매가 어느 정도 받쳐주나 더 키울 여지가 큽니다.');
-  else diag.push('전체 재구매율 <b>'+rr.toFixed(1)+'%</b> — 재구매 기반이 탄탄합니다.');
-  if(conv90!=null){ if(conv90<15){ diag.push('첫 구매 후 90일 내 재구매 전환 <b>'+conv90.toFixed(1)+'%</b> — 신규가 다시 오지 않는 "밑빠진 독" 신호.'); act.push('신규의 <b>2번째 구매 전환</b>에 집중: 첫 구매 직후 리마인드·재구매 쿠폰·정기구독 유도.'); } else diag.push('첫 90일 재구매 전환 <b>'+conv90.toFixed(1)+'%</b> — 신규가 초기에 재구매하는 편.'); }
-  if(ct){ if(ct.dir==='하락'){ diag.push('코호트(유입월별) 재구매율 <b>하락 추세</b> ('+ct.first.rate.toFixed(0)+'% → '+ct.last.rate.toFixed(0)+'%) — 최근 유입 고객의 질이 떨어지고 있습니다.'); act.push('최근 획득 채널·프로모션이 "한 번 사고 마는" 고객을 데려오는지 점검 → 리텐션 좋은 채널로 예산 재배분.'); } else if(ct.dir==='상승') diag.push('코호트 재구매율 <b>상승 추세</b> — 신규 리텐션이 개선되고 있습니다.'); }
-  if(cyc!=null){ var rem=Math.max(1,Math.round(cyc)-7); act.push('평균 재구매 주기 <b>'+Math.round(cyc)+'일</b> → <b>'+rem+'일차</b>에 리마인드/쿠폰 발송이 효과적.'); }
-  if(sameShare!=null){ if(sameShare>=55){ diag.push('재구매 고객의 <b>'+sameShare.toFixed(0)+'%</b>가 <b>같은 품목</b>을 재구매 — 소모품 충성형.'); act.push('<b>정기구독·리필·묶음</b> 상품으로 같은 품목 재구매를 자동화.'); } else if(sameShare<=45){ diag.push('재구매 고객의 <b>'+(100-sameShare).toFixed(0)+'%</b>가 <b>다른 품목</b>으로 재구매 — 교차구매 확장형.'); act.push('<b>번들·신제품 추천·크로스셀 쿠폰</b>으로 품목 확장을 촉진.'); } else diag.push('동일품목/타품목 재구매가 반반 — 구독과 크로스셀 둘 다 여지.'); }
+  var clip=function(s){ return (typeof clipLabel==='function')?clipLabel(s,14):s; };
+  var it=[];   // {label, level, finding, action}
+  it.push({label:'전체 재구매율', level:rr<15?'bad':rr<30?'warn':'good', finding:'<b style="font-size:16px">'+rr.toFixed(1)+'%</b> · '+(rr<15?'재구매 기반 얇음':rr<30?'성장 여지 큼':'탄탄'), action:rr<30?'재구매 고객 늘리기에 집중':''});
+  if(conv90!=null) it.push({label:'첫 90일 재구매 전환', level:conv90<15?'bad':'good', finding:'<b style="font-size:16px">'+conv90.toFixed(1)+'%</b> · '+(conv90<15?'신규가 다시 안 옴(밑빠진 독)':'초기 재구매 양호'), action:conv90<15?'첫 구매 직후 리마인드·쿠폰·구독으로 2번째 구매 유도':''});
+  if(ct) it.push({label:'신규 리텐션 추세(코호트)', level:ct.dir==='하락'?'bad':ct.dir==='상승'?'good':'info', finding:'<b>'+ct.first.rate.toFixed(0)+'% → '+ct.last.rate.toFixed(0)+'%</b> '+ct.dir, action:ct.dir==='하락'?'리텐션 좋은 채널로 획득 예산 재배분':''});
+  if(cyc!=null){ var rem=Math.max(1,Math.round(cyc)-7); it.push({label:'평균 재구매 주기', level:'info', finding:'<b style="font-size:16px">'+Math.round(cyc)+'일</b>', action:rem+'일차에 리마인드/쿠폰 발송'}); }
+  if(sameShare!=null){ var loyal=sameShare>=55, expand=sameShare<=45; it.push({label:'재구매 성향', level:'info', finding:loyal?('동일품목 <b>'+sameShare.toFixed(0)+'%</b> · 충성형'):expand?('타품목 <b>'+(100-sameShare).toFixed(0)+'%</b> · 확장형'):'동일/타 반반', action:loyal?'정기구독·리필·묶음으로 자동화':expand?'번들·신제품 추천·크로스셀':'구독+크로스셀 병행'}); }
   var valid=bp.filter(function(p){return p.buyers>=5;});
-  if(valid.length>=2){ var hi=valid.slice().sort(function(a,b){return b.rate-a.rate;})[0]; var lo=valid.slice().sort(function(a,b){return a.rate-b.rate;})[0]; diag.push('품목 재구매 엔진: <b>'+pEsc(hi.nm)+'</b>(동일 재구매율 '+hi.rate.toFixed(0)+'%). 최저는 <b>'+pEsc(lo.nm)+'</b>('+lo.rate.toFixed(0)+'%)로 이탈 위험.'); act.push('<b>'+pEsc(hi.nm)+'</b>을 진입상품·구독 상품으로 전면 배치, <b>'+pEsc(lo.nm)+'</b>은 재구매 낮은 원인(품질·가격·경험) 점검.'); }
-  var cs=(rd.crossSell||[]).filter(function(x){return x.partners&&x.partners.length;}); if(cs.length&&cs[0].partners[0]) act.push('<b>'+pEsc(cs[0].nm)+'</b> 구매자는 <b>'+pEsc(cs[0].partners[0].nm)+'</b>을 많이 함께 삼 → <b>번들·추천</b>으로 묶기.');
-  var am=rd.amounts||{}; if(am.hasAmount&&am.firstAOV>0){ var dd=(am.repeatAOV-am.firstAOV)/am.firstAOV*100; if(dd>3) diag.push('재구매 객단가가 첫 구매보다 <b>'+dd.toFixed(0)+'%</b> 높음 — 재구매 고객이 더 씀(업셀 여지).'); }
-  var L=function(arr){ return arr.length?arr.map(function(t){return '<li style="margin-bottom:5px">'+t+'</li>';}).join(''):'<li style="color:#9aa1b2">데이터가 더 쌓이면 표시됩니다.</li>'; };
-  return '<div class="salesSec"><h4>진단 · 추천 액션 <span class="secSub">위 지표를 자동 해석한 요약 (데이터 기준)</span></h4>'
-    +'<div class="repChartGrid">'
-    +'<div><div style="font-size:12.5px;font-weight:800;color:var(--navy);margin-bottom:6px">🔎 진단</div><ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.55;color:#3a3d47">'+L(diag)+'</ul></div>'
-    +'<div><div style="font-size:12.5px;font-weight:800;color:#1E6B3A;margin-bottom:6px">✅ 추천 액션</div><ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.55;color:#3a3d47">'+L(act)+'</ul></div>'
-    +'</div><div style="font-size:11px;color:#9aa1b2;margin-top:8px">※ 자동 생성 진단입니다. 대형 이벤트(예: 6월 공동구매)가 낀 달은 데이터 특성상 왜곡될 수 있어요.</div></div>';
+  if(valid.length>=2){ var hi=valid.slice().sort(function(a,b){return b.rate-a.rate;})[0], lo=valid.slice().sort(function(a,b){return a.rate-b.rate;})[0];
+    it.push({label:'품목 재구매 엔진', level:'good', finding:'<b>'+pEsc(clip(hi.nm))+'</b> '+hi.rate.toFixed(0)+'%', action:'진입상품·구독 상품으로 전면 배치'});
+    it.push({label:'재구매 취약 품목', level:'warn', finding:'<b>'+pEsc(clip(lo.nm))+'</b> '+lo.rate.toFixed(0)+'%', action:'재구매 낮은 원인(품질·가격·경험) 점검'}); }
+  var cs=(rd.crossSell||[]).filter(function(x){return x.partners&&x.partners.length;});
+  if(cs.length&&cs[0].partners[0]) it.push({label:'대표 크로스셀', level:'info', finding:'<b>'+pEsc(clip(cs[0].nm))+'</b> → '+pEsc(clip(cs[0].partners[0].nm)), action:'두 품목을 번들·추천으로 묶기'});
+  var am=rd.amounts||{}; if(am.hasAmount&&am.firstAOV>0){ var dd=(am.repeatAOV-am.firstAOV)/am.firstAOV*100; if(dd>3) it.push({label:'재구매 객단가', level:'good', finding:'첫 구매 대비 <b>+'+dd.toFixed(0)+'%</b>', action:'재구매 시 상위 구성·세트 업셀'}); }
+  var COL={bad:'#C0392B',warn:'#E59A1C',good:'#1E9E63',info:'#3355FF'}, BG={bad:'#fdf0ee',warn:'#fdf6e9',good:'#eef8f1',info:'#eef2ff'};
+  var cards=it.map(function(x){ var c=COL[x.level]||'#3355FF', bg=BG[x.level]||'#eef2ff';
+    return '<div style="background:'+bg+';border:1px solid var(--line);border-left:4px solid '+c+';border-radius:10px;padding:10px 13px;min-width:0">'
+      +'<div style="font-size:10.5px;color:#7a8194;font-weight:700;margin-bottom:3px">'+pEsc(x.label)+'</div>'
+      +'<div style="font-size:13px;color:var(--navy);line-height:1.35;word-break:keep-all">'+x.finding+'</div>'
+      +(x.action?'<div style="font-size:11.5px;color:'+c+';margin-top:6px;line-height:1.4;word-break:keep-all"><b>→ 할 일</b> '+x.action+'</div>':'')
+      +'</div>';
+  }).join('')||'<div style="color:#9aa1b2;font-size:12px;padding:6px">데이터가 더 쌓이면 진단이 표시됩니다.</div>';
+  return '<div class="salesSec"><h4>진단 · 추천 액션 <span class="secSub">핵심 지표 자동 해석 · 카드마다 <b>→ 할 일</b> 포함</span></h4>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px">'+cards+'</div>'
+    +'<div style="font-size:11px;color:#9aa1b2;margin-top:8px">※ 자동 생성 · 6월 공동구매 등 대형 이벤트가 낀 달은 왜곡될 수 있어요.</div></div>';
 }
 function repurSummaryViewHtml(rd){
   return repurHeroHtml(rd) + repurInsightsHtml(rd) + repurAdvancedKpiHtml(rd) + repurFunnelHtml(rd)
