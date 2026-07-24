@@ -11356,7 +11356,7 @@ function computeRepurchaseFromAcc(store){
   // 크로스셀 — 상위 40개 품목별로, 그 구매자가 함께 재구매한 품목 Top12(전체 품명·비율)
   var topForCross=Object.keys(pAgg).map(function(pi){return {pi:+pi, buyers:pAgg[pi].buyers};}).sort(function(a,b){return b.buyers-a.buyers;}).slice(0,40);
   var crossSell=topForCross.map(function(p){ var partners=coBuy[p.pi]||{}; var arr=Object.keys(partners).map(function(k){return {nm:groupName[k]||('품목'+k), n:partners[k], rate:p.buyers?partners[k]/p.buyers*100:0};}).sort(function(a,b){return b.n-a.n;}).slice(0,12); return {nm:groupName[p.pi]||('품목'+p.pi), buyers:p.buyers, partners:arr}; });
-  var yms=Object.keys(monthCust).sort(); var seen={};
+  var yms=Object.keys(monthCust).sort(); var seen={};   // 월별 재구매율 = 그 달 결제고객 중 '이전 달에도 구매한' 고객 비중 — 네이버 스마트스토어 재구매 정의(조회기간 이전 구매이력자)와 동일
   var monthly=yms.map(function(ym){ var active=Object.keys(monthCust[ym]); var returning=0; active.forEach(function(c){ if(seen[c]) returning++; }); active.forEach(function(c){ seen[c]=true; }); return {ym:ym, active:active.length, returning:returning, rate:active.length?returning/active.length*100:0}; });
   return {
     overall:{ totalCustomers:total, repeatCustomers:repeat, repurchaseRate:total?repeat/total*100:0, avgOrders:avgOrders, totalOrders:totalOrders },
@@ -11735,7 +11735,7 @@ function repurTrendViewHtml(rd){
   return '<div class="salesSec"><h4>재구매 주기 · 기간 분석 <span class="secSub">기간별 누적 재구매율(관측 고객 기준 = 코호트와 동일) · 재구매 간격 분포</span></h4>'
     +'<div class="repChartGrid"><div>'+chartBox('repWindow',250)+'</div><div>'+chartBox('repCycleDist',250)+'</div></div></div>'
     + repurCohortHtml(rd)
-    + '<div class="salesSec"><h4>월별 재구매율 <span class="secSub">달력 시점별 재방문 고객 비중 · 코호트와 다른 관점</span></h4><div>'+chartBox('repMonthly',220)+'</div></div>';
+    + '<div class="salesSec"><h4>월별 재구매율 <span class="secSub">그 달 결제고객 중 이전 달에도 구매한 고객 비중 · 네이버 스마트스토어 재구매 정의와 동일</span></h4><div>'+chartBox('repMonthly',220)+'</div></div>';
 }
 // [품목] 기간필터 + 품목별 재구매율 막대 + 상세표 + 함께구매(크로스셀)
 function repurProductsViewHtml(rd){
@@ -11816,8 +11816,8 @@ function drawRepurchaseCharts(rd){
   makeChart('repMonthly',{ type:mtype,
     data:{ labels:mon.map(function(m){return m.ym;}), datasets:[{ label:'재구매율', data:mon.map(function(m){return Math.round(m.rate*10)/10;}),
       borderColor:CC.blue, backgroundColor:mtype==='bar'?CC.blue:'rgba(51,85,255,.08)', borderRadius:mtype==='bar'?4:0, fill:mtype==='line', tension:.3, pointRadius:3, borderWidth:2 }] },
-    options:{ plugins:{legend:{display:false}, title:{display:true,text:'월별 재구매율 (월별 활성 고객 중 재방문)'},
-      tooltip:{callbacks:{label:function(c){ var m=mon[c.dataIndex]; return ' '+m.rate.toFixed(0)+'% (재방문 '+m.returning.toLocaleString('ko-KR')+' / 활성 '+m.active.toLocaleString('ko-KR')+'명)'; }}}},
+    options:{ plugins:{legend:{display:false}, title:{display:true,text:'월별 재구매율 (그 달 결제고객 중 재구매 · 네이버 기준)'},
+      tooltip:{callbacks:{label:function(c){ var m=mon[c.dataIndex]; return ' '+m.rate.toFixed(1)+'% (재구매 '+m.returning.toLocaleString('ko-KR')+' / 결제고객 '+m.active.toLocaleString('ko-KR')+'명)'; }}}},
       scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, suggestedMax:100, grid:{color:CC.grid}, ticks:{callback:function(v){return v+'%';}}} } } });
   // 기간별 누적 재구매율 (첫 구매 → 2번째 구매까지 걸린 기간)
   var wr=rd.windowRates||[];
