@@ -11361,7 +11361,7 @@ function computeRepurchaseFromAcc(store){
     avgCycle:avgCycle, medCycle:medCycle, cycleDist:cycleDist, windowRates:windowRates,
     cohortByWindow:cohortByWindow, cohortWindows:COH_WINS,
     sameCross:{ sameProd:sameProdRepeaters, crossOnly:crossOnlyRepeaters, repeatCust:repeat },
-    amounts:{ firstAOV:firstAmtN?sumFirstAmt/firstAmtN:0, repeatAOV:repeatOrderN?sumRepeatAmt/repeatOrderN:0, overallAOV:totalOrders?sumAllAmt/totalOrders:0, hasAmount:sumAllAmt>0 }
+    amounts:{ firstAOV:firstAmtN?sumFirstAmt/firstAmtN:0, repeatAOV:repeatOrderN?sumRepeatAmt/repeatOrderN:0, overallAOV:totalOrders?sumAllAmt/totalOrders:0, repeatRevShare:sumAllAmt>0?sumRepeatAmt/sumAllAmt*100:0, hasAmount:sumAllAmt>0 }
   };
 }
 function recomputeRepurAgg(){
@@ -11653,19 +11653,39 @@ function repurAccBarHtml(rd){
   return '<div class="repAccBar"><span class="repMapTitle">누적 업로드 ('+b.length+'개 파일)</span>'+(chips||'<span style="color:#9aa1b2">없음</span>')+big
     +'<button class="tbtn" style="margin-left:auto;font-size:11px;padding:4px 10px" onclick="repurResetAll()">누적 초기화</button></div>';
 }
+// [요약 최상단] 브랜드 운영자가 매달 챙길 핵심 3지표
+function repurHeroHtml(rd){
+  var o=rd.overall||{}, wr=(rd.windowRates||[]);
+  var w90=null; wr.forEach(function(w){ if(w.days===90) w90=w; });
+  var conv=(w90&&w90.rate!=null)?w90.rate.toFixed(1)+'%':'-';
+  var cyc=rd.avgCycle!=null?Math.round(rd.avgCycle).toLocaleString('ko-KR')+'일':'-';
+  var cycSub=rd.medCycle!=null?('중앙값 '+Math.round(rd.medCycle)+'일 · '):'';
+  var am=rd.amounts||{}, revShare, revLabel, revSub;
+  if(am.hasAmount){ revShare=(am.repeatRevShare!=null?am.repeatRevShare.toFixed(1)+'%':'-'); revLabel='재구매 매출 비중'; revSub='전체 매출 중 재구매 고객'; }
+  else { var repO=Math.max(0,(o.totalOrders||0)-(o.totalCustomers||0)); revShare=o.totalOrders?(repO/o.totalOrders*100).toFixed(1)+'%':'-'; revLabel='재구매 주문 비중'; revSub='전체 주문 중 2번째+ 주문 (금액 없어 대용)'; }
+  var card=function(emoji,val,label,sub){
+    return '<div style="flex:1;min-width:150px;background:#eef4ff;border:1px solid #cddafb;border-radius:12px;padding:14px 16px">'
+      +'<div style="font-size:12px;color:#5a6478;font-weight:700"><span style="margin-right:5px">'+emoji+'</span>'+label+'</div>'
+      +'<div style="font-size:26px;font-weight:800;color:var(--navy);line-height:1.15;margin:5px 0 3px">'+val+'</div>'
+      +'<div style="font-size:11px;color:#7a8194">'+sub+'</div></div>';
+  };
+  return '<div style="margin-bottom:14px"><h4 style="margin-bottom:8px">브랜드 핵심 지표 <span class="secSub">운영자가 매달 챙길 3가지</span></h4>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap">'
+    +card('🎯',conv,'첫 90일 재구매 전환','신규가 90일 내 재구매 · 리텐션 핵심 신호')
+    +card('🔁',cyc,'평균 재구매 주기',cycSub+'리마인드·구독 타이밍')
+    +card('💰',revShare,revLabel,revSub)
+    +'</div></div>';
+}
 function repurAdvancedKpiHtml(rd){
-  var cyc = rd.avgCycle!=null? Math.round(rd.avgCycle).toLocaleString('ko-KR')+'일' : '-';
-  var med = rd.medCycle!=null? '연속 구매 간격 · 중앙값 '+Math.round(rd.medCycle).toLocaleString('ko-KR')+'일' : '연속 구매 간격 (표본 부족)';
   var am=rd.amounts||{}, sc=rd.sameCross||{}, scTot=(sc.sameProd||0)+(sc.crossOnly||0);
   var aovDelta=(am.hasAmount&&am.firstAOV>0)?((am.repeatAOV-am.firstAOV)/am.firstAOV*100):null;
   var deltaHtml=aovDelta!=null?('<span style="color:'+(aovDelta>=0?'#1E9E63':'#C0392B')+';font-weight:700">'+(aovDelta>=0?'▲ +':'▼ ')+Math.abs(aovDelta).toFixed(0)+'%</span>'):'';
-  var cards='<div class="kpi"><div class="v">'+cyc+'</div><div class="l">평균 재구매 주기</div><div class="sub">'+med+'</div></div>';
+  var cards='<div class="kpi"><div class="v">'+(scTot?Math.round((sc.sameProd||0)/scTot*100)+'%':'-')+'</div><div class="l">동일 품목 재구매 비중</div><div class="sub">재구매 고객 중 (나머지는 타품목)</div></div>';
   if(am.hasAmount){   // 금액 컬럼이 있을 때만 객단가(AOV) 표시
     cards+='<div class="kpi"><div class="v">'+repurMoney(am.firstAOV)+'</div><div class="l">첫 구매 객단가</div><div class="sub">첫 주문 평균금액</div></div>'
       +'<div class="kpi"><div class="v">'+repurMoney(am.repeatAOV)+'</div><div class="l">재구매 객단가</div><div class="sub">첫 구매 대비 '+deltaHtml+'</div></div>';
   }
-  cards+='<div class="kpi"><div class="v">'+(scTot?Math.round((sc.sameProd||0)/scTot*100)+'%':'-')+'</div><div class="l">동일 품목 재구매 비중</div><div class="sub">재구매 고객 중</div></div>';
-  var note=am.hasAmount?'':'<div style="font-size:11px;color:#9aa1b2;margin:2px 0 8px 2px">※ 업로드 데이터에 금액 컬럼이 없어 객단가(AOV)는 계산에서 제외했습니다.</div>';
+  var note=am.hasAmount?'':'<div style="font-size:11px;color:#9aa1b2;margin:2px 0 8px 2px">※ 업로드 데이터에 금액 컬럼이 없어 객단가(AOV)는 제외 · 재구매 매출 비중은 주문 비중으로 대용.</div>';
   return '<div class="kpis" style="margin-top:2px">'+cards+'</div>'+note;
 }
 // 첫 구매 코호트별 재구매율 추이 — "어느 시점 유입 고객이 재구매를 더/덜 하는지" + 상승/하락 추세
@@ -11702,7 +11722,7 @@ function repurCohortHtml(rd){
 function setRepurView(v){ repurView=v; renderRepurchase(); }
 // [요약] 심화 KPI + 퍼널 + 구매횟수 분포
 function repurSummaryViewHtml(rd){
-  return repurAdvancedKpiHtml(rd) + repurFunnelHtml(rd)
+  return repurHeroHtml(rd) + repurAdvancedKpiHtml(rd) + repurFunnelHtml(rd)
     + '<div class="salesSec"><h4>구매횟수 분포 <span class="secSub">고객별 총 주문 횟수 (1회 = 재구매 없음)</span></h4><div style="max-width:520px;margin:0 auto">'+chartBox('repDist',240)+'</div></div>';
 }
 // [주기·추세] 기간별 누적 · 주기 분포 · 코호트 · 월별
