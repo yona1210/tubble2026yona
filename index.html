@@ -11180,6 +11180,8 @@ var repurCrossIdx=0;       // 크로스셀 조회에서 선택된 기준 품목 
 var repurProdSort='buyers';// 품목별 재구매 상세 표 정렬 기준
 var repurView='summary';   // 재구매율 탭 뷰: summary/trend/products/data
 var repurCohortWin=90;     // 코호트 재구매율 관측 기간창(일): 30/60/90/180
+var repurProdPeriod=0;     // 품목 뷰 기간 필터(일): 0=전체, 365/180/90/60/30=최근 N개월
+var _repurProdCache=null;  // 품목 뷰 기간별 재계산 캐시 {period,byProduct,crossSell}
 
 var REPUR_CANDS={
   cust:['거래처','거래처번호','거래처코드','거래처명','회원id','회원번호','구매자id','구매자번호','주문자id','주문자아이디','아이디','구매자','주문자','주문자명','고객id','고객번호','고객','고객명','연락처','휴대폰','전화','전화번호','이메일','수령인','수취인'],
@@ -11362,6 +11364,7 @@ function computeRepurchaseFromAcc(store){
   };
 }
 function recomputeRepurAgg(){
+  _repurProdCache=null;   // 데이터 변경 → 품목 기간 필터 캐시 무효화
   var store=ensureRepurStore(); var agg=computeRepurchaseFromAcc(store);
   store.overall=agg.overall; store.dist=agg.dist; store.byProduct=agg.byProduct; store.monthly=agg.monthly; store.uploaded=repurToday();
   store.avgCycle=agg.avgCycle; store.medCycle=agg.medCycle; store.cycleDist=agg.cycleDist; store.windowRates=agg.windowRates; store.sameCross=agg.sameCross; store.amounts=agg.amounts;
@@ -11469,7 +11472,7 @@ function repurProdSortList(bp){ var a=bp.slice();
 }
 function setRepurProdSort(mode){ repurProdSort=mode; var box=document.getElementById('repProdTblBox'); if(box&&DATA.repurchase) box.innerHTML=repurProdTableInner(DATA.repurchase); }
 function repurProdTableInner(rd){
-  var bp=repurProdSortList(rd.byProduct||[]);
+  var bp=repurProdSortList(repurCurProd().byProduct||[]);
   var rows=bp.map(function(p){
     var rc=p.rate>=30?'#1E9E63':p.rate>=15?'#E59A1C':'#C0392B';
     var cc=(p.crossRate||0)>=30?'#1E9E63':(p.crossRate||0)>=15?'#E59A1C':'#C0392B';
@@ -11484,7 +11487,7 @@ function repurProdTableInner(rd){
   return segHtml+'<div class="salesTblWrap"><table class="salesTbl planTbl"><thead><tr><th class="l">품목</th><th class="r">구매고객</th><th class="c">동일상품 재구매율</th><th class="c">타상품 재구매율</th><th class="c">일회성</th><th class="c">성향</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 function repurProdTableHtml(rd){
-  var bp=rd.byProduct||[];
+  var bp=repurCurProd().byProduct||[];
   var summ='';
   if(bp.length>=2){ var byRate=bp.slice().sort(function(a,b){return b.rate-a.rate;}); var hi=byRate[0], lo=byRate[byRate.length-1];
     summ='<div style="font-size:12px;color:#3a3d47;margin-bottom:8px">동일상품 재구매율 <b style="color:#1E9E63">최고</b> '+pEsc(hi.nm)+' <b>'+hi.rate.toFixed(0)+'%</b> · <b style="color:#C0392B">최저</b> '+pEsc(lo.nm)+' <b>'+lo.rate.toFixed(0)+'%</b> <span style="color:#9aa1b2">(구매고객 상위 '+bp.length+'개 품목 중)</span></div>';
@@ -11492,15 +11495,50 @@ function repurProdTableHtml(rd){
   return '<div class="salesSec"><h4>품목별 재구매 상세 <span class="secSub">기준: 각 품목 구매자 · 동일=그 품목 재구매 · 타상품=다른 품목도 구매 · 일회성=1회 후 이탈 · 정렬 가능</span></h4>'
     +summ+'<div id="repProdTblBox">'+repurProdTableInner(rd)+'</div></div>';
 }
+// 품목 기간 필터 — 주어진 acc 라인으로 품목별 재구매(동일/타/성향) + 크로스셀 재계산 (전체 계산과 동일 로직)
+function repurProductAgg(accLines, prods, nameMap){
+  nameMap=nameMap||{};
+  var groupName=[], groupIndex={}, gidOf=[];
+  (prods||[]).forEach(function(raw,pi){ var v=nameMap[raw]; var disp=(v&&String(v).trim())?String(v).trim():raw; var gi=groupIndex[disp]; if(gi==null){ gi=groupName.length; groupIndex[disp]=gi; groupName.push(disp); } gidOf[pi]=gi; });
+  var custOrders={};
+  (accLines||[]).forEach(function(L){ var c=L[0], o=L[1], pIdx=L[3]; var gid=(pIdx>=0&&gidOf[pIdx]!=null)?gidOf[pIdx]:-1; var co=custOrders[c]||(custOrders[c]={}); var od=co[o]||(co[o]={prods:{}}); if(gid>=0) od.prods[gid]=1; });
+  var pAgg={}, coBuy={};
+  Object.keys(custOrders).forEach(function(c){
+    var os=Object.keys(custOrders[c]).map(function(o){return custOrders[c][o];});
+    var prodOrders={}; os.forEach(function(od){ Object.keys(od.prods).forEach(function(p){ prodOrders[p]=(prodOrders[p]||0)+1; }); });
+    var dp=Object.keys(prodOrders), isRepeat=os.length>=2;
+    dp.forEach(function(p){ var pa=pAgg[p]||(pAgg[p]={buyers:0,single:0,sameOnly:0,sameCross:0,crossOnly:0}); pa.buyers++;
+      if(!isRepeat){ pa.single++; } else { var mulP=prodOrders[p]>=2, other=dp.length>=2; if(mulP&&!other)pa.sameOnly++; else if(mulP&&other)pa.sameCross++; else if(!mulP&&other)pa.crossOnly++; else pa.sameOnly++; } });
+    if(isRepeat && dp.length>=2 && dp.length<=60){ for(var a=0;a<dp.length;a++){ for(var b=a+1;b<dp.length;b++){ var ka=dp[a],kb=dp[b]; (coBuy[ka]=coBuy[ka]||{})[kb]=(coBuy[ka][kb]||0)+1; (coBuy[kb]=coBuy[kb]||{})[ka]=(coBuy[kb][ka]||0)+1; } } }
+  });
+  var byProduct=Object.keys(pAgg).map(function(pi){ var pa=pAgg[pi]; var same=pa.sameOnly+pa.sameCross, cross=pa.sameCross+pa.crossOnly, repeatB=pa.sameOnly+pa.sameCross+pa.crossOnly;
+    var type=repeatB===0?'일회성 위주':(pa.sameOnly>=(pa.sameCross+pa.crossOnly)?'동일제품 충성형':'교차구매 확장형');
+    return {pi:+pi, nm:groupName[pi]||('품목'+pi), buyers:pa.buyers, repeatBuyers:same, rate:pa.buyers?same/pa.buyers*100:0, crossBuyers:cross, crossRate:pa.buyers?cross/pa.buyers*100:0, single:pa.single, singleRate:pa.buyers?pa.single/pa.buyers*100:0, type:type, revenue:0, qty:0}; }).sort(function(a,b){return b.buyers-a.buyers;}).slice(0,20);
+  var topForCross=Object.keys(pAgg).map(function(pi){return {pi:+pi, buyers:pAgg[pi].buyers};}).sort(function(a,b){return b.buyers-a.buyers;}).slice(0,40);
+  var crossSell=topForCross.map(function(p){ var partners=coBuy[p.pi]||{}; var arr=Object.keys(partners).map(function(k){return {nm:groupName[k]||('품목'+k), n:partners[k], rate:p.buyers?partners[k]/p.buyers*100:0};}).sort(function(a,b){return b.n-a.n;}).slice(0,12); return {nm:groupName[p.pi]||('품목'+p.pi), buyers:p.buyers, partners:arr}; });
+  return {byProduct:byProduct, crossSell:crossSell};
+}
+function repurProductView(rd){
+  if(!repurProdPeriod) return {byProduct:rd.byProduct||[], crossSell:rd.crossSell||[]};
+  if(_repurProdCache && _repurProdCache.period===repurProdPeriod) return _repurProdCache;
+  var latest=repurDayNum(rd.periodTo), acc=rd.acc||[], lines=acc;
+  if(latest!=null){ var cut=latest-repurProdPeriod; lines=acc.filter(function(L){ var dn=repurDayNum(L[2]); return dn!=null && dn>cut; }); }
+  var r=repurProductAgg(lines, rd.prods||[], rd.nameMap||{});
+  _repurProdCache={period:repurProdPeriod, byProduct:r.byProduct, crossSell:r.crossSell};
+  return _repurProdCache;
+}
+function repurCurProd(){ return repurProductView(DATA.repurchase||{}); }
+function setRepurProdPeriod(d){ repurProdPeriod=+d||0; _repurProdCache=null; repurCrossIdx=0; renderRepurchase(); }
 function repurCrossSellListHtml(item){
   if(!item) return '';
   var rows=(item.partners||[]).map(function(q,i){
     return '<tr><td class="c">'+(i+1)+'</td><td class="l">'+pEsc(q.nm)+'</td><td class="r">'+q.n.toLocaleString('ko-KR')+'명</td><td class="c"><b>'+q.rate.toFixed(0)+'%</b></td></tr>';
   }).join('')||'<tr><td colspan="4" style="text-align:center;color:#aaa;padding:12px">함께 재구매한 품목이 없습니다</td></tr>';
-  return '<div style="font-size:12px;color:#7a8194;margin-bottom:6px"><b style="color:var(--navy)">'+pEsc(item.nm)+'</b> 구매고객 '+item.buyers.toLocaleString('ko-KR')+'명이 함께 구매한 다른 품목 <span style="color:#9aa1b2">(전체 기간 · 재구매 고객 기준 · 같은 주문·다른 주문 모두 포함)</span></div>'
+  var per=repurProdPeriod?('최근 '+repurWinLabel(repurProdPeriod)):'전체 기간';
+  return '<div style="font-size:12px;color:#7a8194;margin-bottom:6px"><b style="color:var(--navy)">'+pEsc(item.nm)+'</b> 구매고객 '+item.buyers.toLocaleString('ko-KR')+'명이 함께 구매한 다른 품목 <span style="color:#9aa1b2">('+per+' · 재구매 고객 기준 · 같은 주문·다른 주문 모두 포함)</span></div>'
     +'<div class="salesTblWrap"><table class="salesTbl planTbl"><thead><tr><th class="c">순위</th><th class="l">함께 구매한 품목</th><th class="r">함께 구매 고객</th><th class="c">비율</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
-function setRepurCross(idx){ repurCrossIdx=+idx||0; var cs=(DATA.repurchase&&DATA.repurchase.crossSell)||[]; var box=document.getElementById('repCrossBox'); if(box) box.innerHTML=repurCrossSellListHtml(cs[repurCrossIdx]); }
+function setRepurCross(idx){ repurCrossIdx=+idx||0; var cs=repurCurProd().crossSell||[]; var box=document.getElementById('repCrossBox'); if(box) box.innerHTML=repurCrossSellListHtml(cs[repurCrossIdx]); }
 // 품목명 매핑 편집 — 원본 긴 품명 → 운영 품목명(짧게). 키워드 규칙(일괄) + 개별 매핑. 같은 표시명은 하나로 합침
 function repurAddRuleRow(kw, to){
   var box=document.getElementById('repRuleBox'); if(!box) return;
@@ -11547,11 +11585,12 @@ function openRepurNameMap(){
   };
 }
 function repurCrossSellHtml(rd){
-  var cs=(rd.crossSell||[]).filter(function(x){return x.partners&&x.partners.length;});
+  var cs=(repurCurProd().crossSell||[]).filter(function(x){return x.partners&&x.partners.length;});
   if(!cs.length) return '';
   if(repurCrossIdx>=cs.length || repurCrossIdx<0) repurCrossIdx=0;
   var opts=cs.map(function(x,i){return '<option value="'+i+'"'+(i===repurCrossIdx?' selected':'')+'>'+pEsc(x.nm)+' (구매 '+x.buyers.toLocaleString('ko-KR')+'명)</option>';}).join('');
-  return '<div class="salesSec"><h4>함께 구매 분석 (크로스셀) <span class="secSub">기준 품목 선택 → 그 구매자가 함께 산 다른 품목 · 전체 기간 · 재구매 고객 기준(같은/다른 주문 포함)</span></h4>'
+  var per=repurProdPeriod?('최근 '+repurWinLabel(repurProdPeriod)):'전체 기간';
+  return '<div class="salesSec"><h4>함께 구매 분석 (크로스셀) <span class="secSub">기준 품목 선택 → 그 구매자가 함께 산 다른 품목 · '+per+' · 재구매 고객 기준(같은/다른 주문 포함)</span></h4>'
     +'<div style="margin-bottom:10px"><span style="font-size:12px;font-weight:700;color:var(--navy);margin-right:6px">기준 품목</span>'
     +'<select id="repCrossSel" onchange="setRepurCross(this.value)" style="font-size:12.5px;padding:6px 10px;border:1px solid #d6dbe7;border-radius:8px;max-width:100%;min-width:260px">'+opts+'</select></div>'
     +'<div id="repCrossBox">'+repurCrossSellListHtml(cs[repurCrossIdx])+'</div></div>';
@@ -11660,9 +11699,15 @@ function repurTrendViewHtml(rd){
     + repurCohortHtml(rd)
     + '<div class="salesSec"><h4>월별 재구매율 <span class="secSub">달력 시점별 재방문 고객 비중 · 코호트와 다른 관점</span></h4><div>'+chartBox('repMonthly',220)+'</div></div>';
 }
-// [품목] 품목별 재구매율 막대 + 상세표 + 함께구매(크로스셀)
+// [품목] 기간필터 + 품목별 재구매율 막대 + 상세표 + 함께구매(크로스셀)
 function repurProductsViewHtml(rd){
-  return '<div class="salesSec"><h4>품목별 동일상품 재구매율 <span class="secSub">구매고객 상위 10 · 그 품목을 다시 산 비율</span></h4><div>'+chartBox('repProd',300)+'</div></div>'
+  var periods=[[0,'전체'],[365,'12개월'],[180,'6개월'],[90,'3개월'],[60,'2개월'],[30,'1개월']];
+  var seg='<div class="salesViewSeg" style="margin:0 0 8px;flex-wrap:wrap">'+periods.map(function(p){ return '<button class="svTab'+(repurProdPeriod===p[0]?' on':'')+'" onclick="setRepurProdPeriod('+p[0]+')">'+p[1]+(p[0]?' 이내':'')+'</button>'; }).join('')+'</div>';
+  var warn=(repurProdPeriod&&repurProdPeriod<=60)?' · <span style="color:#9a4b00">⚠ 짧은 기간은 재구매 표본이 적어 값이 낮게 나올 수 있음</span>':'';
+  var note='<div style="font-size:11.5px;color:#7a8194;margin-bottom:2px">기간 기준: <b>'+(repurProdPeriod?('최신일로부터 최근 '+repurWinLabel(repurProdPeriod)+' 주문만'):'전체 누적 기간')+'</b> 으로 품목 재구매·크로스셀 재계산'+warn+'</div>';
+  var filterSec='<div class="salesSec"><h4>품목 기간 필터 <span class="secSub">선택 기간 내 주문만으로 아래 지표 재계산</span></h4>'+seg+note+'</div>';
+  return filterSec
+    + '<div class="salesSec"><h4>품목별 동일상품 재구매율 <span class="secSub">구매고객 상위 10 · 그 품목을 다시 산 비율</span></h4><div>'+chartBox('repProd',300)+'</div></div>'
     + repurProdTableHtml(rd) + repurCrossSellHtml(rd);
 }
 // [데이터·설정] 누적 이력 · 컬럼 매핑 · 품목명 매핑
@@ -11717,7 +11762,7 @@ function drawRepurchaseCharts(rd){
       centerText:{text:(rd.overall.totalCustomers||0).toLocaleString('ko-KR'), sub:(rd.isB2B?'총 거래처':'총 고객'), size:isNarrow()?14:17},
       title:{display:true,text:'구매횟수 분포 (전체 고객)'},
       tooltip:{callbacks:{label:function(c){ return ' '+dist[c.dataIndex].label+': '+Number(c.parsed).toLocaleString('ko-KR')+'명 ('+(c.parsed/distTot*100).toFixed(1)+'%)'; }}} } } });
-  var bp=(rd.byProduct||[]).slice(0,10);
+  var bp=(repurCurProd().byProduct||[]).slice(0,10);
   makeChart('repProd',{ type:'bar',
     data:{ labels:bp.map(function(p){return clipLabel(p.nm,isNarrow()?8:14);}), datasets:[{ label:'재구매율', data:bp.map(function(p){return Math.round(p.rate*10)/10;}), backgroundColor:seriesColors(bp.length), borderRadius:4 }] },
     options:{ indexAxis:'y', plugins:{legend:{display:false}, barValueLabel:false, title:{display:true,text:'품목별 동일상품 재구매율 (각 품목 구매자 기준)'},
