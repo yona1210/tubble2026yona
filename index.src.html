@@ -10733,10 +10733,21 @@ function planEok(v){ return (v/1e8).toFixed(2)+'억'; }
       (DATA.stock||[]).slice(0,12).forEach(function(s,i){
         var own=+s.price||0;
         var cst=(typeof getCurrentCost==='function'?(getCurrentCost(s.nm,0)||0):0)|| (+s.cost||0);
-        _ppSeed.push({id:i+1, brand:'터블', nm:s.nm, cost:cst, ch:{'쿠팡':{n:own,s:0},'네이버':{n:own,s:0},'자사몰':{n:own,s:0}}, map:0, memo:''});
+        _ppSeed.push({id:i+1, brand:'터블', nm:s.nm, cost:cst, vat:'excl', prices:{normal:own,always:0,event:0,closed:0,special:0}, ship:'', shipFee:0, shipFreeMin:0, map:0, memo:''});
       });
     }catch(e){}
-    DATA.pricePolicy={ seq:_ppSeed.length+1, rules:'· 할인가는 정상가의 최대 30%까지, 그 이상 인하는 대표 승인 후 진행.\n· 최저광고가(MAP) 미만 판매 금지 — 채널 위반 적발 시 시정 요청.\n· 신제품 출시 후 첫 4주는 정상가 유지(런칭 프로모션은 정상가 유지 + 쿠폰으로 대응).\n· 채널 간 판매가 격차는 5% 이내로 관리.', items:_ppSeed };
+    DATA.pricePolicy={ seq:_ppSeed.length+1, rules:'· 정상가는 소비자 기준가로 고정, 상시가는 정상가의 5~10% 이내에서 운영.\n· 행사가는 정상가의 최대 30%까지, 그 이상 인하는 대표 승인 후 진행.\n· 폐쇄몰/공구가·특판가는 노출 제한(비공개) 조건에서만 운영 — 오픈마켓 노출 금지.\n· 최저광고가(MAP) 미만 판매 금지 — 채널 위반 적발 시 시정 요청.\n· 원가는 품목별 VAT 기준(별도/포함)을 명시하고, 마진은 정상가 기준으로 관리.', items:_ppSeed };
+  }
+  // [가격정책] 구조 마이그레이션 — 구 채널형(ch:{쿠팡/네이버/자사몰}) → 가격유형형(prices) 1회 변환
+  if(DATA.pricePolicy && Array.isArray(DATA.pricePolicy.items)){
+    DATA.pricePolicy.items=DATA.pricePolicy.items.map(function(o){
+      if(!o || o.prices) return o;           // 이미 신형이면 그대로
+      var own=(o.ch&&o.ch['자사몰'])||{}, normal=+own.n||0, event=+own.s||0;
+      if(!normal){ try{ Object.keys(o.ch||{}).forEach(function(k){ normal=Math.max(normal,+((o.ch[k]||{}).n)||0); }); }catch(e){} }
+      return { id:o.id, brand:o.brand||'터블', nm:o.nm||'', cost:+o.cost||0, vat:o.vat||'excl',
+        prices:{ normal:normal, always:0, event:event, closed:0, special:0 },
+        ship:o.ship||'', shipFee:+o.shipFee||0, shipFreeMin:+o.shipFreeMin||0, map:+o.map||0, memo:o.memo||'' };
+    });
   }
   // [FAQ] 데이터 init — 없을 때만 대표 Q&A 시드
   if(!DATA.faq || !Array.isArray(DATA.faq.items)){
@@ -10779,7 +10790,7 @@ function renderPlanning(){
     kpi=faqKpiHtml(); view=planFaqHtml();
   } else if(planView==='pricePolicy'){
     var pit=(DATA.pricePolicy&&DATA.pricePolicy.items)||[];
-    if(meta) meta.textContent=pit.length+'개 품목 · 채널별 판매가·마진 관리 · 행 클릭 편집';
+    if(meta) meta.textContent=pit.length+'개 품목 · 가격유형별 판매가·마진·배송비 관리 · 행 클릭 편집';
     leftFilter='<span style="font-size:12px;font-weight:700;color:var(--navy)">브랜드</span><div class="salesViewSeg" style="margin:0">'
       +['전체'].concat(PLAN_BRANDS).map(function(b){ var c=priceItemsByBrand(b).length; return '<button class="svTab'+(planBrandFilter===b?' on':'')+'" onclick="setPlanBrand(\''+b+'\')">'+b+' ('+c+')</button>'; }).join('')
       +'</div>';
@@ -10806,62 +10817,81 @@ function renderPlanning(){
 }
 // ===== [가격정책] 뷰 =====
 function priceItemsByBrand(b){ var it=(DATA.pricePolicy&&DATA.pricePolicy.items)||[]; return b==='전체'?it:it.filter(function(x){return (x.brand||'터블')===b;}); }
-function ppMargin(o){ var own=(o.ch&&o.ch['자사몰']&&+o.ch['자사몰'].n)||0, cost=+o.cost||0; return (own>0&&cost>0)?((own-cost)/own*100):null; }
+var PP_TIERS=[['normal','정상가'],['always','상시가'],['event','행사가'],['closed','폐쇄몰/공구가'],['special','특판가']];
+function ppMargin(o){ var base=(o.prices&&+o.prices.normal)||0, cost=+o.cost||0; return (base>0&&cost>0)?((base-cost)/base*100):null; }
 function ppMarginColor(m){ return m==null?'#aaa':(m>=40?'#1E9E63':m>=25?'#E59A1C':'#C0392B'); }
-function ppChCell(c){ if(!c) return '-'; var n=+c.n||0, s=+c.s||0; if(!n&&!s) return '-'; if(s>0&&s<n) return planNum(n)+' <span style="color:#C0392B">→ '+planNum(s)+'</span>'; return planNum(n); }
+function ppNum(v){ return (+v>0)?planNum(v):'<span style="color:#c4c8d2">-</span>'; }
+function ppVatLabel(o){ return (o.vat==='incl')?'VAT포함':'VAT별도'; }
+function ppShipText(o){
+  if(o.ship==='무료') return '<span style="color:#1E9E63">무료</span>';
+  if(o.ship==='유료') return (+o.shipFee>0?planNum(o.shipFee)+'원':'유료');
+  if(o.ship==='조건부') return (+o.shipFee>0?planNum(o.shipFee)+'원':'조건부')+(+o.shipFreeMin>0?' <span style="color:#7a8194;font-size:10px">('+planNum(o.shipFreeMin)+'↑무료)</span>':'');
+  return '<span style="color:#c4c8d2">-</span>';
+}
 function pricePolicyKpiHtml(){
   var items=priceItemsByBrand(planBrandFilter);
   var withM=items.map(ppMargin).filter(function(m){return m!=null;});
   var avg=withM.length?(withM.reduce(function(a,b){return a+b;},0)/withM.length):null;
   var lowest=null; items.forEach(function(o){ var m=ppMargin(o); if(m!=null&&(lowest==null||m<lowest.m)) lowest={m:m,nm:o.nm}; });
-  var onSale=items.filter(function(o){ return o.ch&&['쿠팡','네이버','자사몰'].some(function(k){ return o.ch[k]&&+o.ch[k].s>0 && +o.ch[k].s < (+o.ch[k].n||0); }); }).length;
+  var eventCnt=items.filter(function(o){ return o.prices&&+o.prices.event>0; }).length;
+  var freeShip=items.filter(function(o){ return o.ship==='무료'; }).length;
   return '<div class="kpis">'
     +'<div class="kpi accent"><div class="v">'+items.length+'</div><div class="l">관리 품목</div><div class="sub">'+pEsc(planBrandFilter)+'</div></div>'
-    +'<div class="kpi"><div class="v" style="color:'+ppMarginColor(avg)+'">'+(avg!=null?avg.toFixed(0)+'%':'-')+'</div><div class="l">평균 마진율</div><div class="sub">자사몰 정상가 기준</div></div>'
+    +'<div class="kpi"><div class="v" style="color:'+ppMarginColor(avg)+'">'+(avg!=null?avg.toFixed(0)+'%':'-')+'</div><div class="l">평균 마진율</div><div class="sub">정상가 기준 · 원가 VAT 확인</div></div>'
     +'<div class="kpi"><div class="v" style="color:'+ppMarginColor(lowest?lowest.m:null)+'">'+(lowest?lowest.m.toFixed(0)+'%':'-')+'</div><div class="l">최저 마진</div><div class="sub">'+(lowest?pEsc(lowest.nm):'-')+'</div></div>'
-    +'<div class="kpi"><div class="v">'+onSale+'</div><div class="l">할인 진행</div><div class="sub">채널 할인가 설정 품목</div></div></div>';
+    +'<div class="kpi"><div class="v">'+eventCnt+'</div><div class="l">행사가 운영</div><div class="sub">무료배송 '+freeShip+'개</div></div></div>';
 }
 function planPricePolicyHtml(){
   var items=priceItemsByBrand(planBrandFilter);
   var rows=items.map(function(o){
-    var m=ppMargin(o), mc=ppMarginColor(m), bcol=PLAN_BRANDCOLOR[o.brand||'터블']||'#868a96';
+    var m=ppMargin(o), mc=ppMarginColor(m), bcol=PLAN_BRANDCOLOR[o.brand||'터블']||'#868a96', pr=o.prices||{};
     return '<tr onclick="openPricePolicyEdit('+o.id+')" style="cursor:pointer">'
       +'<td class="l"><span class="planCatBadge" style="background:'+bcol+';color:#fff">'+pEsc(o.brand||'터블')+'</span> '+pEsc(o.nm)+'</td>'
-      +'<td class="r">'+(+o.cost?planNum(o.cost)+'원':'-')+'</td>'
+      +'<td class="r">'+(+o.cost?planNum(o.cost)+'원 <span style="display:inline-block;font-size:9px;line-height:1.4;padding:0 4px;border-radius:4px;background:'+(o.vat==='incl'?'#e7f1ec;color:#1E9E63':'#eef1f7;color:#6b7180')+';vertical-align:middle">'+ppVatLabel(o)+'</span>':'-')+'</td>'
       +'<td class="c"><b style="color:'+mc+'">'+(m!=null?m.toFixed(0)+'%':'-')+'</b></td>'
-      +'<td class="r">'+ppChCell(o.ch&&o.ch['쿠팡'])+'</td>'
-      +'<td class="r">'+ppChCell(o.ch&&o.ch['네이버'])+'</td>'
-      +'<td class="r">'+ppChCell(o.ch&&o.ch['자사몰'])+'</td>'
+      +'<td class="r"><b>'+ppNum(pr.normal)+'</b></td>'
+      +'<td class="r">'+ppNum(pr.always)+'</td>'
+      +'<td class="r" style="color:#C0392B">'+ppNum(pr.event)+'</td>'
+      +'<td class="r">'+ppNum(pr.closed)+'</td>'
+      +'<td class="r">'+ppNum(pr.special)+'</td>'
+      +'<td class="c" style="font-size:11.5px">'+ppShipText(o)+'</td>'
       +'<td class="r">'+(+o.map?planNum(o.map)+'원':'<span style="color:#c4c8d2">미설정</span>')+'</td>'
       +'<td class="l" style="color:#7a8194">'+pEsc(o.memo||'')+'</td></tr>';
-  }).join('')||'<tr><td colspan="8" style="text-align:center;color:#aaa;padding:16px">등록된 품목이 없습니다 — [+ 품목 추가]</td></tr>';
+  }).join('')||'<tr><td colspan="11" style="text-align:center;color:#aaa;padding:16px">등록된 품목이 없습니다 — [+ 품목 추가]</td></tr>';
   var rules=(DATA.pricePolicy&&DATA.pricePolicy.rules)||'';
   var rulesCard='<div class="salesSec" style="margin-top:14px"><h4>가격 정책 규칙 <span class="secSub">할인·최저가·승인 기준</span> <button class="tbtn" style="float:right;font-size:11px;padding:4px 10px" onclick="openPricePolicyRules()">편집</button></h4>'
     +'<div class="pdText" style="white-space:pre-wrap">'+(rules?pEsc(rules):'등록된 정책 규칙이 없습니다 — [편집]에서 입력하세요')+'</div></div>';
-  return '<div class="salesSec"><h4>채널별 판매가 · 마진 <span class="secSub">쿠팡·네이버·자사몰 정상가/할인가 · 행 클릭 편집</span></h4>'
-    +'<div class="salesTblWrap"><table class="salesTbl planTbl"><thead><tr><th class="l">품목</th><th class="r">원가</th><th class="c">마진</th><th class="r">쿠팡</th><th class="r">네이버</th><th class="r">자사몰</th><th class="r">최저가(MAP)</th><th class="l">메모</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'
+  return '<div class="salesSec"><h4>가격 유형별 판매가 · 마진 <span class="secSub">정상가·상시가·행사가·폐쇄몰/공구가·특판가 · 원가 VAT 기준·배송비 · 행 클릭 편집</span></h4>'
+    +'<div style="font-size:11px;color:#8a90a0;margin:-2px 0 8px;padding:0 2px">정상가=소비자 기준가 · 상시가=평상시 판매가 · 행사가=프로모션가 · 폐쇄몰/공구가=비공개 채널·공동구매가 · 특판가=대량/특별 단가 · 마진=(정상가−원가)/정상가</div>'
+    +'<div class="salesTblWrap"><table class="salesTbl planTbl"><thead><tr><th class="l">품목</th><th class="r">원가</th><th class="c">마진</th><th class="r">정상가</th><th class="r">상시가</th><th class="r">행사가</th><th class="r">폐쇄몰/공구가</th><th class="r">특판가</th><th class="c">배송비</th><th class="r">최저가(MAP)</th><th class="l">메모</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'
     +rulesCard;
 }
 function openPricePolicyEdit(id){
   if(!DATA.pricePolicy) return;
   var defBrand=(planBrandFilter&&planBrandFilter!=='전체')?planBrandFilter:'터블';
-  var o = id? (DATA.pricePolicy.items||[]).find(function(x){return x.id===id;}) : {id:null,brand:defBrand,nm:'',cost:0,ch:{'쿠팡':{n:0,s:0},'네이버':{n:0,s:0},'자사몰':{n:0,s:0}},map:0,memo:''};
+  var o = id? (DATA.pricePolicy.items||[]).find(function(x){return x.id===id;}) : {id:null,brand:defBrand,nm:'',cost:0,vat:'excl',prices:{normal:0,always:0,event:0,closed:0,special:0},ship:'',shipFee:0,shipFreeMin:0,map:0,memo:''};
   if(!o) return;
+  var pr=o.prices||{normal:0,always:0,event:0,closed:0,special:0};
   var old=document.getElementById('ppEditModal'); if(old) old.remove();
   var sel=function(opts,v){return opts.map(function(c){return '<option value="'+c+'"'+(c===v?' selected':'')+'>'+c+'</option>';}).join('');};
-  var num=function(label,key,val){return '<div class="efield"><label>'+label+'</label><input id="pp_'+key+'" type="number" value="'+(val!=null&&val!==''?val:'')+'"></div>';};
-  var ch=function(k){ return (o.ch&&o.ch[k])||{n:0,s:0}; };
+  var sel2=function(pairs,v){return pairs.map(function(p){return '<option value="'+p[0]+'"'+(p[0]===v?' selected':'')+'>'+p[1]+'</option>';}).join('');};
+  var num=function(label,key,val){return '<div class="efield"><label>'+label+'</label><input id="pp_'+key+'" type="number" value="'+(val!=null&&val!==''&&val!==0?val:'')+'"></div>';};
   var m=document.createElement('div'); m.id='ppEditModal'; m.className='modal open';
-  m.innerHTML='<div class="mbox" style="max-width:600px;width:100%;padding:22px;max-height:88vh;overflow:auto">'
+  m.innerHTML='<div class="mbox" style="max-width:620px;width:100%;padding:22px;max-height:88vh;overflow:auto">'
     +'<h3>'+(id?'가격정책 편집':'새 품목 가격정책')+'</h3>'
     +'<div class="efgrid"><div class="efield"><label>브랜드</label><select id="pp_brand">'+sel(PLAN_BRANDS,o.brand||'터블')+'</select></div>'
     +'<div class="efield"><label>품목명</label><input id="pp_nm" value="'+pEsc(o.nm||'')+'"></div></div>'
-    +'<div class="efgrid">'+num('원가(원)','cost',o.cost)+num('최저광고가 MAP(원)','map',o.map)+'</div>'
-    +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin:8px 0 3px">채널별 정상가 / 할인가 (원)</div>'
-    +'<div class="efgrid">'+num('쿠팡 정상','coupang_n',ch('쿠팡').n)+num('쿠팡 할인','coupang_s',ch('쿠팡').s)+'</div>'
-    +'<div class="efgrid">'+num('네이버 정상','naver_n',ch('네이버').n)+num('네이버 할인','naver_s',ch('네이버').s)+'</div>'
-    +'<div class="efgrid">'+num('자사몰 정상','own_n',ch('자사몰').n)+num('자사몰 할인','own_s',ch('자사몰').s)+'</div>'
-    +'<div class="efield"><label>메모</label><input id="pp_memo" value="'+pEsc(o.memo||'')+'"></div>'
+    +'<div class="efgrid">'+num('원가(원)','cost',o.cost)
+    +'<div class="efield"><label>원가 VAT 기준</label><select id="pp_vat">'+sel2([['excl','VAT 별도'],['incl','VAT 포함']],o.vat||'excl')+'</select></div></div>'
+    +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin:10px 0 3px">가격 유형별 판매가 (원)</div>'
+    +'<div class="efgrid">'+num('정상가','p_normal',pr.normal)+num('상시가','p_always',pr.always)+'</div>'
+    +'<div class="efgrid">'+num('행사가','p_event',pr.event)+num('폐쇄몰/공구가','p_closed',pr.closed)+'</div>'
+    +'<div class="efgrid">'+num('특판가','p_special',pr.special)+num('최저광고가 MAP','map',o.map)+'</div>'
+    +'<div style="font-size:11px;font-weight:700;color:var(--navy);margin:10px 0 3px">배송비</div>'
+    +'<div class="efgrid"><div class="efield"><label>배송 정책</label><select id="pp_ship">'+sel2([['','미설정'],['무료','무료배송'],['유료','유료배송'],['조건부','조건부무료']],o.ship||'')+'</select></div>'
+    +num('배송비(원)','shipFee',o.shipFee)+'</div>'
+    +'<div class="efgrid">'+num('무료조건(이 금액↑ 무료)','shipFreeMin',o.shipFreeMin)
+    +'<div class="efield"><label>메모</label><input id="pp_memo" value="'+pEsc(o.memo||'')+'"></div></div>'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px">'
     +(id?'<button class="tbtn danger" id="ppDel">삭제</button>':'<span></span>')
     +'<div style="display:flex;gap:8px"><button class="tbtn" id="ppCancel">취소</button><button class="tbtn primary" id="ppSave">저장</button></div></div></div>';
@@ -10870,9 +10900,10 @@ function openPricePolicyEdit(id){
   if(id){ var del=m.querySelector('#ppDel'); if(del) del.onclick=function(){ DATA.pricePolicy.items=DATA.pricePolicy.items.filter(function(x){return x.id!==id;}); m.remove(); if(typeof markDirty==='function')markDirty(); renderPlanning(); }; }
   m.querySelector('#ppSave').onclick=function(){
     var g=function(k){return document.getElementById('pp_'+k);};
-    var v={ brand:g('brand').value, nm:g('nm').value.trim(), cost:+g('cost').value||0, map:+g('map').value||0,
-      ch:{'쿠팡':{n:+g('coupang_n').value||0,s:+g('coupang_s').value||0},'네이버':{n:+g('naver_n').value||0,s:+g('naver_s').value||0},'자사몰':{n:+g('own_n').value||0,s:+g('own_s').value||0}},
-      memo:g('memo').value.trim() };
+    var v={ brand:g('brand').value, nm:g('nm').value.trim(), cost:+g('cost').value||0, vat:g('vat').value||'excl',
+      prices:{ normal:+g('p_normal').value||0, always:+g('p_always').value||0, event:+g('p_event').value||0, closed:+g('p_closed').value||0, special:+g('p_special').value||0 },
+      ship:g('ship').value||'', shipFee:+g('shipFee').value||0, shipFreeMin:+g('shipFreeMin').value||0,
+      map:+g('map').value||0, memo:g('memo').value.trim() };
     if(!v.nm){ if(typeof toast==='function')toast('품목명을 입력하세요'); return; }
     if(id){ var idx=DATA.pricePolicy.items.findIndex(function(x){return x.id===id;}); if(idx>=0) DATA.pricePolicy.items[idx]=Object.assign({},DATA.pricePolicy.items[idx],v); }
     else { if(!DATA.pricePolicy.seq) DATA.pricePolicy.seq=(DATA.pricePolicy.items.reduce(function(mx,x){return Math.max(mx,x.id||0);},0)+1); v.id=DATA.pricePolicy.seq++; DATA.pricePolicy.items.push(v); }
