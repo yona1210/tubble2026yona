@@ -11179,6 +11179,7 @@ var _lastBatchName='';     // 이번 세션 마지막 업로드 파일명
 var repurCrossIdx=0;       // 크로스셀 조회에서 선택된 기준 품목 인덱스
 var repurProdSort='buyers';// 품목별 재구매 상세 표 정렬 기준
 var repurView='summary';   // 재구매율 탭 뷰: summary/trend/products/data
+var repurCohortWin=90;     // 코호트 재구매율 관측 기간창(일): 30/60/90/180
 
 var REPUR_CANDS={
   cust:['거래처','거래처번호','거래처코드','거래처명','회원id','회원번호','구매자id','구매자번호','주문자id','주문자아이디','아이디','구매자','주문자','주문자명','고객id','고객번호','고객','고객명','연락처','휴대폰','전화','전화번호','이메일','수령인','수취인'],
@@ -11295,7 +11296,8 @@ function computeRepurchaseFromAcc(store){
   var sumFirstAmt=0, firstAmtN=0, sumRepeatAmt=0, repeatOrderN=0, sumAllAmt=0;
   var sameProdRepeaters=0, crossOnlyRepeaters=0;
   var pAgg={}, coBuy={};     // 품목별 {buyers,same,cross} · 크로스셀 co-buy 매트릭스(pIdx a<->b)
-  var COHW=90, cohorts={};   // 첫 구매 월별 코호트: 90일 이내 재구매율(관측창 확보된 고객만)
+  var COH_WINS=[30,60,90,180], cohortsByWin={};   // 첫 구매 월별 코호트: 기간창별 재구매율(관측창 확보 고객만)
+  COH_WINS.forEach(function(w){ cohortsByWin[w]={}; });
   custs.forEach(function(c){
     var os=Object.keys(custOrders[c]).map(function(o){return custOrders[c][o];});
     os.sort(function(a,b){ var da=repurDayNum(a.d), db=repurDayNum(b.d); if(da==null&&db==null)return 0; if(da==null)return 1; if(db==null)return -1; return da-db; });
@@ -11316,17 +11318,17 @@ function computeRepurchaseFromAcc(store){
         if(mulP&&!other) pa.sameOnly++; else if(mulP&&other) pa.sameCross++; else if(!mulP&&other) pa.crossOnly++; else pa.sameOnly++; }
     });
     if(isRepeat && dp.length>=2 && dp.length<=60){ for(var a=0;a<dp.length;a++){ for(var b=a+1;b<dp.length;b++){ var ka=dp[a],kb=dp[b]; (coBuy[ka]=coBuy[ka]||{})[kb]=(coBuy[ka][kb]||0)+1; (coBuy[kb]=coBuy[kb]||{})[ka]=(coBuy[kb][ka]||0)+1; } } }
-    // 첫 구매 코호트(월) — 90일 관측창 확보된 고객만 분모, 90일 내 재구매 여부
+    // 첫 구매 코호트(월) — 기간창별로 관측창 확보 고객만 분모, 그 창 내 재구매 여부
     if(os.length){ var fDay=repurDayNum(os[0].d), fMonth=(os[0].d||'').slice(0,7);
-      if(fMonth && fDay!=null){ var ch=cohorts[fMonth]||(cohorts[fMonth]={size:0,obs:0,rep:0}); ch.size++;
-        if(maxDay!=null && (fDay+COHW)<=maxDay){ ch.obs++;
-          var rw=false; for(var k=1;k<os.length;k++){ var dk=repurDayNum(os[k].d); if(dk!=null && dk>fDay && dk<=fDay+COHW){ rw=true; break; } }
-          if(rw) ch.rep++;
-        }
+      if(fMonth && fDay!=null){
+        var nextGap=null; for(var k=1;k<os.length;k++){ var dk=repurDayNum(os[k].d); if(dk!=null && dk>fDay){ nextGap=dk-fDay; break; } }
+        COH_WINS.forEach(function(w){ var cm=cohortsByWin[w]; var ch=cm[fMonth]||(cm[fMonth]={size:0,obs:0,rep:0}); ch.size++;
+          if(maxDay!=null && (fDay+w)<=maxDay){ ch.obs++; if(nextGap!=null && nextGap<=w) ch.rep++; }
+        });
       }
     }
   });
-  var cohortSeries=Object.keys(cohorts).sort().map(function(m){ var ch=cohorts[m]; return {ym:m, size:ch.size, obs:ch.obs, rep:ch.rep, rate:ch.obs?ch.rep/ch.obs*100:null}; });
+  var cohortByWindow={}; COH_WINS.forEach(function(w){ cohortByWindow[w]=Object.keys(cohortsByWin[w]).sort().map(function(m){ var ch=cohortsByWin[w][m]; return {ym:m, size:ch.size, obs:ch.obs, rep:ch.rep, rate:ch.obs?ch.rep/ch.obs*100:null}; }); });
   var repeat=counts.filter(function(n){return n>=2;}).length;
   var avgOrders=total?counts.reduce(function(a,b){return a+b;},0)/total:0;
   var dist=[{label:'1회',n:0},{label:'2회',n:0},{label:'3회',n:0},{label:'4회+',n:0}];
@@ -11351,7 +11353,7 @@ function computeRepurchaseFromAcc(store){
     overall:{ totalCustomers:total, repeatCustomers:repeat, repurchaseRate:total?repeat/total*100:0, avgOrders:avgOrders, totalOrders:totalOrders },
     dist:dist, byProduct:byProduct, monthly:monthly, crossSell:crossSell,
     avgCycle:avgCycle, medCycle:medCycle, cycleDist:cycleDist, windowRates:windowRates,
-    cohortSeries:cohortSeries, cohortWindow:COHW,
+    cohortByWindow:cohortByWindow, cohortWindows:COH_WINS,
     sameCross:{ sameProd:sameProdRepeaters, crossOnly:crossOnlyRepeaters, repeatCust:repeat },
     amounts:{ firstAOV:firstAmtN?sumFirstAmt/firstAmtN:0, repeatAOV:repeatOrderN?sumRepeatAmt/repeatOrderN:0, overallAOV:totalOrders?sumAllAmt/totalOrders:0, hasAmount:sumAllAmt>0 }
   };
@@ -11360,7 +11362,7 @@ function recomputeRepurAgg(){
   var store=ensureRepurStore(); var agg=computeRepurchaseFromAcc(store);
   store.overall=agg.overall; store.dist=agg.dist; store.byProduct=agg.byProduct; store.monthly=agg.monthly; store.uploaded=repurToday();
   store.avgCycle=agg.avgCycle; store.medCycle=agg.medCycle; store.cycleDist=agg.cycleDist; store.windowRates=agg.windowRates; store.sameCross=agg.sameCross; store.amounts=agg.amounts;
-  store.cohortSeries=agg.cohortSeries; store.cohortWindow=agg.cohortWindow; store.crossSell=agg.crossSell;
+  store.cohortByWindow=agg.cohortByWindow; store.cohortWindows=agg.cohortWindows; store.crossSell=agg.crossSell;
   var pf='', pt='';
   (store.batches||[]).forEach(function(b){ if(b.dateMin && (!pf||b.dateMin<pf))pf=b.dateMin; if(b.dateMax && (!pt||b.dateMax>pt))pt=b.dateMax; });
   store.periodFrom=pf; store.periodTo=pt;
@@ -11619,20 +11621,25 @@ function repurCohortTrend(series){
   return { first:v[0], last:v[v.length-1], slope:slope, totalChange:totalChange,
     dir: totalChange>2?'상승':totalChange<-2?'하락':'보합' };
 }
-function repurCohortHtml(rd){
-  var series=(rd.cohortSeries||[]).filter(function(x){return x.rate!=null;});
-  var win=rd.cohortWindow||90;
-  if(series.length<2) return '<div class="salesSec"><h4>재구매율 추이 (첫 구매 코호트) <span class="secSub">최근 '+win+'일 관측창이 확보된 월만 표시</span></h4>'
-    +'<div style="color:#7a8194;font-size:12px;padding:10px">추세를 낼 만한 기간이 아직 부족합니다 (주문일자 컬럼·누적 데이터 확인).</div></div>';
-  var t=repurCohortTrend(rd.cohortSeries);
+function repurWinLabel(w){ return (w%30===0)?(w/30)+'개월':w+'일'; }
+function setRepurCohortWin(w){ repurCohortWin=+w; var box=document.getElementById('repCohortBody'); if(box&&DATA.repurchase){ box.innerHTML=repurCohortBodyHtml(DATA.repurchase); drawRepurCohortChart(DATA.repurchase); } document.querySelectorAll('#repCohortWinSeg .svTab').forEach(function(b){ b.classList.toggle('on', +b.dataset.w===repurCohortWin); }); }
+function repurCohortBodyHtml(rd){
+  var series=(((rd.cohortByWindow||{})[repurCohortWin])||[]).filter(function(x){return x.rate!=null;});
+  if(series.length<2) return '<div style="color:#7a8194;font-size:12px;padding:10px">이 기간('+repurWinLabel(repurCohortWin)+' 이내)으로 추세를 낼 코호트가 부족합니다 — 관측창 확보 월이 적습니다. 더 짧은 기간을 선택해 보세요.</div>';
+  var t=repurCohortTrend((rd.cohortByWindow||{})[repurCohortWin]);
   var note='';
   if(t){ var col=t.dir==='상승'?'#1E9E63':t.dir==='하락'?'#C0392B':'#E59A1C';
-    note='<div style="font-size:12.5px;color:#3a3d47;margin-bottom:8px">첫 구매 '+win+'일 이내 재구매율 추세: '
+    note='<div style="font-size:12.5px;color:#3a3d47;margin-bottom:8px">첫 구매 '+repurWinLabel(repurCohortWin)+' 이내 재구매율 추세: '
       +'<b>'+pEsc(t.first.ym)+' '+t.first.rate.toFixed(0)+'%</b> → <b>'+pEsc(t.last.ym)+' '+t.last.rate.toFixed(0)+'%</b> '
       +'· <b style="color:'+col+'">'+t.dir+' ('+(t.totalChange>=0?'+':'')+t.totalChange.toFixed(0)+'%p)</b></div>';
   }
-  return '<div class="salesSec"><h4>재구매율 추이 (첫 구매 코호트) <span class="secSub">유입 월별 · '+win+'일 이내 재구매율 · 관측창 확보 월만</span></h4>'
-    +note+'<div>'+chartBox('repCohort',240)+'</div></div>';
+  return note+'<div>'+chartBox('repCohort',240)+'</div>';
+}
+function repurCohortHtml(rd){
+  var wins=rd.cohortWindows||[90]; if(wins.indexOf(repurCohortWin)<0) repurCohortWin=(wins.indexOf(90)>=0?90:wins[0]);
+  var winSeg='<div class="salesViewSeg" id="repCohortWinSeg" style="margin:0 0 9px">'+wins.map(function(w){ return '<button class="svTab'+(repurCohortWin===w?' on':'')+'" data-w="'+w+'" onclick="setRepurCohortWin('+w+')">'+repurWinLabel(w)+' 이내</button>'; }).join('')+'</div>';
+  return '<div class="salesSec"><h4>재구매율 추이 (첫 구매 코호트) <span class="secSub">유입 월별 · 선택 기간 이내 재구매율 · 관측창 확보 월만</span></h4>'
+    +winSeg+'<div id="repCohortBody">'+repurCohortBodyHtml(rd)+'</div></div>';
 }
 function setRepurView(v){ repurView=v; renderRepurchase(); }
 // [요약] 심화 KPI + 퍼널 + 구매횟수 분포
@@ -11662,6 +11669,8 @@ function repurDataViewHtml(rd){
 function renderRepurchase(){
   var body=document.getElementById('repurchaseBody'); if(!body) return;
   var rd=DATA.repurchase, meta=document.getElementById('repMeta');
+  // 구버전 저장 데이터 → 새 집계 필드(cohortByWindow 등) 없으면 acc에서 1회 재계산
+  if(rd && Array.isArray(rd.acc) && rd.acc.length && !rd.cohortByWindow){ try{ recomputeRepurAgg(); rd=DATA.repurchase; }catch(e){} }
   if(!rd || !rd.overall || !rd.overall.totalCustomers){ if(meta) meta.textContent=''; body.innerHTML=repurEmptyHtml(); return; }
   var o=rd.overall;
   if(meta) meta.textContent=(rd.batches?rd.batches.length:0)+'개 파일 누적 · '+(rd.isB2B?'거래처':'구매자')+' '+o.totalCustomers.toLocaleString('ko-KR')+' · 주문 '+o.totalOrders.toLocaleString('ko-KR')+'건'+((rd.periodFrom||rd.periodTo)?(' · 기간 '+(rd.periodFrom||'?')+'~'+(rd.periodTo||'?')):'');
@@ -11728,16 +11737,20 @@ function drawRepurchaseCharts(rd){
     options:{ plugins:{legend:{display:false}, title:{display:true,text:'재구매 주기 분포 (연속 구매 간격)'},
       tooltip:{callbacks:{label:function(c){ return ' '+Number(c.parsed).toLocaleString('ko-KR')+'건'; }}}},
       scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, grid:{color:CC.grid}, ticks:{precision:0}} } }, plugins:[repurValueLabel({id:'cyc', fmt:function(v){return Number(v).toLocaleString('ko-KR');}})] });
-  // 첫 구매 코호트별 재구매율 추이 (관측창 확보 월만)
-  var cohS=(rd.cohortSeries||[]).filter(function(x){return x.rate!=null;});
-  if(cohS.length){ var ct=cohS.length<=1?'bar':'line';
-    makeChart('repCohort',{ type:ct,
-      data:{ labels:cohS.map(function(x){return x.ym;}), datasets:[{ label:(rd.cohortWindow||90)+'일내 재구매율', data:cohS.map(function(x){return Math.round(x.rate*10)/10;}),
-        borderColor:CC.green, backgroundColor:ct==='bar'?CC.green:'rgba(39,174,96,.10)', borderRadius:ct==='bar'?4:0, fill:ct==='line', tension:.3, pointRadius:3, borderWidth:2 }] },
-      options:{ plugins:{legend:{display:false}, title:{display:true,text:'첫 구매 코호트별 '+(rd.cohortWindow||90)+'일내 재구매율'},
-        tooltip:{callbacks:{label:function(c){ var x=cohS[c.dataIndex]; return ' '+x.rate.toFixed(1)+'% (재구매 '+x.rep.toLocaleString('ko-KR')+' / 관측 '+x.obs.toLocaleString('ko-KR')+'명, 코호트 '+x.size.toLocaleString('ko-KR')+'명)'; }}}},
-        scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, grid:{color:CC.grid}, ticks:{callback:function(v){return v+'%';}}} } }, plugins:[repurValueLabel({suffix:'%',id:'coh'})] });
-  }
+  drawRepurCohortChart(rd);
+}
+// 첫 구매 코호트별 재구매율 추이 (선택된 기간창 · 관측창 확보 월만)
+function drawRepurCohortChart(rd){
+  if(!window.Chart) return;
+  var cohS=(((rd.cohortByWindow||{})[repurCohortWin])||[]).filter(function(x){return x.rate!=null;});
+  if(!cohS.length) return;
+  var ct=cohS.length<=1?'bar':'line', wl=repurWinLabel(repurCohortWin);
+  makeChart('repCohort',{ type:ct,
+    data:{ labels:cohS.map(function(x){return x.ym;}), datasets:[{ label:wl+' 이내 재구매율', data:cohS.map(function(x){return Math.round(x.rate*10)/10;}),
+      borderColor:CC.green, backgroundColor:ct==='bar'?CC.green:'rgba(39,174,96,.10)', borderRadius:ct==='bar'?4:0, fill:ct==='line', tension:.3, pointRadius:3, borderWidth:2 }] },
+    options:{ plugins:{legend:{display:false}, title:{display:true,text:'첫 구매 코호트별 '+wl+' 이내 재구매율'},
+      tooltip:{callbacks:{label:function(c){ var x=cohS[c.dataIndex]; return ' '+x.rate.toFixed(1)+'% (재구매 '+x.rep.toLocaleString('ko-KR')+' / 관측 '+x.obs.toLocaleString('ko-KR')+'명, 코호트 '+x.size.toLocaleString('ko-KR')+'명)'; }}}},
+      scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, grid:{color:CC.grid}, ticks:{callback:function(v){return v+'%';}}} } }, plugins:[repurValueLabel({suffix:'%',id:'coh'})] });
 }
 </script>
 
