@@ -11178,6 +11178,7 @@ var _lastBatchId=null;     // 이번 세션 마지막 업로드 배치 id(재매
 var _lastBatchName='';     // 이번 세션 마지막 업로드 파일명
 var repurCrossIdx=0;       // 크로스셀 조회에서 선택된 기준 품목 인덱스
 var repurProdSort='buyers';// 품목별 재구매 상세 표 정렬 기준
+var repurView='summary';   // 재구매율 탭 뷰: summary/trend/products/data
 
 var REPUR_CANDS={
   cust:['거래처','거래처번호','거래처코드','거래처명','회원id','회원번호','구매자id','구매자번호','주문자id','주문자아이디','아이디','구매자','주문자','주문자명','고객id','고객번호','고객','고객명','연락처','휴대폰','전화','전화번호','이메일','수령인','수취인'],
@@ -11607,11 +11608,6 @@ function repurAdvancedKpiHtml(rd){
     +'<div class="kpi"><div class="v">'+(am.hasAmount?repurMoney(am.repeatAOV):'-')+'</div><div class="l">재구매 객단가</div><div class="sub">'+(am.hasAmount?('첫 구매 대비 '+deltaHtml):'금액 컬럼 없음')+'</div></div>'
     +'<div class="kpi"><div class="v">'+(scTot?Math.round((sc.sameProd||0)/scTot*100)+'%':'-')+'</div><div class="l">동일 품목 재구매 비중</div><div class="sub">재구매 고객 중</div></div></div>';
 }
-function repurAdvancedChartsHtml(rd){
-  return '<div class="salesSec"><h4>재구매 주기 · 유형 분석 <span class="secSub">기간별 누적 재구매율 · 동일/타품목 · 주기 분포</span></h4>'
-    +'<div class="repChartGrid"><div>'+chartBox('repWindow',240)+'</div><div>'+chartBox('repSameCross',240)+'</div></div>'
-    +'<div style="margin-top:10px">'+chartBox('repCycleDist',220)+'</div></div>';
-}
 // 첫 구매 코호트별 재구매율 추이 — "어느 시점 유입 고객이 재구매를 더/덜 하는지" + 상승/하락 추세
 function repurCohortTrend(series){
   var v=(series||[]).filter(function(x){return x.rate!=null && x.obs>=3;});   // 표본 3명 미만 코호트 제외
@@ -11638,6 +11634,31 @@ function repurCohortHtml(rd){
   return '<div class="salesSec"><h4>재구매율 추이 (첫 구매 코호트) <span class="secSub">유입 월별 · '+win+'일 이내 재구매율 · 관측창 확보 월만</span></h4>'
     +note+'<div>'+chartBox('repCohort',240)+'</div></div>';
 }
+function setRepurView(v){ repurView=v; renderRepurchase(); }
+// [요약] 심화 KPI + 퍼널 + 구매횟수 분포
+function repurSummaryViewHtml(rd){
+  return repurAdvancedKpiHtml(rd) + repurFunnelHtml(rd)
+    + '<div class="salesSec"><h4>구매횟수 분포 <span class="secSub">고객별 총 주문 횟수 (1회 = 재구매 없음)</span></h4><div style="max-width:520px;margin:0 auto">'+chartBox('repDist',240)+'</div></div>';
+}
+// [주기·추세] 기간별 누적 · 주기 분포 · 코호트 · 월별
+function repurTrendViewHtml(rd){
+  return '<div class="salesSec"><h4>재구매 주기 · 기간 분석 <span class="secSub">첫 구매 후 기간별 누적 재구매율 · 연속 구매 간격 분포</span></h4>'
+    +'<div class="repChartGrid"><div>'+chartBox('repWindow',250)+'</div><div>'+chartBox('repCycleDist',250)+'</div></div></div>'
+    + repurCohortHtml(rd)
+    + '<div class="salesSec"><h4>월별 재구매율 <span class="secSub">달력 시점별 재방문 고객 비중 · 코호트와 다른 관점</span></h4><div>'+chartBox('repMonthly',220)+'</div></div>';
+}
+// [품목] 품목별 재구매율 막대 + 상세표 + 함께구매(크로스셀)
+function repurProductsViewHtml(rd){
+  return '<div class="salesSec"><h4>품목별 동일상품 재구매율 <span class="secSub">구매고객 상위 10 · 그 품목을 다시 산 비율</span></h4><div>'+chartBox('repProd',300)+'</div></div>'
+    + repurProdTableHtml(rd) + repurCrossSellHtml(rd);
+}
+// [데이터·설정] 누적 이력 · 컬럼 매핑 · 품목명 매핑
+function repurDataViewHtml(rd){
+  return '<div class="salesSec"><h4>데이터 · 설정 <span class="secSub">누적 업로드 이력 · 컬럼 매핑 · 품목명 매핑</span></h4>'
+    + repurAccBarHtml(rd) + repurMapBarHtml(rd)
+    + '<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap"><button class="tbtn" onclick="openRepurNameMap()">품목명 매핑 편집</button>'
+    + '<span style="font-size:11.5px;color:#9aa1b2">긴 원본 품명 → 운영 품목명(변형 묶기 · 세트는 개별 지정)</span></div></div>';
+}
 function renderRepurchase(){
   var body=document.getElementById('repurchaseBody'); if(!body) return;
   var rd=DATA.repurchase, meta=document.getElementById('repMeta');
@@ -11649,10 +11670,12 @@ function renderRepurchase(){
     +'<div class="kpi"><div class="v">'+o.totalCustomers.toLocaleString('ko-KR')+'</div><div class="l">총 '+(rd.isB2B?'거래처':'고객')+'수</div><div class="sub">주문 '+o.totalOrders.toLocaleString('ko-KR')+'건</div></div>'
     +'<div class="kpi"><div class="v">'+o.repeatCustomers.toLocaleString('ko-KR')+'</div><div class="l">재구매 '+(rd.isB2B?'거래처':'고객')+'수</div><div class="sub">2회 이상 구매</div></div>'
     +'<div class="kpi"><div class="v">'+o.avgOrders.toFixed(2)+'</div><div class="l">평균 구매횟수</div><div class="sub">'+(rd.isB2B?'거래처':'고객')+'당 주문 수</div></div></div>';
-  var charts='<div class="salesSec"><h4>재구매 분석 <span class="secSub">구매횟수 분포 · 품목별 재구매율 · 월별 추이</span></h4>'
-    +'<div class="repChartGrid"><div>'+chartBox('repDist',240)+'</div><div>'+chartBox('repProd',240)+'</div></div>'
-    +'<div style="margin-top:10px">'+chartBox('repMonthly',220)+'</div></div>';
-  body.innerHTML = kpi + repurInfoBarHtml(rd) + repurAdvancedKpiHtml(rd) + repurAccBarHtml(rd) + repurMapBarHtml(rd) + repurFunnelHtml(rd) + charts + repurCohortHtml(rd) + repurAdvancedChartsHtml(rd) + repurProdTableHtml(rd) + repurCrossSellHtml(rd);
+  var VIEWS=[['summary','요약'],['trend','주기·추세'],['products','품목'],['data','데이터·설정']];
+  if(!VIEWS.some(function(v){return v[0]===repurView;})) repurView='summary';
+  var segBar='<div class="salesSec" style="display:flex;align-items:center;gap:10px;padding:8px 12px;margin-bottom:12px"><span style="font-size:12px;font-weight:700;color:var(--navy)">보기</span><div class="salesViewSeg" style="margin:0">'
+    +VIEWS.map(function(v){return '<button class="svTab'+(repurView===v[0]?' on':'')+'" onclick="setRepurView(\''+v[0]+'\')">'+v[1]+'</button>';}).join('')+'</div></div>';
+  var content = repurView==='trend'?repurTrendViewHtml(rd) : repurView==='products'?repurProductsViewHtml(rd) : repurView==='data'?repurDataViewHtml(rd) : repurSummaryViewHtml(rd);
+  body.innerHTML = kpi + repurInfoBarHtml(rd) + segBar + content;
   drawRepurchaseCharts(rd);
   if(typeof queueVisibleTabLayoutSync==='function') queueVisibleTabLayoutSync();
 }
@@ -11674,7 +11697,7 @@ function drawRepurchaseCharts(rd){
   makeChart('repDist',{ type:'doughnut',
     data:{ labels:dist.map(function(d){return d.label;}), datasets:[{ data:dist.map(function(d){return d.n;}), backgroundColor:seriesColors(dist.length), borderWidth:2, borderColor:'#fff' }] },
     options:{ cutout:'62%', plugins:{ legend:{position:isNarrow()?'bottom':'right', labels:{font:{size:isNarrow()?9.5:10.5}}},
-      centerText:{text:repurPct(rd.overall.repurchaseRate), sub:'재구매율', size:isNarrow()?15:19},
+      centerText:{text:(rd.overall.totalCustomers||0).toLocaleString('ko-KR'), sub:(rd.isB2B?'총 거래처':'총 고객'), size:isNarrow()?14:17},
       title:{display:true,text:'구매횟수 분포'},
       tooltip:{callbacks:{label:function(c){ return ' '+dist[c.dataIndex].label+': '+Number(c.parsed).toLocaleString('ko-KR')+'명 ('+(c.parsed/distTot*100).toFixed(1)+'%)'; }}} } } });
   var bp=(rd.byProduct||[]).slice(0,10);
@@ -11697,14 +11720,7 @@ function drawRepurchaseCharts(rd){
     options:{ plugins:{legend:{display:false}, title:{display:true,text:'기간별 누적 재구매율 (첫 구매 후)'},
       tooltip:{callbacks:{label:function(c){ var w=wr[c.dataIndex]; return ' '+w.rate.toFixed(1)+'% ('+w.n.toLocaleString('ko-KR')+'명)'; }}}},
       scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, grid:{color:CC.grid}, ticks:{callback:function(v){return v+'%';}}} } }, plugins:[repurValueLabel({suffix:'%',id:'win'})] });
-  // 재구매 유형 — 동일 품목 vs 타 품목
-  var sc=rd.sameCross||{}; var scData=[sc.sameProd||0, sc.crossOnly||0]; var scTot=(scData[0]+scData[1])||1;
-  makeChart('repSameCross',{ type:'doughnut',
-    data:{ labels:['동일 품목 재구매','타 품목만 재구매'], datasets:[{ data:scData, backgroundColor:[CC.blue,CC.gold], borderWidth:2, borderColor:'#fff' }] },
-    options:{ cutout:'62%', plugins:{ legend:{position:isNarrow()?'bottom':'right'},
-      centerText:{text:Math.round(scData[0]/scTot*100)+'%', sub:'동일품목', size:isNarrow()?15:19},
-      title:{display:true,text:'재구매 유형 (재구매 고객 기준)'},
-      tooltip:{callbacks:{label:function(c){ return ' '+c.label+': '+Number(c.parsed).toLocaleString('ko-KR')+'명 ('+(c.parsed/scTot*100).toFixed(1)+'%)'; }}} } } });
+  // (재구매 유형 도넛은 퍼널의 2단과 중복이라 제거 — repurFunnelHtml 참조)
   // 재구매 주기 분포 (연속 구매 간격)
   var cd=rd.cycleDist||[];
   makeChart('repCycleDist',{ type:'bar',
