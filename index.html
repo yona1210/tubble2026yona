@@ -11190,7 +11190,8 @@ var REPUR_CANDS={
   prod:['품명','상품명','품목','품목명','상품','제품명','제품','productname','product','옵션명'],
   qty :['수량','판매수량','주문수량','qty','quantity'],
   amt :['원화판매금액','판매금액','결제금액','주문금액','금액','매출액','상품금액','amount','price'],
-  ord :['매출번호','주문번호','주문id','주문아이디','orderno','orderid','전표번호','거래번호']
+  ord :['매출번호','주문번호','주문id','주문아이디','orderno','orderid','전표번호','거래번호'],
+  name:['구매자명','주문자명','수취인명','수령인','성명','이름','고객명','거래처명','구매자이름']  // 보조 고객키(마스킹 ID 충돌 완화용)
 };
 function repurNorm(v){ return (typeof normName==='function'?normName(v):String(v||'').toLowerCase().replace(/\s+/g,'')); }
 function repurDetectCol(headers, cands){
@@ -11229,8 +11230,9 @@ function parseRepurchaseWorkbook(wb){
   }
   if(headerRow<0) return {error:'주문 데이터 헤더(고객·일자·품명)를 찾지 못했습니다 — 컬럼명을 확인해 주세요.'};
   var rows=arr.slice(headerRow+1).filter(function(rw){ return rw && rw.some(function(c){return c!==''&&c!=null;}); });
-  var map={ cust:repurDetectCol(headers,REPUR_CANDS.cust), date:repurDetectCol(headers,REPUR_CANDS.date), prod:repurDetectCol(headers,REPUR_CANDS.prod), qty:repurDetectCol(headers,REPUR_CANDS.qty), amt:repurDetectCol(headers,REPUR_CANDS.amt), ord:repurDetectCol(headers,REPUR_CANDS.ord) };
+  var map={ cust:repurDetectCol(headers,REPUR_CANDS.cust), date:repurDetectCol(headers,REPUR_CANDS.date), prod:repurDetectCol(headers,REPUR_CANDS.prod), qty:repurDetectCol(headers,REPUR_CANDS.qty), amt:repurDetectCol(headers,REPUR_CANDS.amt), ord:repurDetectCol(headers,REPUR_CANDS.ord), cust2:repurDetectCol(headers,REPUR_CANDS.name) };
   if(map.cust<0){ for(var i=0;i<headers.length;i++){ if(headers[i]){ map.cust=i; break; } } }
+  if(map.cust2===map.cust) map.cust2=-1;   // 주 고객키와 같으면 보조키 미사용
   return { headers:headers, rows:rows, map:map };
 }
 // 고객 식별자 해시(PII 원문 미저장 — 같은 고객은 항상 같은 해시로 기간 넘어 연결)
@@ -11250,6 +11252,7 @@ function repurBuildLines(rows, headers, map, store){
   var lines=[]; var dMin='', dMax='';
   (rows||[]).forEach(function(r){
     var custRaw=String(map.cust>=0?r[map.cust]:'').trim(); if(!custRaw) return;
+    if(map.cust2>=0){ var c2=String(r[map.cust2]||'').trim(); if(c2) custRaw=custRaw+'~@~'+c2; }   // 보조키(이름) 결합 → 마스킹 ID 충돌 완화
     var c=repurHash(custRaw);
     var dRaw=hasDate?r[map.date]:''; var dateStr=String(dRaw).trim();
     var dnorm=repurDate(dRaw); if(dnorm){ if(!dMin||dnorm<dMin)dMin=dnorm; if(!dMax||dnorm>dMax)dMax=dnorm; }
@@ -11409,7 +11412,7 @@ function applyRepurUpload(){
   store.orderKeyBasis=built.hasOrd?'주문번호':'고객+일자';
   store.insufficient=(!built.hasOrd && !built.hasDate);
   if(store.sourceLabel==null) store.sourceLabel = store.isB2B?'거래처(B2B)':'브랜드 스토어';
-  store.mapping={ cust:built.custName, date:_repurMap.date>=0?_repurHeaders[_repurMap.date]:'', prod:_repurMap.prod>=0?_repurHeaders[_repurMap.prod]:'', ord:_repurMap.ord>=0?_repurHeaders[_repurMap.ord]:'', amt:_repurMap.amt>=0?_repurHeaders[_repurMap.amt]:'', qty:_repurMap.qty>=0?_repurHeaders[_repurMap.qty]:'' };
+  store.mapping={ cust:built.custName, cust2:(_repurMap.cust2>=0?_repurHeaders[_repurMap.cust2]:''), date:_repurMap.date>=0?_repurHeaders[_repurMap.date]:'', prod:_repurMap.prod>=0?_repurHeaders[_repurMap.prod]:'', ord:_repurMap.ord>=0?_repurHeaders[_repurMap.ord]:'', amt:_repurMap.amt>=0?_repurHeaders[_repurMap.amt]:'', qty:_repurMap.qty>=0?_repurHeaders[_repurMap.qty]:'' };
   recomputeRepurAgg();
   if(typeof markDirty==='function')markDirty();
   renderRepurchase();
@@ -11452,15 +11455,17 @@ function repurMapBarHtml(rd){
       var opts=(req?'':'<option value="-1">(없음)</option>')+_repurHeaders.map(function(h,i){ return '<option value="'+i+'"'+(_repurMap[which]===i?' selected':'')+'>'+pEsc(h||('열'+(i+1)))+'</option>'; }).join('');
       return '<label class="repMapCol">'+label+' <select onchange="setRepurMapCol(\''+which+'\',this.value)">'+opts+'</select></label>';
     };
-    cols=mk('고객키','cust',true)+mk('주문일자','date',false)+mk('품명','prod',false)+mk('주문번호','ord',false)+mk('금액','amt',false);
+    cols=mk('고객키','cust',true)+mk('보조 고객키(이름)','cust2',false)+mk('주문일자','date',false)+mk('품명','prod',false)+mk('주문번호','ord',false)+mk('금액','amt',false);
   } else {
     var m=rd.mapping||{};
     cols='<span class="repMapStatic">고객키 <b>'+pEsc(m.cust||'-')+'</b></span>'
+      +'<span class="repMapStatic">보조키 <b>'+pEsc(m.cust2||'(없음)')+'</b></span>'
       +'<span class="repMapStatic">주문일자 <b>'+pEsc(m.date||'-')+'</b></span>'
       +'<span class="repMapStatic">품명 <b>'+pEsc(m.prod||'-')+'</b></span>'
       +'<span class="repMapStatic">주문번호 <b>'+pEsc(m.ord||'(없음 · 고객+일자 기준)')+'</b></span>'
       +'<span style="color:#9aa1b2">· 매핑 변경은 재업로드 후 가능</span>';
   }
+  if((rd.mapping&&rd.mapping.cust2)||(_repurMap&&_repurMap.cust2>=0)) warns+='<span class="repWarn" style="color:#1E6B3A;background:#e8f7ee;border-color:#bfe6cd">✓ 이름+ID 조합으로 마스킹 ID 충돌 완화 적용</span>';
   return '<div class="repMapBar"><span class="repMapTitle">컬럼 매핑</span>'+cols+warns+'</div>';
 }
 function repurTypeBadge(t){ var c=t==='동일제품 충성형'?'#1E9E63':t==='교차구매 확장형'?'#3355FF':'#C0392B'; return '<span style="font-size:10.5px;font-weight:700;color:'+c+';background:'+c+'1a;padding:1px 8px;border-radius:9px;white-space:nowrap">'+pEsc(t)+'</span>'; }
