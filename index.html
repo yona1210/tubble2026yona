@@ -11491,8 +11491,8 @@ function repurCrossSellListHtml(item){
   var rows=(item.partners||[]).map(function(q,i){
     return '<tr><td class="c">'+(i+1)+'</td><td class="l">'+pEsc(q.nm)+'</td><td class="r">'+q.n.toLocaleString('ko-KR')+'명</td><td class="c"><b>'+q.rate.toFixed(0)+'%</b></td></tr>';
   }).join('')||'<tr><td colspan="4" style="text-align:center;color:#aaa;padding:12px">함께 재구매한 품목이 없습니다</td></tr>';
-  return '<div style="font-size:12px;color:#7a8194;margin-bottom:6px"><b style="color:var(--navy)">'+pEsc(item.nm)+'</b> 구매고객 '+item.buyers.toLocaleString('ko-KR')+'명 중, 다른 주문에서 함께 재구매한 품목</div>'
-    +'<div class="salesTblWrap"><table class="salesTbl planTbl"><thead><tr><th class="c">순위</th><th class="l">함께 재구매한 품목</th><th class="r">교차구매 고객</th><th class="c">비율</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  return '<div style="font-size:12px;color:#7a8194;margin-bottom:6px"><b style="color:var(--navy)">'+pEsc(item.nm)+'</b> 구매고객 '+item.buyers.toLocaleString('ko-KR')+'명이 함께 구매한 다른 품목 <span style="color:#9aa1b2">(전체 기간 · 재구매 고객 기준 · 같은 주문·다른 주문 모두 포함)</span></div>'
+    +'<div class="salesTblWrap"><table class="salesTbl planTbl"><thead><tr><th class="c">순위</th><th class="l">함께 구매한 품목</th><th class="r">함께 구매 고객</th><th class="c">비율</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 function setRepurCross(idx){ repurCrossIdx=+idx||0; var cs=(DATA.repurchase&&DATA.repurchase.crossSell)||[]; var box=document.getElementById('repCrossBox'); if(box) box.innerHTML=repurCrossSellListHtml(cs[repurCrossIdx]); }
 // 품목명 매핑 편집 — 원본 긴 품명 → 운영 품목명(짧게). 키워드 규칙(일괄) + 개별 매핑. 같은 표시명은 하나로 합침
@@ -11545,7 +11545,7 @@ function repurCrossSellHtml(rd){
   if(!cs.length) return '';
   if(repurCrossIdx>=cs.length || repurCrossIdx<0) repurCrossIdx=0;
   var opts=cs.map(function(x,i){return '<option value="'+i+'"'+(i===repurCrossIdx?' selected':'')+'>'+pEsc(x.nm)+' (구매 '+x.buyers.toLocaleString('ko-KR')+'명)</option>';}).join('');
-  return '<div class="salesSec"><h4>크로스셀 조회 <span class="secSub">기준 품목 선택 → 그 구매자가 다른 주문에서 함께 재구매한 품목</span></h4>'
+  return '<div class="salesSec"><h4>함께 구매 분석 (크로스셀) <span class="secSub">기준 품목 선택 → 그 구매자가 함께 산 다른 품목 · 전체 기간 · 재구매 고객 기준(같은/다른 주문 포함)</span></h4>'
     +'<div style="margin-bottom:10px"><span style="font-size:12px;font-weight:700;color:var(--navy);margin-right:6px">기준 품목</span>'
     +'<select id="repCrossSel" onchange="setRepurCross(this.value)" style="font-size:12.5px;padding:6px 10px;border:1px solid #d6dbe7;border-radius:8px;max-width:100%;min-width:260px">'+opts+'</select></div>'
     +'<div id="repCrossBox">'+repurCrossSellListHtml(cs[repurCrossIdx])+'</div></div>';
