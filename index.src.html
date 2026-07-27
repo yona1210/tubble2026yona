@@ -3880,6 +3880,7 @@ function exportExternal(){
   if(safe.pricePolicy && Array.isArray(safe.pricePolicy.items)) safe.pricePolicy.items=safe.pricePolicy.items.map(x=>{ const y=Object.assign({},x); delete y.cost; return y; });
   if(safe.faq && Array.isArray(safe.faq.items)) safe.faq.items=safe.faq.items.filter(x=>x.cat!=='내부');
   delete safe.repurchase;
+  delete safe.salesAcc;   // 매출 원본 행(거래처·거래단위) 외부 유출 방지
   safe.viewonly=true; safe.external=true;
   safe.leadtime=LEADTIME.slice();
   exportHtml(safe,`터블_관리시스템_외부공유_${fmt(NOW)}.html`,'외부 공유본 저장됨 — 원가·매입·재고·거래처 데이터 완전 제거',true);
@@ -8830,7 +8831,11 @@ function classifyChannelsFromDashboard(){
   const items=Object.keys(totals).sort((a,b)=>totals[b]-totals[a]);
   showClassifyModal({ title:'거래처 → 채널 분류', items, totals, options:SALES_CHANNELS,
     guess:guessClientChannel, map:DATA.clientChannelMap, unit:'누적 매출', itemLabel:'거래처', optLabel:'채널',
-    fmt:v=>salesEok(v), onDone:()=>renderSales() });
+    fmt:v=>salesEok(v), onDone:()=>{
+      // 매핑 변경 → 누적 원본에서 채널 재해석하여 재집계 → 재고 연동
+      if(DATA.salesAcc&&DATA.salesAcc.rows&&DATA.salesAcc.rows.length){ const a=rebuildSalesData(); if(typeof markDirty==='function')markDirty(); renderSales(); if(typeof syncStockFromSales==='function') syncStockFromSales(a); }
+      else renderSales();
+    } });
 }
 // 매출 대시보드에서 카테고리→대분류 분류
 function classifyGroupsFromDashboard(){
@@ -8840,6 +8845,152 @@ function classifyGroupsFromDashboard(){
   showClassifyModal({ title:'카테고리 → 대분류 분류', items, totals, options:CAT_GROUPS,
     guess:guessCategoryGroup, map:DATA.catGroupMap, unit:'누적 매출', itemLabel:'카테고리', optLabel:'대분류',
     fmt:v=>salesEok(v), onDone:()=>renderSales() });
+}
+// [v82] ===== 매출 누적 업로드 (기간별 누적 + 중복 제거 + 거래처→채널 지속 매핑) =====
+// 원본 행 저장: DATA.salesAcc = { rows:[[dateKey, client, rawName, rawCh, qty, amt, wh], ...], batches:[...], seq }
+//  - dateKey: 'YYYY-MM-DD'(일자O) 또는 'YYYY-MM'(월만) · rawCh: 거래처구분 값(없으면 '')
+function ensureSalesAcc(){ if(!DATA.salesAcc||!Array.isArray(DATA.salesAcc.rows)) DATA.salesAcc={rows:[],batches:[],seq:0}; if(!Array.isArray(DATA.salesAcc.batches)) DATA.salesAcc.batches=[]; return DATA.salesAcc; }
+// 중복 판정 서명: 경제적 동일성(날짜·거래처·품명·수량·금액·창고) — 거래처구분(rawCh)은 메타이므로 제외
+function salesRowSig(r){ return [r[0],r[1],r[2],r[4],r[5],r[6]].join(''); }
+// 거래처구분 원값 → 표준 채널 (온라인 일반은 거래처명으로 세분화)
+function normalizeSalesCh(rawCh,client){ if(!rawCh) return ''; if(rawCh==='온라인 일반') return refineOnlineChannel(client); return rawCh; }
+// 채널 해석: ① 저장된 거래처→채널 매핑 ② 거래처명 키워드 추정 ③ 미분류
+function resolveSalesChannel(client){ const map=DATA.clientChannelMap||{}; if(map[client]) return map[client]; return guessClientChannel(client)||'미분류'; }
+// 사전 학습: 거래처구분이 있는 행에서 거래처→채널 매핑을 채움(이미 지정된 건 유지) → 이후 파일에 열이 없어도 자동 적용
+function learnClientChannels(rows){ const map=DATA.clientChannelMap||(DATA.clientChannelMap={}); rows.forEach(r=>{ const client=r[1], rawCh=r[3]; if(client&&client!=='-'&&rawCh&&!map[client]){ const n=normalizeSalesCh(rawCh,client); if(n) map[client]=n; } }); }
+// 워크북 → 원본 compact 행 추출 (집계 없음)
+function parseSalesRows(wb){
+  const shName = wb.SheetNames.includes('전체본') ? '전체본' : wb.SheetNames[0];
+  const ws = wb.Sheets[shName];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+  let hi=-1;
+  for(let i=0;i<Math.min(rows.length,10);i++){ const r=rows[i].map(x=>String(x).trim()); if(r.includes('매출일') && (r.includes('원화판매금액')||r.includes('판매금액'))){ hi=i; break; } }
+  if(hi<0) throw new Error('헤더(매출일/원화판매금액)를 찾을 수 없습니다');
+  const hdr=rows[hi].map(x=>String(x).trim());
+  const col=(name)=>hdr.indexOf(name);
+  const ci={ biz:col('사업단위'), date:col('매출일'),
+    ch:col('거래처 구분')>=0?col('거래처 구분'):(col('거래처구분')>=0?col('거래처구분'):(col('판매 구분')>=0?col('판매 구분'):col('판매구분'))),
+    client:col('거래처'), nm:col('품명'), qty:col('수량'),
+    amt:col('원화판매금액')>=0?col('원화판매금액'):col('판매금액'), wh:col('창고') };
+  const pad=n=>String(n).padStart(2,'0');
+  const toKeys=(d)=>{
+    if(d instanceof Date){ return {ym:`${d.getFullYear()}-${pad(d.getMonth()+1)}`, dateKey:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}; }
+    const s=String(d).trim();
+    const md=s.match(/(\d{4})[-./](\d{1,2})[-./](\d{1,2})/), mm=s.match(/(\d{4})[-./](\d{1,2})/);
+    if(md){ const dt=new Date(Number(md[1]),Number(md[2])-1,Number(md[3])); if(!isNaN(dt.getTime())) return {ym:`${dt.getFullYear()}-${pad(dt.getMonth()+1)}`, dateKey:`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`}; }
+    if(/^\d{5}(\.\d+)?$/.test(s)){ const dt=new Date(Date.UTC(1899,11,30)+Math.round(parseFloat(s))*86400000); if(!isNaN(dt.getTime())) return {ym:`${dt.getUTCFullYear()}-${pad(dt.getUTCMonth()+1)}`, dateKey:`${dt.getUTCFullYear()}-${pad(dt.getUTCMonth()+1)}-${pad(dt.getUTCDate())}`}; }
+    if(mm){ return {ym:`${mm[1]}-${mm[2].padStart(2,'0')}`, dateKey:''}; }
+    return {ym:'',dateKey:''};
+  };
+  const out=[]; const hasChCol=ci.ch>=0;
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i]; if(!r||!r.length) continue;
+    if(ci.biz>=0 && String(r[ci.biz]).trim()!=='커머스') continue;
+    const {ym,dateKey}=toKeys(r[ci.date]); if(!ym) continue;
+    const amt=Number(String(r[ci.amt]).replace(/[^0-9.-]/g,''))||0;
+    const qty=Number(String(r[ci.qty]).replace(/[^0-9.-]/g,''))||0;
+    const rawName=String(r[ci.nm]||'').trim();
+    const client=String(r[ci.client]||'-').trim()||'-';
+    const rawCh=ci.ch>=0?(String(r[ci.ch]||'').trim()):'';
+    const wh=ci.wh>=0?(String(r[ci.wh]||'-').trim()||'-'):'-';
+    out.push([dateKey||ym, client, rawName, rawCh, qty, amt, wh]);
+  }
+  return {rows:out, hasChCol};
+}
+// 신규 행 병합(다중집합 중복 제거) → 누적 rows에 추가, {added,dup} 반환
+function mergeSalesRows(newRows){
+  const acc=ensureSalesAcc();
+  const have=Object.create(null); acc.rows.forEach(r=>{ const k=salesRowSig(r); have[k]=(have[k]||0)+1; });
+  const used=Object.create(null); let added=0, dup=0;
+  newRows.forEach(r=>{ const k=salesRowSig(r); const seen=used[k]=(used[k]||0)+1; if(seen<=(have[k]||0)){ dup++; return; } acc.rows.push(r); added++; });
+  return {added, dup};
+}
+// 누적 원본 행 → salesData 집계 구조 (채널은 거래처→채널 매핑으로 해석)
+function aggregateSalesRows(rows){
+  const months=new Set(), dayKeys=new Set(), itemMap={}, catMap={}, chMap={}, clientMap={}, whMap={}, monthMap={};
+  const itemChannelDailyQty={}, itemClientMonthlyQty={};
+  let totalAmt=0, totalQty=0, rowCnt=0;
+  const acc=(map,key,ym,amt,qty)=>{ if(!map[key])map[key]={amt:0,qty:0,byMonth:{}}; map[key].amt+=amt; map[key].qty+=qty; map[key].byMonth[ym]=(map[key].byMonth[ym]||0)+amt; };
+  const addDailyQty=(itemNm,ch,dateKey,qty)=>{ if(!itemNm||!ch||!dateKey||!qty)return; if(!itemChannelDailyQty[itemNm])itemChannelDailyQty[itemNm]={}; if(!itemChannelDailyQty[itemNm][ch])itemChannelDailyQty[itemNm][ch]={}; itemChannelDailyQty[itemNm][ch][dateKey]=(itemChannelDailyQty[itemNm][ch][dateKey]||0)+qty; };
+  rows.forEach(r=>{
+    const dk=String(r[0]||''), ym=dk.slice(0,7); if(!ym) return;
+    const dateKey=(dk.length>=10)?dk:'';
+    const client=r[1]||'-', rawName=r[2]||'', qty=+r[4]||0, amt=+r[5]||0, wh=r[6]||'-';
+    const item=salesNormName(rawName);
+    const stockRow=(typeof findStockByName==='function')?(findStockByName(rawName)||findStockByName(item)):null;
+    const stockNm=stockRow&&stockRow.nm?stockRow.nm:item;
+    const cat=salesCategory(rawName);
+    const ch=resolveSalesChannel(client);
+    months.add(ym); totalAmt+=amt; totalQty+=qty; rowCnt++;
+    if(dateKey) dayKeys.add(dateKey);
+    acc(itemMap,item,ym,amt,qty); acc(catMap,cat,ym,amt,qty); acc(chMap,ch,ym,amt,qty); acc(clientMap,client,ym,amt,qty); acc(whMap,wh,ym,amt,qty);
+    if(!monthMap[ym])monthMap[ym]={amt:0,qty:0}; monthMap[ym].amt+=amt; monthMap[ym].qty+=qty;
+    if(dateKey) addDailyQty(stockNm,ch,dateKey,qty);
+    if(qty){ if(!itemClientMonthlyQty[stockNm])itemClientMonthlyQty[stockNm]={}; if(!itemClientMonthlyQty[stockNm][client])itemClientMonthlyQty[stockNm][client]={}; itemClientMonthlyQty[stockNm][client][ym]=(itemClientMonthlyQty[stockNm][client][ym]||0)+qty; }
+  });
+  return { months:[...months].sort(), dayKeys:[...dayKeys].sort(),
+    item:itemMap, category:catMap, channel:chMap, client:clientMap, warehouse:whMap, month:monthMap,
+    itemChannelDailyQty, itemClientMonthlyQty, totalAmt, totalQty, rowCnt };
+}
+// 누적 원본 → salesData 재빌드(메타 유지) — 채널 매핑 변경 후에도 호출
+function rebuildSalesData(meta){
+  const acc=ensureSalesAcc();
+  const agg=aggregateSalesRows(acc.rows);
+  agg.fileName=(meta&&meta.fileName)||(DATA.salesData&&DATA.salesData.fileName)||'';
+  agg.uploadedAt=(meta&&meta.uploadedAt)||(DATA.salesData&&DATA.salesData.uploadedAt)||fmt(NOW);
+  agg.batchCount=acc.batches.length;
+  DATA.salesData=agg; return agg;
+}
+// 미분류(매핑 안 된) 거래처 → 채널 분류 모달 (없으면 바로 onDone)
+function promptSalesChannelMapping(sd, onDone){
+  const map=DATA.clientChannelMap||(DATA.clientChannelMap={});
+  const totals={}; Object.entries((sd&&sd.client)||{}).forEach(([cl,o])=>{ if(cl&&cl!=='-'&&!map[cl]) totals[cl]=o.amt||0; });
+  const items=Object.keys(totals).sort((a,b)=>totals[b]-totals[a]);
+  if(!items.length){ if(onDone) onDone(); return; }
+  showClassifyModal({ title:'거래처 → 판매채널 분류', items, totals, options:SALES_CHANNELS,
+    guess:guessClientChannel, map, unit:'누적 매출', itemLabel:'거래처', optLabel:'채널',
+    note:'채널 열이 없는 파일에도 적용되도록 <b>거래처별 채널을 한 번만</b> 지정하세요. 저장하면 다음 업로드부터 자동 분류되고 <b>신규 거래처만</b> 다시 묻습니다.',
+    fmt:v=>salesEok(v), onDone:onDone, onCancel:onDone });
+}
+// 누적 초기화 (거래처→채널 매핑은 유지)
+function resetSalesAcc(){
+  DATA.salesAcc={rows:[],batches:[],seq:0};
+  delete DATA.salesData;
+  DATA.channelData={months:[],channels:[],items:{}};
+  try{ CHANNEL_DATA.months=[]; CHANNEL_DATA.channels=[]; CHANNEL_DATA.items={}; }catch(e){}
+  if(typeof markDirty==='function') markDirty();
+  renderSales(); if(typeof renderStock==='function') renderStock();
+  if(typeof toast==='function') toast('매출 누적 초기화 완료 (거래처→채널 매핑은 유지)');
+}
+// 업로드 이력 모달
+function salesShowBatches(){
+  const acc=DATA.salesAcc; if(!acc||!acc.batches||!acc.batches.length){ if(typeof toast==='function')toast('업로드 이력이 없습니다'); return; }
+  const esc=s=>String(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+  const rows=acc.batches.slice().reverse().map(b=>`<tr><td style="white-space:nowrap">${esc(b.uploadedAt)}</td><td style="text-align:left">${esc(b.fileName)}${b.hasCh?'':' <span style="color:#c99a00;font-size:10px">채널열X</span>'}</td><td style="white-space:nowrap">${esc(b.from)}~${esc(b.to)}</td><td style="text-align:right;color:#1E9E63">+${salesWon(b.added)}</td><td style="text-align:right;color:#9aa1b2">중복 ${salesWon(b.dup)}</td></tr>`).join('');
+  const old=document.getElementById('salesBatchModal'); if(old) old.remove();
+  const m=document.createElement('div'); m.id='salesBatchModal'; m.className='modal open';
+  m.innerHTML=`<div class="mbox" style="max-width:640px;width:100%;padding:20px">
+    <h3>매출 업로드 이력 <span style="font-size:11px;font-weight:600;color:#9aa1b2">${acc.batches.length}개 파일 · 누적 ${salesWon(acc.rows.length)}건</span></h3>
+    <div style="max-height:52vh;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:8px">
+      <table class="salesTbl"><thead><tr><th style="text-align:left">업로드</th><th style="text-align:left">파일</th><th style="text-align:left">기간</th><th style="text-align:right">추가</th><th style="text-align:right">중복제외</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="tbtn" id="sbClose">닫기</button></div></div>`;
+  document.body.appendChild(m);
+  m.querySelector('#sbClose').onclick=()=>m.remove();
+}
+// 누적 현황 바 (기간·건수·매핑·버튼)
+function salesAccBarHtml(sd){
+  const acc=DATA.salesAcc||{}; const nRows=(acc.rows||[]).length; const nFiles=(acc.batches||[]).length;
+  const period=(sd.months&&sd.months.length)?`${sd.months[0]} ~ ${sd.months[sd.months.length-1]}`:'-';
+  const mapN=Object.keys(DATA.clientChannelMap||{}).length;
+  return `<div class="salesSec" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:9px 14px;margin-bottom:10px;font-size:12px">`
+    +`<span><b>누적 기준</b> ${period} · ${salesWon(nRows)}건${nFiles?` · ${nFiles}개 파일`:''}</span>`
+    +`<span style="color:#7a8194">거래처→채널 매핑 ${mapN}건 적용 중</span>`
+    +`<span style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">`
+    +`<button class="tbtn" style="font-size:11px;padding:4px 10px" onclick="classifyChannelsFromDashboard()">채널 재분류</button>`
+    +`<button class="tbtn" style="font-size:11px;padding:4px 10px" onclick="salesShowBatches()">업로드 이력</button>`
+    +`<button class="tbtn danger" style="font-size:11px;padding:4px 10px" onclick="if(confirm('누적된 매출 데이터를 모두 초기화할까요? (거래처→채널 매핑은 유지됩니다)'))resetSalesAcc()">누적 초기화</button>`
+    +`</span></div>`;
 }
 function handleSalesUpload(file){
   const proceed=()=>{
@@ -8855,16 +9006,25 @@ function handleSalesUpload(file){
       try{
         const wb=XLSX.read(new Uint8Array(e.target.result), {type:'array'});
         DATA._salesFileName=file.name;
-        const agg=parseSalesWorkbookEnhanced(wb);
-        agg.fileName=file.name;
-        DATA.salesData=agg;
+        const parsed=parseSalesRows(wb);
+        if(!parsed.rows.length) throw new Error('유효한 매출 행이 없습니다 (헤더·사업단위=커머스 확인)');
+        const acc=ensureSalesAcc();
+        learnClientChannels(parsed.rows);                 // 거래처구분 → 거래처별 채널 자동 학습(영속)
+        const merged=mergeSalesRows(parsed.rows);          // 중복 제거하며 누적
+        const yms=parsed.rows.map(r=>String(r[0]).slice(0,7)).filter(Boolean).sort();
+        acc.batches.push({id:++acc.seq, fileName:file.name, uploadedAt:fmt(NOW), rows:parsed.rows.length, added:merged.added, dup:merged.dup, from:yms[0]||'', to:yms[yms.length-1]||'', hasCh:parsed.hasChCol});
+        const agg=rebuildSalesData({fileName:file.name, uploadedAt:fmt(NOW)});
         if(typeof markDirty==='function') markDirty();
-        toast(`매출 데이터 반영 완료 — ${agg.months.length}개월·${salesWon(agg.rowCnt)}건`);
+        toast(`매출 누적 반영 — +${salesWon(merged.added)}건 추가·중복 ${salesWon(merged.dup)}건 제외 (누적 ${salesWon(acc.rows.length)}건·${agg.months.length}개월)`);
         renderSales();
-        // [v80] 재고 연동: 거래처→채널 매핑으로 채널 추이·월판매·발주 기준 자동 갱신
-        //  (미분류 거래처가 있으면 분류 모달을 띄우고, 분류 완료 후 집계)
-        if(typeof syncStockFromSales==='function') syncStockFromSales(agg);
-        else if(typeof renderStock==='function') renderStock();
+        // 미분류 거래처가 있으면 채널 분류 모달 → 완료 후 재집계 + 재고 연동
+        promptSalesChannelMapping(agg, ()=>{
+          const a2=rebuildSalesData({fileName:file.name, uploadedAt:fmt(NOW)});
+          if(typeof markDirty==='function') markDirty();
+          renderSales();
+          if(typeof syncStockFromSales==='function') syncStockFromSales(a2);
+          else if(typeof renderStock==='function') renderStock();
+        });
       }catch(err){
         console.error('매출 파싱 실패',err);
         if(typeof toast==='function') toast('매출 파싱 실패: '+(err&&err.message||err));
@@ -8929,7 +9089,8 @@ function renderSales(){
     : salesView==='yoy' ? salesYoYHtml(sd)
     : DIMV.includes(salesView) ? salesDimHtml(sd, salesView)
     : salesTimeHtml(sd, salesView);
-  if(body) body.innerHTML=html;
+  const accBar=(DATA.salesAcc&&DATA.salesAcc.rows&&DATA.salesAcc.rows.length)?salesAccBarHtml(sd):'';
+  if(body) body.innerHTML=accBar+html;
   const drawNow=()=>{ try{ if(salesView==='summary') drawSalesSummaryCharts(sd); else if(salesView==='group') drawSalesGroupChart(sd); else if(salesView==='yoy') drawSalesTimeChart(sd, salesTimeMode); else if(DIMV.includes(salesView)) drawSalesDimCharts(sd, salesView); else drawSalesTimeChart(sd, salesView); }
     catch(err){ console.error('매출 차트 렌더 실패',err); if(body) body.insertAdjacentHTML('afterbegin',`<div class="salesEmpty" style="color:#c0392b;border:1px solid #f0c0bb;border-radius:8px;margin-bottom:10px">차트 렌더 실패: <b>${String(err&&err.message||err).replace(/</g,'&lt;')}</b></div>`); } };
   if(window.requestAnimationFrame) requestAnimationFrame(()=>requestAnimationFrame(drawNow)); else drawNow();
