@@ -11177,7 +11177,8 @@ function planPricePolicyHtml(){
     if(g){ if(!gmap[g]){ gmap[g]={grp:g,items:[]}; groups.push(gmap[g]); } gmap[g].items.push(o); }
     else singles.push(o);
   });
-  var cell=function(o,label,click,cnt){ var prim=ppPrimary(o), mp=+prim.p>0?(+prim.mr*100):null, mc=ppMarginColor(mp), bcol=PLAN_BRANDCOLOR[o.brand||'터블']||'#868a96';
+  var cell=function(o,label,click,cnt){ var av=ppTier(o,'always'), ev=ppTier(o,'event'), prim=ppPrimary(o), bcol=PLAN_BRANDCOLOR[o.brand||'터블']||'#868a96';
+    var amp=+av.p>0?(+av.mr*100):null, emp=+ev.p>0?(+ev.mr*100):null;
     var badge=cnt?' <span style="font-size:10px;color:#3355FF;background:#eef1ff;padding:1px 6px;border-radius:8px">옵션 '+cnt+'</span>':'';
     return '<tr onclick="'+click+'" style="cursor:pointer">'
       +'<td class="l"><span class="planCatBadge" style="background:'+bcol+';color:#fff">'+pEsc(o.brand||'터블')+'</span> '+(cnt?'<b>'+pEsc(label)+'</b>':pEsc(label))+badge+'</td>'
@@ -11190,19 +11191,20 @@ function planPricePolicyHtml(){
       +'<td class="r">'+ppFmt(ppTier(o,'closed').p)+'</td>'
       +'<td class="r" style="color:#7a8194">'+ppFmt(prim.sum)+'</td>'
       +'<td class="c">'+ppShipHtml(o)+'</td>'
-      +'<td class="c"><b style="color:'+mc+'">'+(mp!=null?mp.toFixed(0)+'%':'-')+'</b></td></tr>';
+      +'<td class="c"><b style="color:'+ppMarginColor(amp)+'">'+(amp!=null?amp.toFixed(0)+'%':'-')+'</b></td>'
+      +'<td class="c"><b style="color:'+ppMarginColor(emp)+'">'+(emp!=null?emp.toFixed(0)+'%':'-')+'</b></td></tr>';
   };
   var rows='';
   groups.forEach(function(gr){ var rep=gr.items.slice().sort(function(a,b){return (a.id||0)-(b.id||0);})[0];
     rows+=cell(rep, gr.grp, "openPriceGroup('"+encodeURIComponent(gr.grp)+"')", gr.items.length); });
   singles.forEach(function(o){ rows+=cell(o, ppShortNm(o.nm), "openPricePolicyEdit("+o.id+")", 0); });
-  if(!rows) rows='<tr><td colspan="11" style="text-align:center;color:#aaa;padding:16px">등록된 품목이 없습니다 — [+ 품목 추가]</td></tr>';
+  if(!rows) rows='<tr><td colspan="12" style="text-align:center;color:#aaa;padding:16px">등록된 품목이 없습니다 — [+ 품목 추가]</td></tr>';
   var rules=(DATA.pricePolicy&&DATA.pricePolicy.rules)||'';
   var rulesCard='<div class="salesSec" style="margin-top:14px"><h4>가격 정책 규칙 <span class="secSub">가격대·마진 산정 기준</span> <button class="tbtn" style="float:right;font-size:11px;padding:4px 10px" onclick="openPricePolicyRules()">편집</button></h4>'
     +'<div class="pdText" style="white-space:pre-wrap">'+(rules?pEsc(rules):'등록된 정책 규칙이 없습니다 — [편집]에서 입력하세요')+'</div></div>';
   return '<div class="salesSec"><h4>가격 유형별 판매가 · 원가 · 마진 <span class="secSub">정상가·상시가·행사가·초특가·공구가·폐쇄몰가 · 행 클릭 시 원가/마진 상세</span></h4>'
-    +'<div style="font-size:11px;color:#8a90a0;margin:-2px 0 8px;padding:0 2px">정상가=리스트 기준가 · 상시가=평상시 판매가 · 마진율=(공급가−원가합)÷판매가 (상시가 기준) · <b>단품(옵션 N) 클릭 → 옵션별</b>, <b>옵션 클릭 → 6가격대 원가 상세</b></div>'
-    +'<div class="salesTblWrap"><table class="salesTbl planTbl"><thead><tr><th class="l">품목</th><th class="c">용량</th><th class="r">정상가</th><th class="r">상시가</th><th class="r">행사가</th><th class="r">초특가</th><th class="r">공구가</th><th class="r">폐쇄몰가</th><th class="r">원가합</th><th class="c">배송</th><th class="c">마진율</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'
+    +'<div style="font-size:11px;color:#8a90a0;margin:-2px 0 8px;padding:0 2px">정상가=리스트 기준가 · 상시가=평상시가·행사가=프로모션가 · 마진율=(공급가−원가합)÷판매가 · <b>상시마진</b>=상시가 기준, <b>행사마진</b>=행사가 기준 · <b>단품(옵션 N) 클릭 → 옵션별</b>, <b>옵션 클릭 → 6가격대 상세</b></div>'
+    +'<div class="salesTblWrap"><table class="salesTbl planTbl"><thead><tr><th class="l">품목</th><th class="c">용량</th><th class="r">정상가</th><th class="r">상시가</th><th class="r">행사가</th><th class="r">초특가</th><th class="r">공구가</th><th class="r">폐쇄몰가</th><th class="r">원가합</th><th class="c">배송</th><th class="c">상시<br>마진</th><th class="c">행사<br>마진</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'
     +rulesCard;
 }
 function openPriceGroup(grpEnc){
@@ -11210,7 +11212,8 @@ function openPriceGroup(grpEnc){
   var items=((DATA.pricePolicy&&DATA.pricePolicy.items)||[]).filter(function(o){return ppGroupOf(o.nm)===grp;}).sort(function(a,b){return (a.id||0)-(b.id||0);});
   if(!items.length) return;
   var old=document.getElementById('ppGroupModal'); if(old) old.remove();
-  var rows=items.map(function(o){ var prim=ppPrimary(o), mp=+prim.p>0?(+prim.mr*100):null, mc=ppMarginColor(mp);
+  var rows=items.map(function(o){ var prim=ppPrimary(o), av=ppTier(o,'always'), ev=ppTier(o,'event');
+    var amp=+av.p>0?(+av.mr*100):null, emp=+ev.p>0?(+ev.mr*100):null;
     return '<tr onclick="var g=document.getElementById(\'ppGroupModal\');if(g)g.remove();openPricePolicyEdit('+o.id+')" style="cursor:pointer">'
       +'<td style="text-align:left;font-weight:600;white-space:nowrap">'+pEsc(ppOptOf(o.nm))+'</td>'
       +'<td style="text-align:right;color:#9aa1b2">'+ppFmt(o.list)+'</td>'
@@ -11221,13 +11224,14 @@ function openPriceGroup(grpEnc){
       +'<td style="text-align:right">'+ppFmt(ppTier(o,'closed').p)+'</td>'
       +'<td style="text-align:right;color:#7a8194">'+ppFmt(prim.sum)+'</td>'
       +'<td style="text-align:center">'+ppShipHtml(o)+'</td>'
-      +'<td style="text-align:center"><b style="color:'+mc+'">'+(mp!=null?mp.toFixed(0)+'%':'-')+'</b></td></tr>';
+      +'<td style="text-align:center"><b style="color:'+ppMarginColor(amp)+'">'+(amp!=null?amp.toFixed(0)+'%':'-')+'</b></td>'
+      +'<td style="text-align:center"><b style="color:'+ppMarginColor(emp)+'">'+(emp!=null?emp.toFixed(0)+'%':'-')+'</b></td></tr>';
   }).join('');
   var m=document.createElement('div'); m.id='ppGroupModal'; m.className='modal open';
   m.innerHTML='<div class="mbox" style="max-width:840px;width:100%;padding:22px;max-height:88vh;overflow:auto">'
     +'<h3 style="margin-bottom:2px">'+pEsc(grp)+' <span style="font-size:12px;font-weight:600;color:#9aa1b2">옵션 '+items.length+'개</span></h3>'
     +'<div style="font-size:11px;color:#8a90a0;margin-bottom:10px">옵션(수량/번들)별 가격·원가·마진 · <b>행 클릭 시 6가격대 원가 상세</b></div>'
-    +'<div style="overflow-x:auto"><table class="salesTbl" style="font-size:11.5px"><thead><tr><th style="text-align:left">옵션</th><th>정상가</th><th>상시가</th><th>행사가</th><th>초특가</th><th>공구가</th><th>폐쇄몰가</th><th>원가합</th><th>배송</th><th>마진율</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +'<div style="overflow-x:auto"><table class="salesTbl" style="font-size:11.5px"><thead><tr><th style="text-align:left">옵션</th><th>정상가</th><th>상시가</th><th>행사가</th><th>초특가</th><th>공구가</th><th>폐쇄몰가</th><th>원가합</th><th>배송</th><th>상시마진</th><th>행사마진</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
     +'<div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="tbtn" id="ppgClose">닫기</button></div></div>';
   document.body.appendChild(m);
   m.querySelector('#ppgClose').onclick=function(){m.remove();};
