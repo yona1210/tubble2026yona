@@ -8993,6 +8993,15 @@ function salesAccBarHtml(sd){
     +`</span></div>`;
 }
 function handleSalesUpload(file){
+  // [안전장치] 기존 매출이 "집계본(salesData)만 있고 원본 행(salesAcc)은 없는" 상태에서 업로드하면,
+  // 재집계가 새 파일 기준으로만 이뤄져 기존 데이터가 화면에서 사라진다 → 사전 확인.
+  const _sd=DATA.salesData;
+  const _accEmpty=!DATA.salesAcc||!Array.isArray(DATA.salesAcc.rows)||!DATA.salesAcc.rows.length;
+  if(_accEmpty && _sd && _sd.months && _sd.months.length){
+    const _m0=_sd.months[0], _m1=_sd.months[_sd.months.length-1], _nM=_sd.months.length;
+    const _ok=confirm(`⚠️ 기존 매출 데이터(${_nM}개월, ${_m0}~${_m1})는 원본 행이 없어 이번 파일과 자동으로 합쳐지지 않습니다.\n\n이대로 올리면 새 파일 기준으로 다시 만들어져 기존 데이터가 화면에서 사라집니다.\n(전체 기간 ERP 파일을 먼저 올리면 이후 업로드부터는 정상 누적됩니다.)\n\n그래도 이 파일만으로 새로 시작할까요?`);
+    if(!_ok){ if(typeof toast==='function') toast('업로드 취소됨 — 전체 기간 파일을 먼저 올리면 누적됩니다'); return; }
+  }
   const proceed=()=>{
   const reader=new FileReader();
   reader.onerror=()=>{ if(typeof toast==='function') toast('파일 읽기 실패 — 다시 시도하세요'); };
