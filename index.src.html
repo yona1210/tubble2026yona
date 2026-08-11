@@ -9136,19 +9136,49 @@ function salesGroupHtml(sd){
   const bar=`<div class="salesSec" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;margin-bottom:12px">
     <span style="font-size:12px;color:#3a3d47"><b>카테고리 → 대분류 분류</b> ${unmapped?`· <b style="color:#C0392B">미분류 ${unmapped}건</b> — 분류하면 대분류로 묶입니다`:'· <b style="color:#1E9E63">완료 ✓</b>'}</span>
     <button class="tbtn primary" onclick="classifyGroupsFromDashboard()" style="font-size:11.5px;padding:6px 13px;white-space:nowrap">분류 관리</button></div>`;
-  const rows=h.order.map(g=>{
+  // [v83] 세부 카테고리별 품목 버킷(올해 기준) — 세부 카테고리 클릭 시 품목별 비중 펼침
+  const itemBuckets={};
+  Object.keys(sd.item||{}).forEach(nm=>{
+    if(!nm||nm==='-') return;
+    const amt=salesYearAmt(sd.item[nm], h.cy);
+    if(amt<=0) return;
+    const cat=salesCategory(nm);
+    (itemBuckets[cat]=itemBuckets[cat]||[]).push({nm,amt});
+  });
+  Object.values(itemBuckets).forEach(arr=>arr.sort((a,b)=>b.amt-a.amt));
+  const rows=h.order.map((g,gi)=>{
     const grp=h.groups[g], gpct=(grp.amt/h.total*100);
     const head=`<tr class="grpRow"><td style="text-align:left">${g}</td><td><b>${salesEok(grp.amt)}</b></td><td><b>${gpct.toFixed(1)}%</b></td></tr>`;
-    const subs=grp.cats.slice().sort((a,b)=>b.amt-a.amt).map(c=>`<tr class="subRow"><td style="text-align:left;padding-left:24px;color:#5f6470">└ ${c.cat}</td><td>${salesEok(c.amt)}</td><td>${(c.amt/h.total*100).toFixed(1)}%</td></tr>`).join('');
+    const subs=grp.cats.slice().sort((a,b)=>b.amt-a.amt).map((c,ci)=>{
+      const key=`g${gi}c${ci}`;
+      const items=itemBuckets[c.cat]||[];
+      const catTotal=items.reduce((s,it)=>s+it.amt,0)||c.amt||1;
+      const has=items.length>0;
+      const caret=has?'<span class="catCaret" style="display:inline-block;width:11px;color:#9aa1b2;font-size:9px">▶</span>':'<span style="display:inline-block;width:11px"></span>';
+      const sub=`<tr class="subRow${has?' catExpandable':''}" data-cat-key="${key}"${has?` onclick="toggleSalesCatItems('${key}',this)" style="cursor:pointer"`:''}><td style="text-align:left;padding-left:20px;color:#5f6470">${caret} └ ${c.cat}${has?` <span style="color:#aab;font-weight:400;font-size:10.5px">(${items.length}품목)</span>`:''}</td><td>${salesEok(c.amt)}</td><td>${(c.amt/h.total*100).toFixed(1)}%</td></tr>`;
+      const itemRows=items.map(it=>{
+        const inPct=it.amt/catTotal*100, ofT=it.amt/h.total*100;
+        return `<tr class="itemRow" data-cat-parent="${key}" style="display:none;background:#fafbfe"><td style="text-align:left;padding-left:44px;color:#8a90a2;font-size:12px" title="${pEsc(it.nm)}">· ${pEsc(clipLabel(it.nm,28))}</td><td style="color:#8a90a2">${salesEok(it.amt)}</td><td><b style="color:#3a3d47">${inPct.toFixed(1)}%</b> <span style="color:#aab;font-size:10.5px">(${ofT.toFixed(1)}%)</span></td></tr>`;
+      }).join('');
+      return sub+itemRows;
+    }).join('');
     return head+subs;
   }).join('');
   return `${bar}
   <div class="chartGrid2">
     <div class="salesSec"><h4>대분류별 매출 비율 <span class="secSub">${h.cy} 기준 · 주방/세탁/청소/탈취</span></h4>${chartBox('groupDonut',280)}</div>
-    <div class="salesSec"><h4>대분류 → 세부품목 <span class="secSub">${h.cy} 매출 · 비중(전체 대비)</span></h4>
-      <div class="salesTblWrap"><table class="salesTbl groupTbl"><thead><tr><th style="text-align:left">대분류 / 세부품목</th><th>${h.cy} 매출</th><th>비중</th></tr></thead>
+    <div class="salesSec"><h4>대분류 → 세부 → 품목 <span class="secSub">${h.cy} · 세부 카테고리(└) 클릭 시 품목별 펼침 · 품목%=카테고리 내 비중(괄호=전체 대비)</span></h4>
+      <div class="salesTblWrap"><table class="salesTbl groupTbl"><thead><tr><th style="text-align:left">대분류 / 세부 / 품목</th><th>${h.cy} 매출</th><th>비중</th></tr></thead>
       <tbody>${rows}<tr class="tot"><td style="text-align:left">합계</td><td><b>${salesEok(h.total)}</b></td><td>100%</td></tr></tbody></table></div></div>
   </div>`;
+}
+// [v83] 세부 카테고리 행 클릭 → 품목별 비중 펼침/접기
+function toggleSalesCatItems(key,rowEl){
+  const rows=document.querySelectorAll('tr.itemRow[data-cat-parent="'+key+'"]');
+  if(!rows.length) return;
+  const show=rows[0].style.display==='none';
+  rows.forEach(r=>{ r.style.display=show?'':'none'; });
+  if(rowEl){ const c=rowEl.querySelector('.catCaret'); if(c) c.textContent=show?'▼':'▶'; }
 }
 function drawSalesGroupChart(sd){
   if(!window.Chart) return;
