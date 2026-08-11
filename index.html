@@ -2529,8 +2529,7 @@ body{padding-bottom:48px}
     <span class="salesMeta" id="salesMeta">매출품목조회_20260626.xlsx · 2024-01~2026-05 (29개월) · 15,439건 · 2026-06-26 반영</span>
     <div class="salesViewSeg" id="salesViewSeg" style="margin-left:auto">
       <button class="svTab on" data-sv="summary">요약</button>
-      <button class="svTab" data-sv="item">품목별</button>
-      <button class="svTab" data-sv="group">카테고리별</button>
+      <button class="svTab" data-sv="group">카테고리·품목</button>
       <button class="svTab" data-sv="channel">채널별</button>
       <button class="svTab" data-sv="yoy">YoY 비교</button>
     </div>
@@ -9091,8 +9090,9 @@ function renderSales(){
     <div class="salesKpi goal"><span class="kpiIco">${kpiIcon('target')}</span><div class="l">연간목표 달성 (${salesEok(SALES_GOAL)})</div><div class="semiGauge">${semiGaugeSvg(goalPct, goalPct>=100?'#1E9E63':CC.blue)}</div><div class="sub">${curY} 누적 ${salesEok(curYearAmt)} · 잔여 ${salesEok(Math.max(0,SALES_GOAL-curYearAmt))}</div></div>`;
     drawKpiSpark('salesSparkKpi', months.slice(-12).map(m=>sd.month[m]?sd.month[m].amt:0), CC.blue);
   }
-  // 본문: 뷰별 렌더 (품목/채널 = 차원, 카테고리 = 대분류 계층, YoY = 월/분기/연도 비교)
-  const DIMV=['item','channel'];
+  // 본문: 뷰별 렌더 (카테고리·품목 통합=계층 드릴다운, 채널=차원, YoY=시간 비교)
+  if(salesView==='item') salesView='group';   // [v83] 품목별 → 카테고리·품목 통합
+  const DIMV=['channel'];
   const html = salesView==='summary' ? salesSummaryHtml(sd)
     : salesView==='group' ? salesGroupHtml(sd)
     : salesView==='yoy' ? salesYoYHtml(sd)
@@ -9136,16 +9136,19 @@ function salesGroupHtml(sd){
   const bar=`<div class="salesSec" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;margin-bottom:12px">
     <span style="font-size:12px;color:#3a3d47"><b>카테고리 → 대분류 분류</b> ${unmapped?`· <b style="color:#C0392B">미분류 ${unmapped}건</b> — 분류하면 대분류로 묶입니다`:'· <b style="color:#1E9E63">완료 ✓</b>'}</span>
     <button class="tbtn primary" onclick="classifyGroupsFromDashboard()" style="font-size:11.5px;padding:6px 13px;white-space:nowrap">분류 관리</button></div>`;
-  // [v83] 세부 카테고리별 품목 버킷(올해 기준) — 세부 카테고리 클릭 시 품목별 비중 펼침
+  // [v83] 세부 카테고리별 품목 버킷(올해 기준, byMonth 포함) — 세부 클릭→품목, 품목 클릭→월별 상세
+  const ymObj=salesByYearMonth(sd);
+  const cyMonths=Object.keys(ymObj[h.cy]||{}).sort();
   const itemBuckets={};
   Object.keys(sd.item||{}).forEach(nm=>{
     if(!nm||nm==='-') return;
-    const amt=salesYearAmt(sd.item[nm], h.cy);
+    const o=sd.item[nm]; const amt=salesYearAmt(o, h.cy);
     if(amt<=0) return;
     const cat=salesCategory(nm);
-    (itemBuckets[cat]=itemBuckets[cat]||[]).push({nm,amt});
+    (itemBuckets[cat]=itemBuckets[cat]||[]).push({nm,amt,o});
   });
   Object.values(itemBuckets).forEach(arr=>arr.sort((a,b)=>b.amt-a.amt));
+  let itemSeq=0;
   const rows=h.order.map((g,gi)=>{
     const grp=h.groups[g], gpct=(grp.amt/h.total*100);
     const head=`<tr class="grpRow"><td style="text-align:left">${g}</td><td><b>${salesEok(grp.amt)}</b></td><td><b>${gpct.toFixed(1)}%</b></td></tr>`;
@@ -9157,8 +9160,18 @@ function salesGroupHtml(sd){
       const caret=has?'<span class="catCaret" style="display:inline-block;width:11px;color:#9aa1b2;font-size:9px">▶</span>':'<span style="display:inline-block;width:11px"></span>';
       const sub=`<tr class="subRow${has?' catExpandable':''}" data-cat-key="${key}"${has?` onclick="toggleSalesCatItems('${key}',this)" style="cursor:pointer"`:''}><td style="text-align:left;padding-left:20px;color:#5f6470">${caret} └ ${c.cat}${has?` <span style="color:#aab;font-weight:400;font-size:10.5px">(${items.length}품목)</span>`:''}</td><td>${salesEok(c.amt)}</td><td>${(c.amt/h.total*100).toFixed(1)}%</td></tr>`;
       const itemRows=items.map(it=>{
+        const ikey=key+'i'+(itemSeq++);
         const inPct=it.amt/catTotal*100, ofT=it.amt/h.total*100;
-        return `<tr class="itemRow" data-cat-parent="${key}" style="display:none;background:#fafbfe"><td style="text-align:left;padding-left:44px;color:#8a90a2;font-size:12px" title="${pEsc(it.nm)}">· ${pEsc(clipLabel(it.nm,28))}</td><td style="color:#8a90a2">${salesEok(it.amt)}</td><td><b style="color:#3a3d47">${inPct.toFixed(1)}%</b> <span style="color:#aab;font-size:10.5px">(${ofT.toFixed(1)}%)</span></td></tr>`;
+        const hasMon=cyMonths.length>0;
+        const icaret=hasMon?'<span class="itmCaret" style="display:inline-block;width:10px;color:#b6bccb;font-size:8px">▶</span>':'<span style="display:inline-block;width:10px"></span>';
+        const itemTr=`<tr class="itemRow${hasMon?' itemExpandable':''}" data-cat-parent="${key}" data-item-key="${ikey}"${hasMon?` onclick="toggleSalesItemMonths('${ikey}',this)" style="display:none;background:#fafbfe;cursor:pointer"`:' style="display:none;background:#fafbfe"'}><td style="text-align:left;padding-left:40px;color:#8a90a2;font-size:12px" title="${pEsc(it.nm)}">${icaret} · ${pEsc(clipLabel(it.nm,26))}</td><td style="color:#8a90a2">${salesEok(it.amt)}</td><td><b style="color:#3a3d47">${inPct.toFixed(1)}%</b> <span style="color:#aab;font-size:10.5px">(${ofT.toFixed(1)}%)</span></td></tr>`;
+        let monTr='';
+        if(hasMon){
+          const chips=cyMonths.map(mo=>{ const v=(it.o.byMonth||{})[h.cy+'-'+mo]||0; const mt=(ymObj[h.cy]&&ymObj[h.cy][mo])||0; const p=(v&&mt)?(v/mt*100):0; const on=v>0;
+            return `<span style="display:inline-flex;flex-direction:column;align-items:center;min-width:46px;padding:3px 5px;border-radius:6px;background:${on?'#eef2fe':'#f4f5f8'};font-size:10px;line-height:1.4"><b style="color:#5a6478">${mo}월</b><span style="color:${on?'#1E2761':'#c8ccd6'};font-weight:700">${on?salesWon(Math.round(v/1e4))+'만':'-'}</span>${on?`<span style="color:#9aa1b2">${p.toFixed(1)}%</span>`:''}</span>`; }).join('');
+          monTr=`<tr class="itemMonRow" data-cat-parent="${key}" data-mon-parent="${ikey}" style="display:none"><td colspan="3" style="padding:6px 8px 10px 40px;background:#f7f9ff;text-align:left"><div style="font-size:10.5px;color:#8a90a2;margin-bottom:5px">${h.cy} 월별 매출(만원) · 그 달 내 비중</div><div style="display:flex;flex-wrap:wrap;gap:4px">${chips}</div></td></tr>`;
+        }
+        return itemTr+monTr;
       }).join('');
       return sub+itemRows;
     }).join('');
@@ -9166,19 +9179,29 @@ function salesGroupHtml(sd){
   }).join('');
   return `${bar}
   <div class="chartGrid2">
-    <div class="salesSec"><h4>대분류별 매출 비율 <span class="secSub">${h.cy} 기준 · 주방/세탁/청소/탈취</span></h4>${chartBox('groupDonut',280)}</div>
-    <div class="salesSec"><h4>대분류 → 세부 → 품목 <span class="secSub">${h.cy} · 세부 카테고리(└) 클릭 시 품목별 펼침 · 품목%=카테고리 내 비중(괄호=전체 대비)</span></h4>
-      <div class="salesTblWrap"><table class="salesTbl groupTbl"><thead><tr><th style="text-align:left">대분류 / 세부 / 품목</th><th>${h.cy} 매출</th><th>비중</th></tr></thead>
-      <tbody>${rows}<tr class="tot"><td style="text-align:left">합계</td><td><b>${salesEok(h.total)}</b></td><td>100%</td></tr></tbody></table></div></div>
-  </div>`;
+    <div class="salesSec"><h4>대분류별 매출 비율 <span class="secSub">${h.cy} 기준 · 주방/세탁/청소/탈취</span></h4>${chartBox('groupDonut',260)}</div>
+    <div class="salesSec"><h4>품목별 월별 추이 <span class="secSub">상위 5 · 최근 12개월</span></h4>${chartBox('groupItemLine',260)}</div>
+  </div>
+  <div class="salesSec"><h4>대분류 → 세부 → 품목 <span class="secSub">${h.cy} · 세부(└) 클릭→품목 · 품목(·) 클릭→월별 추이 · 품목%=카테고리 내 비중(괄호=전체 대비)</span></h4>
+    <div class="salesTblWrap"><table class="salesTbl groupTbl"><thead><tr><th style="text-align:left">대분류 / 세부 / 품목</th><th>${h.cy} 매출</th><th>비중</th></tr></thead>
+    <tbody>${rows}<tr class="tot"><td style="text-align:left">합계</td><td><b>${salesEok(h.total)}</b></td><td>100%</td></tr></tbody></table></div></div>`;
 }
-// [v83] 세부 카테고리 행 클릭 → 품목별 비중 펼침/접기
+// [v83] 세부 카테고리 행 클릭 → 품목 펼침/접기 (접을 땐 하위 월별 행도 함께 숨김)
 function toggleSalesCatItems(key,rowEl){
   const rows=document.querySelectorAll('tr.itemRow[data-cat-parent="'+key+'"]');
   if(!rows.length) return;
   const show=rows[0].style.display==='none';
-  rows.forEach(r=>{ r.style.display=show?'':'none'; });
+  rows.forEach(r=>{ r.style.display=show?'':'none'; if(!show){ const ic=r.querySelector('.itmCaret'); if(ic) ic.textContent='▶'; } });
+  if(!show){ document.querySelectorAll('tr.itemMonRow[data-cat-parent="'+key+'"]').forEach(r=>{ r.style.display='none'; }); }
   if(rowEl){ const c=rowEl.querySelector('.catCaret'); if(c) c.textContent=show?'▼':'▶'; }
+}
+// [v83] 품목 행 클릭 → 그 품목의 월별 매출 상세 펼침/접기
+function toggleSalesItemMonths(ikey,rowEl){
+  const rows=document.querySelectorAll('tr.itemMonRow[data-mon-parent="'+ikey+'"]');
+  if(!rows.length) return;
+  const show=rows[0].style.display==='none';
+  rows.forEach(r=>{ r.style.display=show?'':'none'; });
+  if(rowEl){ const c=rowEl.querySelector('.itmCaret'); if(c) c.textContent=show?'▼':'▶'; }
 }
 function drawSalesGroupChart(sd){
   if(!window.Chart) return;
@@ -9188,6 +9211,14 @@ function drawSalesGroupChart(sd){
     options:{ cutout:'62%', plugins:{ legend:donutLegend(),
       centerText:{text:salesEok(h.total), sub:h.cy+' 매출', size:isNarrow()?16:20},
       tooltip:{callbacks:{label:c=>` ${labels[c.dataIndex]}: ${salesEok(c.parsed)} (${(c.parsed/h.total*100).toFixed(1)}%)`}} } } });
+  // [v83] 통합 뷰: 품목별 월별 추이(상위 5 · 최근 12개월) — 기존 품목별 탭 차트 흡수
+  const top5=salesDimYear(sd,'item',h.cy).slice(0,5).map(([n])=>n);
+  const showM=(sd.months||[]).slice(-12), imap=sd.item||{}, t=lineOrBar(showM);
+  makeChart('groupItemLine',{ type:t,
+    data:{ labels:showM.map(m=>m.slice(2)), datasets: top5.map((nm,i)=>{ const o=imap[nm]||{};
+      return { label:clipLabel(nm,10), data:showM.map(m=>((o.byMonth&&o.byMonth[m])||0)/1e4), borderColor:DONUT_COLORS[i], backgroundColor:DONUT_COLORS[i], borderRadius:t==='bar'?3:0, tension:.3, pointRadius:2, borderWidth:2 }; }) },
+    options:{ plugins:{legend:{position:'bottom', labels:{font:{size:isNarrow()?9.5:10.5}}}, tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${salesWon(Math.round(c.parsed.y))}만`}}},
+      scales:{ x:{grid:{display:false}}, y:{grid:{color:CC.grid}, ticks:{callback:v=>salesWon(v)+'만'}} } } });
 }
 // [v78] 특정 연도 기준 집계 — byMonth에서 해당 연도만 합산
 function salesYearAmt(o, year){ let a=0; Object.entries(o.byMonth||{}).forEach(([ym,v])=>{ if(ym.slice(0,4)===year) a+=v; }); return a; }
