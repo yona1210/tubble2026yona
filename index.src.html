@@ -8298,7 +8298,8 @@ function salesCategory(nm){
   if(n.includes('한화')) return '기타';                              // 한화 OEM 등 자사 제품 아님 → 기타
   if(n.includes('세정티슈')||n.includes('물티슈')) return '세정티슈';    // 세정티슈 먼저 (다목적 세정티슈가 다목적용기세척제로 가지 않도록)
   if(n.includes('텀블러')||n.includes('용기세척')||n.includes('다목적')) return '다목적용기세척제';
-  if(n.includes('캡슐')) return '캡슐세제';   // 캡슐세제 단품 + 캡슐 7종 세트 등 캡슐 묶음도 캡슐세제 (한화는 위에서 기타 처리)
+  if(n.includes('캡슐') && n.includes('7종')) return '기타';   // 캡슐 7종 세트(구성 assortment)는 캡슐세제 단품이 아님 → 기타
+  if(n.includes('캡슐')) return '캡슐세제';   // 캡슐세제 단품·다팩(예: 35개입 2세트)은 캡슐세제 (한화·7종세트는 위에서 처리)
   if(n.includes('탈취')) return '탈취제';
   if(n.includes('주방세제')) return '주방세제';
   if(n.includes('욕실')) return '욕실클리너';
@@ -9047,6 +9048,11 @@ function handleSalesUpload(file){
 
 // KPI + 본문 렌더
 function renderSales(){
+  // [v83] 배포 시드의 salesData는 예전 분류 규칙으로 집계돼 있을 수 있음 → 원본(salesAcc)에서 1회 재집계해 최신 분류 반영
+  if(!DATA._salesReagg && DATA.salesAcc && DATA.salesAcc.rows && DATA.salesAcc.rows.length){
+    try{ rebuildSalesData(); }catch(e){ console.warn('salesData 재집계 실패', e); }
+    DATA._salesReagg = true;
+  }
   const meta=document.getElementById('salesMeta');
   const kpis=document.getElementById('salesKpis');
   const body=document.getElementById('salesBody');
