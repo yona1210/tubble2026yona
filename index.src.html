@@ -2898,6 +2898,15 @@ function applyMultiCleanerOrderBasis(){
     if(s){ if(s.targetMonths==null) s.targetMonths=1; if(s.skipItemMoq==null) s.skipItemMoq=true; } });
 }
 applyMultiCleanerOrderBasis();
+// [v83] 얼룩제거제 5종 묶음 발주 기본 그룹 보장 (costDetail에 '얼룩제거' 품목이 있고 그룹이 없을 때만 추가)
+(function(){
+  DATA.costGroups = DATA.costGroups || [];
+  if(DATA.costGroups.some(function(g){return g && g.id==='stain_remover';})) return;
+  var stain = Object.keys(DATA.costDetail||{}).filter(function(k){return k.indexOf('얼룩제거')>=0;});
+  if(stain.length){
+    DATA.costGroups.push({id:'stain_remover', name:'얼룩제거제 5종 묶음 발주', items:stain, memo:'스팟 얼룩제거제 5종(용도별)은 통상 함께 발주'});
+  }
+})();
 
 // 데일리 재고 이력: 오늘 재고 업데이트를 누적해 실제 재고 감소 속도 산출
 // 구조: { "품목명": [{date:'YYYY-MM-DD', stock:1234, source:'데일리', file:'파일명'}] }
@@ -5643,7 +5652,7 @@ function renderCost(){
   // 본문: 품목 선택(칩) → 선택 품목만 표시
   if(shown.length && (!costSel || !DATA.costDetail[costSel] || !shown.includes(costSel))) costSel=shown[0];
   // 품목 칩: 카테고리별로 묶어 표시(스캔 쉽게) + 원가율(%)·색상
-  const chipCat=(nm)=>{ const st=DATA.stock.find(s=>s.nm===nm); return (st&&st.cat)?st.cat:'기타'; };
+  const chipCat=(nm)=>{ const st=DATA.stock.find(s=>s.nm===nm); return (st&&st.cat)?st.cat:salesCategory(nm); };  // 재고 cat 없으면 품목명 기반 분류(예: 얼룩제거제)
   const chipGrp={}, chipOrder=[];
   shown.forEach(k=>{ const c=chipCat(k); if(!chipGrp[c]){chipGrp[c]=[];chipOrder.push(c);} chipGrp[c].push(k); });
   // 품목 선택: 카테고리별 optgroup 드롭다운(컴팩트) — 각 옵션에 @원가·원가율%
@@ -8306,6 +8315,7 @@ function salesCategory(nm){
   if(n.includes('식기세척')) return '식기세척기세제';
   if(n.includes('세탁조')) return '세탁조클리너';
   if(n.includes('이염방지')||n.includes('시트세제')) return '이염방지시트세제';
+  if(n.includes('얼룩제거')) return '얼룩제거제';   // 스팟 얼룩제거제 5종(용도별) — 캡슐(얼룩 땀냄새)은 위에서 이미 처리됨
   return '기타';
 }
 // 품명 정규화(인하/차수 꼬리표 제거 → 같은 품목 합산)
