@@ -2917,6 +2917,10 @@ if(!DATA.stockMeta){ DATA.stockMeta={ msaleMonth:'2026.05', dailyFile:'', dailyD
 if(!DATA.clientChannelMap || typeof DATA.clientChannelMap!=='object') DATA.clientChannelMap={};
 // [v81] 카테고리→대분류(주방/세탁/청소/탈취) 매핑 · 저장/복원
 if(!DATA.catGroupMap || typeof DATA.catGroupMap!=='object') DATA.catGroupMap={};
+// [v83] 얼룩제거제 대분류 = 세탁 (미지정 시 기본값)
+if(DATA.catGroupMap['얼룩제거제']==null) DATA.catGroupMap['얼룩제거제']='세탁';
+// [v83] 캡슐 7종 세트는 캡슐세제가 아닌 기타 — 재고 cat 강제 정정(원가·재고 탭 일관성, salesCategory와 일치)
+(DATA.stock||[]).forEach(function(s){ if(s&&s.nm&&s.nm.indexOf('캡슐')>=0&&s.nm.indexOf('7종')>=0&&s.cat!=='기타') s.cat='기타'; });
 // [v80] ERP 업로드로 갱신된 채널 월별 데이터 복원 (CHANNEL_DATA는 const라 DATA에 저장해 영속화)
 if(DATA.channelData && DATA.channelData.months && DATA.channelData.months.length){
   try{ CHANNEL_DATA.months=DATA.channelData.months; CHANNEL_DATA.channels=DATA.channelData.channels; CHANNEL_DATA.items=DATA.channelData.items; }catch(e){}
