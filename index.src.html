@@ -6919,11 +6919,12 @@ const NAME_ALIAS=[
   {kw:['캡슐세제코튼가든','코튼가든'], to:'캡슐세제 코튼가든'},
   {kw:['캡슐세제아쿠아','아쿠아블루'], to:'캡슐세제 아쿠아블루'},
   {kw:['캡슐세제퍼퓸미모사','퍼퓸미모사','미모사'], to:'캡슐세제 퍼퓸미모사'},
-  {kw:['캡슐세제퍼퓸그라스','퍼퓸그라스','그라스'], to:'캡슐세제 퍼퓸그라스'},
+  {kw:['캡슐세제퍼퓸그라스','퍼퓸그라스','그라스'], not:['챔버'], to:'캡슐세제 퍼퓸그라스'},   // '챔버' 포함(그라스 1챔버 신제품)은 제외 → 퍼퓸그라스로 오인식 방지
 ];
 function aliasResolve(nm){
   const key=normName(nm);
   for(const a of NAME_ALIAS){
+    if(a.not && a.not.some(k=>key.includes(normName(k)))) continue;   // 제외 키워드(예: 챔버) 포함 시 이 별칭 건너뜀
     if(a.kw.some(k=>key.includes(normName(k)))){
       const row=(DATA.stock||[]).find(s=>s.nm===a.to);
       if(row) return row;
