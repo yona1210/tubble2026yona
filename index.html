@@ -435,6 +435,7 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .runmain.trend{color:#C0392B}
 .runfaster{font-size:9px;font-weight:700;color:#C0392B;margin-top:1px}
 .runavg{font-size:9px;color:#aaa;margin-top:1px}
+.runmo{font-size:11px;font-weight:700;color:var(--navy)}
 .stockcell.low{color:var(--red);font-weight:700}
 .editable-stock{background:#fffde8;border:1px dashed #d8c860;border-radius:4px;padding:3px 6px;width:80px;text-align:right;font-size:12px}
 .linktag{display:inline-block;font-size:8px;background:#eef0f7;color:var(--navy);padding:1px 5px;border-radius:6px;margin-left:3px;vertical-align:1px}
@@ -4834,7 +4835,7 @@ function renderStock(){
       runoutBlock=unverifiedRunoutHtml(s,c);
     } else {
       const baseGap=(c.runout&&c.runoutBase)?Math.round((c.runoutBase-c.runout)/86400000):0;
-      runoutBlock=`<div class="runmain ${baseGap>0?'trend':''}">${cellRunout}</div>
+      runoutBlock=`<div class="runmain ${baseGap>0?'trend':''}">${cellRunout}${c.runoutMonths!=null?` <span class="runmo">· 약 ${c.runoutMonths.toFixed(1)}개월분</span>`:''}</div>
         <div class="runfaster">${won(Math.round(c.daily))}${su}/일 기준</div>
         ${c.runoutBase&&Math.abs(baseGap)>=1?`<div class="runavg">평균 기준 ${fmtMDfull(c.runoutBase)} · ${baseGap>0?`${baseGap}일 빠름`:`${Math.abs(baseGap)}일 늦음`}</div>`:''}`;
     }
@@ -4889,7 +4890,7 @@ function renderStock(){
         <div class="mcgrid">
           <div><span class="ml">현재고</span>${EXTERNAL?MASK:(stockEdit?`<input class="editable-stock" type="number" value="${s.stock}" onchange="updateStock(${i},this.value)">`:`<b class="${stockCls}">${won(s.stock)}</b>${linked?' <span class="linktag">'+s.stockSource+'</span>':''}`)}</div>
           <div><span class="ml">월판매 평균</span><b>${EXTERNAL?MASK:won(Math.round(c.baseMonthly||0))}</b></div>
-          <div><span class="ml">소진예상</span><b>${EXTERNAL?MASK:(c.status==='unverified'?unverifiedMobileRunoutText(c):(c.runout?fmtMDfull(c.runout):'-'))}</b></div>
+          <div><span class="ml">소진예상</span><b>${EXTERNAL?MASK:(c.status==='unverified'?unverifiedMobileRunoutText(c):(c.runout?fmtMDfull(c.runout)+(c.runoutMonths!=null?' · 약 '+c.runoutMonths.toFixed(1)+'개월분':''):'-'))}</b></div>
           <div><span class="ml">권장 발주수량</span><b>${EXTERNAL?MASK:(c.status==='unverified'?unverifiedMobileOrderText(s,c):(c.orderQty?won(c.orderQty):'-'))}</b></div>
           <div><span class="ml">예상 매입액</span><b>${EXTERNAL?MASK:(c.amt?wonMan(c.amt):'-')}</b></div>
           <div><span class="ml">입고예상</span><b>${arriveTxt}</b></div>
@@ -8123,7 +8124,7 @@ function calcStockCoreV47(s,stock,da){
   const unitCost=getCurrentCost(s.nm, s.cost);
   const costRate=s.price>0?unitCost/s.price:null;
   if(daily<=0){
-    return {daily:0,weekly,runout:null,runoutBase:null,runoutTrend:null,runoutInv:null,
+    return {daily:0,weekly,runout:null,runoutBase:null,runoutTrend:null,runoutInv:null,runoutMonths:null,
       recDate:null,recDD:null,orderQty:0,orderQtyOrderUnit:0,arrive:null,arriveByRec:null,
       months:null,coverMonths:null,stockAfterArrive:null,amt:0,status:'na',rop:0,costRate,
       invStockAtArrive:null,stockoutBeforeArrive:false,unitReady,needRaw:0,unit,stock};
@@ -8159,7 +8160,7 @@ function calcStockCoreV47(s,stock,da){
   const stockoutBeforeArrive=recDD<=0&&invStockAtArrive<0;
   let status='ok';
   if(recDD<=0) status='now'; else if(recDD<=Math.max(0,+set.warn||0)) status='soon';
-  return {daily,weekly,runout,runoutBase,runoutTrend,runoutInv,recDate,recDD,
+  return {daily,weekly,runout,runoutBase,runoutTrend,runoutInv,runoutMonths:runoutDays/30,recDate,recDD,
     orderQty,orderQtyOrderUnit,arrive,arriveByRec,months:coverMonths,coverMonths,stockAfterArrive,amt:orderQty*unitCost,status,rop,costRate,
     invStockAtArrive,stockoutBeforeArrive,unitReady,needRaw,unit,stock,arrivalBaseStock,targetStock,bufferStock};
 }
