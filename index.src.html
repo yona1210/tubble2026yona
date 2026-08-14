@@ -371,16 +371,16 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .helpBox .helpBody div{margin-bottom:4px}
 .uploadHelp b{color:var(--navy)}
 
-.speedtag{display:inline-block;font-size:8.5px;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:4px;vertical-align:1px;background:#eef1fc;color:var(--blue)}
+.speedtag{display:inline-block;font-size:8.5px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:4px;vertical-align:1px;background:#eef0f4;color:#7a8194}
 .dailycell{line-height:1.35}
 .dcAvgLine{font-size:10px;color:#9aa0b0;font-weight:600}
 .dcAdopt{font-size:15px;font-weight:800;color:var(--navy)}
-.dcAdopt.up{color:#c0392b}.dcAdopt.dn{color:#1e9e63}
-.dcUp{font-size:9px;color:#c0392b;margin-right:1px;vertical-align:1px}
+.dcAdopt.up{color:var(--navy)}.dcAdopt.dn{color:#1e9e63}
+.dcUp{font-size:9px;color:#8a90a2;margin-right:1px;vertical-align:1px}
 .dcDn{font-size:9px;color:#1e9e63;margin-right:1px;vertical-align:1px}
 .dcAdoptLabel{font-size:8.5px;color:var(--mut);font-weight:600;margin-top:1px}
 .dcAvg{font-size:8.5px;color:#9aa0b0;margin-top:1px}
-.speedtag.daily{background:#fdeee8;color:#C0392B}.speedtag.month{background:#e6f4ec;color:#157a4a}.speedtag.mix{background:#fdf0e3;color:#E67E22}
+.speedtag.daily{background:#eef1f7;color:#5a6478}.speedtag.month{background:#eef2ec;color:#5a7a5f}.speedtag.mix{background:#f3eee6;color:#8a6d4a}
 .speedmini{font-size:9px;color:var(--mut);margin-top:2px;line-height:1.35}.speedmini b{color:var(--navy)}
 .basisbox .brow.final{background:#fff;border:1px solid #dce3f7;border-radius:6px;margin-top:7px;padding:7px 8px}.basisbox .brow.final b{color:var(--blue);font-size:12px}
 #stockKpis{grid-template-columns:repeat(5,1fr)}
@@ -432,8 +432,8 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .t-dip{background:#fff3e0;color:#E67E22;border:1px dashed #f0c089}
 /* 소진예상 블록 */
 .runmain{font-size:14px;font-weight:800;color:var(--ink)}
-.runmain.trend{color:#C0392B}
-.runfaster{font-size:9px;font-weight:700;color:#C0392B;margin-top:1px}
+.runmain.trend{color:var(--navy)}
+.runfaster{font-size:9px;font-weight:700;color:#8a90a2;margin-top:1px}
 .runavg{font-size:9px;color:#aaa;margin-top:1px}
 .runmo{font-size:11px;font-weight:700;color:var(--navy)}
 .runmo.over{color:#C0392B}
@@ -4848,14 +4848,16 @@ function dailyCellHtml(c){
   const diff=adopt-base;
   const arrow=diff>0?'<span class="dcUp">▲</span>':diff<0?'<span class="dcDn">▼</span>':'';
   const adoptCls=diff>0?'dcAdopt up':diff<0?'dcAdopt dn':'dcAdopt';
+  // [v83] 근거는 짧은 태그로만 표시, 전체 문구는 hover 툴팁 · '*'=재입고 보정
+  const shortTag=c.tagCls==='daily'?'데일리':c.tagCls==='mix'?'보정':'월평균';
+  const restock=/재입고/.test(c.sourceLabel||'');
+  const tagHtml=`<span class="speedtag ${c.tagCls||'month'}" title="${pEsc(c.sourceLabel||'')}">${shortTag}${restock?'*':''}</span>`;
   // 월평균과 동일(보정 없음) → 숫자 + 태그만
   if(c.source==='month' || diff===0){
-    return `<span class="dcAdopt">${won(adopt)}${u!=='EA'?u:''}</span>
-      <span class="speedtag ${c.tagCls||'month'}">${c.sourceLabel||'월평균 기준'}</span>`;
+    return `<span class="dcAdopt">${won(adopt)}${u!=='EA'?u:''}</span> ${tagHtml}`;
   }
-  // [v41] 보정 케이스: 채택값(화살표 포함) + 평균 대비를 한 줄로 축약 + 색 태그 (다단 → 2줄)
-  return `<span class="${adoptCls}">${arrow}${won(adopt)}${u!=='EA'?u:''}</span>
-    <span class="speedtag ${c.tagCls||'month'}">${c.sourceLabel||''}</span>
+  // 보정 케이스: 채택값(화살표) + 평균 대비
+  return `<span class="${adoptCls}">${arrow}${won(adopt)}${u!=='EA'?u:''}</span> ${tagHtml}
     <div class="dcAvgLine">평균 ${won(base)}${u!=='EA'?u:''} 대비</div>`;
 }
 function renderStock(){
