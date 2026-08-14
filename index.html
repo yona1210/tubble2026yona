@@ -440,6 +440,17 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .runslow{font-size:9.5px;font-weight:800;color:#C0392B;margin-top:1px}
 .slowbadge{display:inline-block;font-size:9px;font-weight:800;padding:1px 6px;border-radius:6px;margin-left:4px;vertical-align:1px;background:#fdecea;color:#C0392B;border:1px solid #f0c4bd}
 .slowbadge.mid{background:#fdf3e3;color:#B5611A;border-color:#f0d9a8}
+.tblPurpose{font-size:13px;font-weight:800;padding:8px 12px;border-radius:8px;margin:16px 0 8px}
+.tblPurpose .tpSub{font-size:11px;font-weight:600;opacity:.85;margin-left:6px}
+.tblPurpose.t1{background:#eef2fe;color:#1E2761;border-left:4px solid #3355FF}
+.tblPurpose.t2{background:#eafaf1;color:#1E7A44;border-left:4px solid #1E9E63}
+/* [v83] 재고 테이블 간단히 보기 — 부가 설명 숨겨 밀도 완화 (핵심 값·신호·뱃지는 유지) */
+#stockTableWrap.simple .pmeta,
+#stockTableWrap.simple .runfaster,
+#stockTableWrap.simple .runavg,
+#stockTableWrap.simple .costinfo,
+#stockTableWrap.simple .months{display:none !important}
+.mobilecards.simple .pmeta{display:none !important}
 .stockcell.low{color:var(--red);font-weight:700}
 .editable-stock{background:#fffde8;border:1px dashed #d8c860;border-radius:4px;padding:3px 6px;width:80px;text-align:right;font-size:12px}
 .linktag{display:inline-block;font-size:8px;background:#eef0f7;color:var(--navy);padding:1px 5px;border-radius:6px;margin-left:3px;vertical-align:1px}
@@ -1921,6 +1932,7 @@ body{padding-bottom:48px}
     <button class="tbtn primary" id="btnStockEdit">수정하기</button>
     <button class="tbtn warnbtn" id="btnDailyStockUpload" title="">📦 오늘 재고 업데이트</button>
     <button class="tbtn accent" id="btnOrderReport">📋 발주 보고 요약</button>
+    <button class="tbtn" id="btnStockDensity" title="표를 간단히/자세히 전환">🔎 간단히 보기</button>
     <div class="moreWrap">
       <button class="tbtn" id="btnStockMore">관리·설정 ▾</button>
       <div class="moreMenu" id="stockMoreMenu" style="display:none">
@@ -1978,7 +1990,7 @@ body{padding-bottom:48px}
     </div>
   </div>
 
-  <div class="tbl tablescroll">
+  <div class="tbl tablescroll" id="stockTableWrap">
     <table>
       <thead>
         <tr>
@@ -5307,7 +5319,9 @@ function groupViewHtml(g){
     <td class="r ${rateCls}">${M.avgRate!=null?(M.avgRate*100).toFixed(0)+'%':'-'}</td></tr>
     </tbody></table>`;
   const money=(g.id==='multi_cleaner'||g.orderPrices)?groupOrderMoneyHtml(g,M):'';
-  return card+table+money;
+  // [v83] 두 표의 목적을 색으로 구분 (혼동 방지)
+  const t1head=`<div class="tblPurpose t1">① 원가 기준 · 매입액 <span class="tpSub">자동 발주수량 × 생산원가 — 원가·마진 파악용(참고)</span></div>`;
+  return card+t1head+table+money;
 }
 // ===== [발주금액] 묶음 발주 그룹: 권장수량×객단가 = 발주금액, 정수 환산·MOQ 검토 =====
 function groupOrderMoneyHtml(g,M){
@@ -5360,6 +5374,7 @@ function groupOrderMoneyHtml(g,M){
   const moqLine=`<div class="gomMoq ${moqTabs>0?(ok?'ok':'under'):''}" id="gomMoq_${g.id}">${moqTabs>0?`총 환산 <b>${won(totTabs)}정</b> = <b>${man.toFixed(1)}만정</b> / MOQ ${won(moqTabs/10000)}만정 — ${ok?'✅ 충족':`⚠️ 미달 (${won(moqTabs-totTabs)}정 부족)`}`:'MOQ 미설정'}</div>`;
   const moqEdit=editable?`<div class="gomMoqEdit">MOQ(정) <input type="number" value="${g.moqTabs||''}" placeholder="예: 500000" oninput="updateGroupMoq('${g.id}',this.value)" style="width:110px;text-align:right"> <span class="gomHint">비우면 품목 MOQ(${won(moqTabs)}정) 자동 사용</span></div>`:'';
   return `<div class="gomWrap">
+    <div class="tblPurpose t2">② 실제 발주 기준 · 발주 금액 <span class="tpSub">권장수량 × 객단가 · MOQ 검토 — 실제 주문·현금 실행용</span></div>
     <div class="gomTitle">발주 금액 · 정수(MOQ) 검토 ${editable?`<span class="gomCov">발주 후 <input type="number" step="0.5" min="0" value="${tm}" oninput="updateGroupTargetMonths('${g.id}',this.value)" style="width:50px;text-align:center"> 개월 확보 기준 · 권장수량·객단가 직접 편집 가능</span>`:`<span class="gomHint">발주 후 ${tm}개월 확보 기준</span>`}</div>
     <table class="gTbl gomTbl"><thead><tr>
       <th class="l">SKU</th><th class="l">제조사</th><th class="r">권장 발주수량<br><span class="gomHint">발주후 ${tm}개월</span></th><th class="r">객단가(원)</th><th class="r">발주 금액</th><th class="r">정수</th><th class="r">환산 정</th>
@@ -7673,6 +7688,15 @@ document.getElementById('btnReportCopy').onclick=()=>{
 };
 
 document.getElementById('btnOrderReport').onclick=openOrderReport;
+// [v83] 재고 테이블 간단/자세히 뷰 토글 — 간단히 모드에서 부가 설명(pmeta·원가율·평균기준 등) 숨김
+let stockSimpleView=false;
+document.getElementById('btnStockDensity').onclick=function(){
+  stockSimpleView=!stockSimpleView;
+  const wrap=document.getElementById('stockTableWrap'); if(wrap) wrap.classList.toggle('simple', stockSimpleView);
+  const mob=document.getElementById('stockMobile'); if(mob) mob.classList.toggle('simple', stockSimpleView);
+  this.textContent = stockSimpleView ? '🔎 자세히 보기' : '🔎 간단히 보기';
+  this.classList.toggle('primary', stockSimpleView);
+};
 document.getElementById('btnOrderReportClose').onclick=()=>document.getElementById('orderReportModal').classList.remove('open');
 document.getElementById('btnOrderReportCopy').onclick=()=>{
   const txt=orderReportText(buildOrderReport());
