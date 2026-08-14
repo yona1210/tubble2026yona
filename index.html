@@ -5092,7 +5092,6 @@ function renderStock(){
     chip('now','지금 발주',needNow,'now')+
     chip('soon','14일 내',needSoon,'soon')+
     chip('ok','여유',okCnt,'ok')+
-    chip('na','판매 없음',naCnt,'na')+
     chip('slow','소진 지연',slowCnt,'slow');
   const catHtml=`<span class="fsep"></span>`+cats.map(c=>`<button class="fbtn${on(c)}" data-sf="${c}">${c}</button>`).join('');
   const sig='v3|'+cur+'|'+[total,needNow,needSoon,okCnt,naCnt,slowCnt].join(',')+'|'+cats.join('|');
