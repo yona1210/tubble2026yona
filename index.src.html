@@ -436,6 +436,10 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .runfaster{font-size:9px;font-weight:700;color:#C0392B;margin-top:1px}
 .runavg{font-size:9px;color:#aaa;margin-top:1px}
 .runmo{font-size:11px;font-weight:700;color:var(--navy)}
+.runmo.over{color:#C0392B}
+.runslow{font-size:9.5px;font-weight:800;color:#C0392B;margin-top:1px}
+.slowbadge{display:inline-block;font-size:9px;font-weight:800;padding:1px 6px;border-radius:6px;margin-left:4px;vertical-align:1px;background:#fdecea;color:#C0392B;border:1px solid #f0c4bd}
+.slowbadge.mid{background:#fdf3e3;color:#B5611A;border-color:#f0d9a8}
 .stockcell.low{color:var(--red);font-weight:700}
 .editable-stock{background:#fffde8;border:1px dashed #d8c860;border-radius:4px;padding:3px 6px;width:80px;text-align:right;font-size:12px}
 .linktag{display:inline-block;font-size:8px;background:#eef0f7;color:var(--navy);padding:1px 5px;border-radius:6px;margin-left:3px;vertical-align:1px}
@@ -4559,6 +4563,18 @@ function issueBadgeHtml(issues){
   const level=issues.some(x=>x.level==='high')?'high':issues.some(x=>x.level==='mid')?'mid':'low';
   return `<span class="issueBadge ${level}">경고 ${issues.length}</span>`;
 }
+// [v83] 소진 지연/정체 신호 — 판매 속도 대비 재고 과다(기본 6개월분↑)거나, 판매가 없어 소진이 안 되는 품목
+function stockSlowSignal(s,c){
+  const stock=invTotal(s);
+  if(stock<=0) return null;
+  if(!c || c.status==='unverified') return null;   // 재고 미확정은 제외
+  const overM=(DATA.stockset&&+DATA.stockset.overstockMonths)||6;
+  if(c.daily<=0) return {level:'high', label:'소진 정체', reason:'최근 판매가 없어 재고가 소진되지 않고 있습니다 · 빠른 소진 필요'};
+  if(c.runoutMonths!=null && c.runoutMonths>=overM)
+    return {level:(c.runoutMonths>=overM*2)?'high':'mid', label:'소진 지연', reason:`현재고가 약 ${c.runoutMonths.toFixed(1)}개월분(기준 ${overM}개월분↑) · 판매 대비 재고 과다 · 빠른 소진 필요`};
+  return null;
+}
+function slowBadgeHtml(sig){ return sig?`<span class="slowbadge ${sig.level}" title="${sig.reason}">🐢 ${sig.label}</span>`:''; }
 function stockIssueHtml(s,c){
   const issues=stockIssues(s,c);
   if(!issues.length) return `<div class="issueBox"><b>데이터 품질:</b> 현재 기준 이상치 없음</div>`;
@@ -4829,13 +4845,15 @@ function renderStock(){
     const cellRunout = EXTERNAL?MASK:(c.runout?fmtMDfull(c.runout):'-');
     const speedTag = EXTERNAL?'':`<span class="speedtag ${c.tagCls||'month'}">${c.sourceLabel||'월판매 평균'}</span>`;
     // 소진예상 칸: 최종 분석 기준 일판매 기준. 월평균 기준 소진일과 차이가 있으면 함께 표시.
+    const slowSig = EXTERNAL?null:stockSlowSignal(s,c);   // [v83] 소진 지연/정체 신호
     let runoutBlock;
     if(EXTERNAL){ runoutBlock=MASK; }
     else if(c.status==='unverified'){
       runoutBlock=unverifiedRunoutHtml(s,c);
     } else {
       const baseGap=(c.runout&&c.runoutBase)?Math.round((c.runoutBase-c.runout)/86400000):0;
-      runoutBlock=`<div class="runmain ${baseGap>0?'trend':''}">${cellRunout}${c.runoutMonths!=null?` <span class="runmo">· 약 ${c.runoutMonths.toFixed(1)}개월분</span>`:''}</div>
+      runoutBlock=`<div class="runmain ${baseGap>0?'trend':''}">${cellRunout}${c.runoutMonths!=null?` <span class="runmo${slowSig&&slowSig.label==='소진 지연'?' over':''}">· 약 ${c.runoutMonths.toFixed(1)}개월분</span>`:''}</div>
+        ${slowSig?`<div class="runslow">🐢 ${slowSig.label} · 빠른 소진 필요</div>`:''}
         <div class="runfaster">${won(Math.round(c.daily))}${su}/일 기준</div>
         ${c.runoutBase&&Math.abs(baseGap)>=1?`<div class="runavg">평균 기준 ${fmtMDfull(c.runoutBase)} · ${baseGap>0?`${baseGap}일 빠름`:`${Math.abs(baseGap)}일 늦음`}</div>`:''}`;
     }
@@ -4845,9 +4863,10 @@ function renderStock(){
     const cellAmt = EXTERNAL?MASK:(c.amt?`<span class="amtbig">${wonMan(c.amt)}</span><div class="months ${c.months<2?'short':''}">${c.months?'입고 후 '+c.months.toFixed(1)+'개월 확보':''}</div><div class="costinfo">${_costLabel}${c.costRate!=null?` · 원가율 <b class="${c.costRate<=0.5?'cok':'cng'}">${(c.costRate*100).toFixed(0)}%</b>`:''}</div>`:(_uc?`<div class="costinfo">${_costLabel}${c.costRate!=null?` · ${(c.costRate*100).toFixed(0)}%`:''}</div>`:`<div class="costinfo">${_costLabel}</div>`));
     const ti=trendInfo(s.nm);
     const trendBadge = (!EXTERNAL && ti.dir!=='na' && ti.dir!=='flat') ? `<span class="tbadge ${ti.cls}">${ti.icon} ${ti.label}</span>${ti.recentDip?`<span class="tbadge t-dip" title="장기 추세는 ${ti.label}이나 최근 3개월 연속 하락 · 정점 대비 ${ti.momPct}%">▼ 최근 둔화</span>`:''}` : '';
+    const slowBadge = slowBadgeHtml(slowSig);   // [v83] 소진 지연/정체 뱃지
     tb.insertAdjacentHTML('beforeend',`
       <tr class="strow ${s._pendingDel?'penddel':''}" data-srow="${i}">
-        <td><span class="pnm">${s.nm}</span>${trendBadge}${issueBadgeHtml(stockIssues(s,c))}${s._pendingDel?'<span class="delbadge">삭제 예정</span>':''}<div class="pmeta">${s.cat}${s.oem&&s.oem!=='-'?' · '+s.oem:''}${s.round?' · '+s.round:''} ${chKey?'<span class="trendtag">추이 ▾</span>':''}</div></td>
+        <td><span class="pnm">${s.nm}</span>${trendBadge}${slowBadge}${issueBadgeHtml(stockIssues(s,c))}${s._pendingDel?'<span class="delbadge">삭제 예정</span>':''}<div class="pmeta">${s.cat}${s.oem&&s.oem!=='-'?' · '+s.oem:''}${s.round?' · '+s.round:''} ${chKey?'<span class="trendtag">추이 ▾</span>':''}</div></td>
         <td class="num">${EXTERNAL?MASK:won(Math.round(c.baseMonthly||0))}${EXTERNAL?'':`<div class="pmeta">최근 ${c.salesWindowUsed||getSalesWindow()}개월 평균 · ${su}/월</div>`}</td>
         <td class="num">${EXTERNAL?MASK:won(Math.round(c.weekly))}${EXTERNAL?'':`<div class="pmeta">${su}/주</div>`}</td>
         <td class="num dailycell">${EXTERNAL?MASK:dailyCellHtml(c)}</td>
@@ -4943,12 +4962,14 @@ function renderStock(){
   const okCnt=allrows.filter(c=>c.status==='ok').length;
   const unvCnt=allrows.filter(c=>c.status==='unverified').length;
   const overRate=rates.filter(r=>r>0.5).length;
+  const slowCnt=DATA.stock.filter((s,i)=>stockSlowSignal(s,allrows[i])).length;   // [v83] 소진 지연/정체
   const pctOf=n=>DATA.stock.length?Math.round(n/DATA.stock.length*100):0;
   [
    {v:DATA.stock.length,l:'관리 품목 수',accent:true,sub:`발주 대상 <b class="ok">${needNow+needSoon}</b> · 여유 ${okCnt}${unvCnt?` · <b class="warn">미확정 ${unvCnt}</b>`:''}`},
    {v:needNow,l:'지금 발주 필요',alert:needNow>0,sub:needNow>0?`전체의 <b class="up">${pctOf(needNow)}%</b>`:'<b class="ok">없음</b>'},
    {v:needSoon,l:`${DATA.stockset.warn}일내 발주 임박`,alert:needSoon>0,sub:needSoon>0?`전체의 <b class="warn">${pctOf(needSoon)}%</b>`:'<b class="ok">없음</b>'},
    {v:soon14,l:'소진 14일 이내',alert:soon14>0,sub:soon14>0?`<b class="warn">${pctOf(soon14)}%</b> 임박`:'<b class="ok">안정</b>'},
+   {v:slowCnt,l:'소진 지연/정체',alert:slowCnt>0,sub:slowCnt>0?`<b class="warn">${pctOf(slowCnt)}%</b> 빠른 소진 필요`:'<b class="ok">양호</b>'},
    {v:avgRate!=null?(EXTERNAL?'비공개':(avgRate*100).toFixed(0)+'%'):'-',l:'평균 원가율 (≤50%)',alert:!EXTERNAL&&avgRate>0.5,sub:EXTERNAL?'':(overRate>0?`50% 초과 <b class="up">${overRate}건</b>`:'<b class="ok">전 품목 양호</b>')},
   ].forEach(x=>k.insertAdjacentHTML('beforeend',`<div class="kpi ${x.alert?'alert':''} ${x.accent?'accent':''}"><div class="v">${x.v}</div><div class="l">${x.l}</div>${x.sub?`<div class="sub">${x.sub}</div>`:''}</div>`));
   // [v72] 재고 시각화 패널 — 발주 상태 도넛 + 소진 임박 가로막대 (매출 탭 차트 자산 재사용)
