@@ -4025,7 +4025,7 @@ function dailyStockVelocity(s,simStock){
   if(validCnt<2) return {daily:null,sampleDays:0,sampleCnt:0,validCnt,totalCnt,latestDaily:null,
     tier:'insufficient',periodFrom:null,periodTo:null,netDrop:0,excluded:[],label:'유효 이력 부족'};
   // 인접한 두 정상마감 구간 단위로 평가. 두 정상마감 '사이'에 비정상 기록이 끼어 있으면 그 구간 전체 제외.
-  const events=[]; const excluded=[];
+  const events=[]; const excluded=[]; const restocks=[];
   let prevNormalIdx=-1;
   for(let i=0;i<histAll.length;i++){
     if(!isNormal(histAll[i])) continue;
@@ -4040,16 +4040,18 @@ function dailyStockVelocity(s,simStock){
       } else if(days){
         const diff=prev.stock-cur.stock;
         if(diff>0) events.push({daily:diff/days,days,diff,to:cur.dateObj,from:prev.dateObj});
+        else if(diff<0) restocks.push({to:cur.dateObj, inc:-diff});   // 정상 구간인데 재고 증가 = 재입고(판매를 가림)
       }
     }
     prevNormalIdx=i;
   }
+  const recentRestock=restocks.some(r=>((NOW-r.to)/86400000)<=28);   // 최근 28일 내 재입고 여부
   // 유효 분석 기간 = 제외 안 된 이벤트들의 최소~최대
   const usedFrom = events.length?events.reduce((m,e)=>e.from<m?e.from:m, events[0].from):null;
   const usedTo   = events.length?events.reduce((m,e)=>e.to>m?e.to:m, events[0].to):null;
   const spanDays = (usedFrom&&usedTo)?dayGap(usedFrom,usedTo):0;
   if(!events.length) return {daily:null,sampleDays:0,sampleCnt:0,validCnt,totalCnt,latestDaily:null,
-    tier:validCnt>=3?'flat':'insufficient',periodFrom:usedFrom,periodTo:usedTo,spanDays,netDrop:0,excluded,label:'순감소 없음(또는 전 구간 제외)'};
+    tier:validCnt>=3?'flat':'insufficient',periodFrom:usedFrom,periodTo:usedTo,spanDays,netDrop:0,excluded,recentRestock,label:'순감소 없음(또는 전 구간 제외)'};
   const recent=events.filter(e=>((NOW-e.to)/86400000)<=28);
   const use=recent.length?recent:events;
   const totalDiff=use.reduce((a,e)=>a+e.diff,0);
@@ -4060,7 +4062,7 @@ function dailyStockVelocity(s,simStock){
   if(validCnt>=3 && spanDays>=7) tier='apply';
   else if(validCnt>=3) tier='reference';
   return {daily,sampleDays:totalDays,sampleCnt:use.length,validCnt,totalCnt,latestDaily:latest.daily,
-    tier,periodFrom:usedFrom,periodTo:usedTo,spanDays,netDrop:totalDiff,excluded,
+    tier,periodFrom:usedFrom,periodTo:usedTo,spanDays,netDrop:totalDiff,excluded,recentRestock,
     label:`최근 ${totalDays}일 정상마감 순재고 감소 추이`};
 }
 // 추세배수: 최근3개월 ÷ 직전3개월 채널합. 상승만 반영(하락은 1=평균유지), 최대 1.5배 상한
@@ -8026,8 +8028,14 @@ demandAnalysis=function(s,simStock){
   let daily,source,sourceLabel,tagCls;
   const monthlyLabel=`최근 ${sales.count||sales.requested}개월 평균 기준${sales.count?` (${sales.periodText})`:''}`;
   if(inv.daily!=null && inv.tier==='apply'){
-    daily=inv.daily; source='daily'; tagCls='daily';
-    sourceLabel=`데일리 순재고 감소 적용 (유효 ${inv.validCnt}건·${inv.spanDays}일)`;
+    if(inv.recentRestock && inv.daily < baseDaily){
+      // [v83] 최근 재입고로 순재고 감소가 실제 판매를 과소평가 → 월평균이 더 신뢰 → 월평균 우선
+      daily=baseDaily; source='monthly'; tagCls='month';
+      sourceLabel=`${monthlyLabel} · 최근 재입고로 데일리 감소 왜곡 → 월평균 우선`;
+    } else {
+      daily=inv.daily; source='daily'; tagCls='daily';
+      sourceLabel=`데일리 순재고 감소 적용 (유효 ${inv.validCnt}건·${inv.spanDays}일)`;
+    }
   } else if(inv.daily!=null && inv.tier==='reference'){
     daily=baseDaily; source='monthly-ref'; tagCls='mix';
     sourceLabel=`${monthlyLabel} · 데일리 참고값(${inv.validCnt}건, 누적 7일 미만)`;
@@ -8173,8 +8181,14 @@ demandAnalysis=function(s,simStock){
     ? `최근 2개월 상승 보정 +${Math.round(momentum.uplift*100)}% 적용 (${momentum.periodText})`
     : '';
   if(inv.daily!=null && inv.tier==='apply'){
-    daily=inv.daily; source='daily'; tagCls='daily';
-    sourceLabel=`데일리 순재고 감소 적용 (유효 ${inv.validCnt}건·${inv.spanDays}일)`;
+    if(inv.recentRestock && inv.daily < baseDaily){
+      // [v83] 최근 재입고로 순재고 감소가 실제 판매를 과소평가 → 월평균이 더 신뢰 → 월평균 우선
+      daily=baseDaily; source='monthly'; tagCls='month';
+      sourceLabel=`${monthlyLabel} · 최근 재입고로 데일리 감소 왜곡 → 월평균 우선`;
+    } else {
+      daily=inv.daily; source='daily'; tagCls='daily';
+      sourceLabel=`데일리 순재고 감소 적용 (유효 ${inv.validCnt}건·${inv.spanDays}일)`;
+    }
   } else if(inv.daily!=null && inv.tier==='reference'){
     daily=upliftDaily; source=momentum.eligible?'momentum-ref':'monthly-ref'; tagCls='mix';
     sourceLabel=`${momentum.eligible?momentumLabel:monthlyLabel} · 데일리 참고값(${inv.validCnt}건, 누적 7일 미만)`;
