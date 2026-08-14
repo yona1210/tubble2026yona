@@ -4840,6 +4840,12 @@ function stockTimingTxt(c){  if(c.status==='unverified') return '재고 기준 �
   return '다음 발주 시';
 }
 // 일판매 셀: 평균 기준 → 추세/데일리 반영(채택값) 흐름 표시
+// [v83] 소진 잔여 표기: 30일 미만은 '일분'(2주 등 짧은 기간 직관적), 그 이상은 '개월분'
+function fmtSupplyDur(mo){
+  if(mo==null) return '';
+  const days=Math.round(mo*30);
+  return days<30 ? `약 ${days}일분` : `약 ${mo.toFixed(1)}개월분`;
+}
 function dailyCellHtml(c){
   if(c.status==='na' || !c.daily) return `<span class="dcAdopt">0</span><div class="pmeta">판매 이력 없음</div>`;
   const u=(c.unit||'EA');
@@ -4907,7 +4913,7 @@ function renderStock(){
       runoutBlock=unverifiedRunoutHtml(s,c);
     } else {
       const baseGap=(c.runout&&c.runoutBase)?Math.round((c.runoutBase-c.runout)/86400000):0;
-      runoutBlock=`<div class="runmain ${baseGap>0?'trend':''}">${cellRunout}${c.runoutMonths!=null?` <span class="runmo${slowSig&&slowSig.label==='소진 지연'?' over':''}">· 약 ${c.runoutMonths.toFixed(1)}개월분</span>`:''}</div>
+      runoutBlock=`<div class="runmain ${baseGap>0?'trend':''}">${cellRunout}${c.runoutMonths!=null?` <span class="runmo${slowSig&&slowSig.label==='소진 지연'?' over':''}">· ${fmtSupplyDur(c.runoutMonths)}</span>`:''}</div>
         ${slowSig?`<div class="runslow">🐢 ${slowSig.label} · 빠른 소진 필요</div>`:''}
         <div class="runfaster">${won(Math.round(c.daily))}${su}/일 기준</div>
         ${c.runoutBase&&Math.abs(baseGap)>=1?`<div class="runavg">평균 기준 ${fmtMDfull(c.runoutBase)} · ${baseGap>0?`${baseGap}일 빠름`:`${Math.abs(baseGap)}일 늦음`}</div>`:''}`;
@@ -4964,7 +4970,7 @@ function renderStock(){
         <div class="mcgrid">
           <div><span class="ml">현재고</span>${EXTERNAL?MASK:(stockEdit?`<input class="editable-stock" type="number" value="${s.stock}" onchange="updateStock(${i},this.value)">`:`<b class="${stockCls}">${won(s.stock)}</b>${linked?' <span class="linktag">'+s.stockSource+'</span>':''}`)}</div>
           <div><span class="ml">월판매 평균</span><b>${EXTERNAL?MASK:won(Math.round(c.baseMonthly||0))}</b></div>
-          <div><span class="ml">소진예상</span><b>${EXTERNAL?MASK:(c.status==='unverified'?unverifiedMobileRunoutText(c):(c.runout?fmtMDfull(c.runout)+(c.runoutMonths!=null?' · 약 '+c.runoutMonths.toFixed(1)+'개월분':''):'-'))}</b></div>
+          <div><span class="ml">소진예상</span><b>${EXTERNAL?MASK:(c.status==='unverified'?unverifiedMobileRunoutText(c):(c.runout?fmtMDfull(c.runout)+(c.runoutMonths!=null?' · '+fmtSupplyDur(c.runoutMonths):''):'-'))}</b></div>
           <div><span class="ml">권장 발주수량</span><b>${EXTERNAL?MASK:(c.status==='unverified'?unverifiedMobileOrderText(s,c):(c.orderQty?won(c.orderQty):'-'))}</b></div>
           <div><span class="ml">예상 매입액</span><b>${EXTERNAL?MASK:(c.amt?wonMan(c.amt):'-')}</b></div>
           <div><span class="ml">입고예상</span><b>${arriveTxt}</b></div>
