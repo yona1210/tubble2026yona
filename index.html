@@ -451,6 +451,20 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 #stockTableWrap.simple .costinfo,
 #stockTableWrap.simple .months{display:none !important}
 .mobilecards.simple .pmeta{display:none !important}
+/* [v83] 발주 대상 표 */
+.otblWrap{overflow-x:auto;margin-top:4px}
+.otbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.otbl th,.otbl td{padding:7px 9px;border-bottom:1px solid #eef0f4;text-align:right;white-space:nowrap}
+.otbl th{background:#1E2761;color:#fff;font-size:11px;position:sticky;top:0}
+.otbl th.l,.otbl td.l{text-align:left;white-space:normal}
+.otbl th.c,.otbl td.c{text-align:center}
+.otbl tr.or-now td{background:#fdf0ee}
+.otbl tr.otot td{background:#eef1f8;font-weight:800;border-top:2px solid #1E2761}
+.otbl .omini{font-size:9.5px;color:#8a93a8;font-weight:600;margin-top:1px}
+.obadge{display:inline-block;font-size:10px;font-weight:800;padding:1px 7px;border-radius:6px}
+.obadge.now{background:#C0392B;color:#fff}
+.obadge.soon{background:#fdf3e3;color:#B5611A;border:1px solid #f0d9a8}
+.omemo{font-size:10.5px;color:#8a93a8;margin-top:6px}
 .stockcell.low{color:var(--red);font-weight:700}
 .editable-stock{background:#fffde8;border:1px dashed #d8c860;border-radius:4px;padding:3px 6px;width:80px;text-align:right;font-size:12px}
 .linktag{display:inline-block;font-size:8px;background:#eef0f7;color:var(--navy);padding:1px 5px;border-radius:6px;margin-left:3px;vertical-align:1px}
@@ -4763,6 +4777,33 @@ function orderReportText(r){
     '\n'+L('4. 데이터 이상치 확인',r.issueRows.map(o=>`${o.s.nm} — ${o.issues.map(x=>x.title).join(', ')} (${o.issues[0].msg})`))+
     '\n'+L('5. 실행 액션',r.action);
 }
+// [v83] 이번 발주 대상 — 품목별 발주수량·매입가 한눈에 표
+function orderTableHtml(r){
+  const rows=r.review;   // 즉시(now) + 14일내(soon), 긴급도순 정렬됨
+  if(!rows.length) return `<div class="rsec"><h4>📦 이번 발주 대상</h4><div class="rnone">지금 발주할 품목이 없습니다 · 재고 여유</div></div>`;
+  const body=rows.map(o=>{
+    const s=o.s, c=o.c, u=s.stockUnit||'EA';
+    const stat=c.status==='now'?'<span class="obadge now">즉시</span>':`<span class="obadge soon">${c.recDD}일 내</span>`;
+    const qty=c.unitReady?`${won(c.orderQty)}${u!=='EA'?u:''}${u!==s.orderUnit?`<div class="omini">제조 ${won(c.orderQtyOrderUnit)}${s.orderUnit}</div>`:''}`:'<span style="color:#c0392b;font-size:11px">단위 설정 필요</span>';
+    const amt=+c.amt||0, uc=getCurrentCost(s.nm,s.cost);
+    return `<tr class="or-${c.status}">
+      <td class="l"><b>${s.nm}</b>${c.stockoutBeforeArrive?'<div class="omini" style="color:#c0392b">⚠ 입고 전 품절 위험</div>':''}${(s.oem&&s.oem!=='-')?`<div class="omini">${s.oem}${s.round?' · '+s.round:''}</div>`:''}</td>
+      <td class="c">${stat}</td>
+      <td class="r">${won(invTotal(s))}${u!=='EA'?u:''}</td>
+      <td class="c">${c.runout?fmtMDfull(c.runout):'-'}</td>
+      <td class="r"><b>${qty}</b></td>
+      <td class="r">${won(amt)}<div class="omini">@${won(uc)}</div></td>
+      <td class="r">${won(Math.round(amt*1.1))}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="rsec"><h4>📦 이번 발주 대상 — 품목별 발주수량·매입가</h4>
+    <div class="otblWrap"><table class="otbl"><thead><tr>
+      <th class="l">품목</th><th class="c">상태</th><th class="r">현재고</th><th class="c">예상 소진</th><th class="r">권장 발주수량</th><th class="r">매입가(별도)</th><th class="r">VAT포함</th>
+    </tr></thead><tbody>${body}
+      <tr class="otot"><td class="l">합계 · ${rows.length}개 품목</td><td colspan="3"></td><td class="r">발주 총액 →</td><td class="r"><b>${won(r.totalAmt)}</b></td><td class="r"><b>${won(r.totalVat)}</b></td></tr>
+    </tbody></table></div>
+    <div class="omemo">매입가 = 권장 발주수량 × 생산원가(@단가) · VAT 별도 기준</div></div>`;
+}
 function orderReportHtml(r){
   const sec=(t,arr,cls='')=>`<div class="rsec ${cls}"><h4>${t}</h4>`+(arr.length?arr.map(x=>`<div class="ri">${x}</div>`).join(''):'<div class="rnone">해당 없음</div>')+'</div>';
   const summary=`<div class="orderReportSummary">
@@ -4772,16 +4813,14 @@ function orderReportHtml(r){
     <div class="orderReportBox"><div class="rv">${wonMan(r.totalAmt)}</div><div class="rl">권장 발주 총액</div></div>
   </div>`;
   const note=`<div class="reportNote"><b>보고 기준:</b> 월별 채널 3개월 추이는 월초 업데이트 기준의 판매 방향성, 데일리 현재고 감소 추이는 예상 소진일·권장 발주량의 우선 기준입니다. 총액은 권장 발주수량×생산원가 기준이며 VAT 별도입니다.</div>`;
-  const now=r.now.map(o=>orderLine(o));
-  const soon=r.soon.map(o=>orderLine(o));
   const bundles=r.bundleNeed.map(bundleLine);
   const issues=r.issueRows.map(o=>`${o.s.nm} — ${o.issues.map(x=>`<b>${x.title}</b>`).join(', ')} · ${o.issues[0].msg}`);
-  return summary+note+
-    sec('1. 즉시 발주 검토',now,'late')+
-    sec('2. 14일 내 발주 후보',soon)+
-    sec('3. 묶음 발주 검토',bundles,'late')+
-    sec('4. 데이터 이상치 확인',issues,'late')+
-    sec('5. 실행 액션',r.action,'late');
+  return summary+
+    orderTableHtml(r)+
+    note+
+    sec('묶음 발주 검토',bundles,'late')+
+    sec('데이터 이상치 확인',issues,'late')+
+    sec('실행 액션',r.action,'late');
 }
 function openOrderReport(){
   const r=buildOrderReport();
