@@ -68,6 +68,12 @@ h1{font-size:20px;font-weight:800;color:var(--navy);letter-spacing:-.4px;line-he
 .fbtn{font-size:11px;padding:5px 13px;border:1px solid var(--line);background:#fff;border-radius:15px;cursor:pointer;color:var(--mut);font-weight:500;transition:all .12s}
 .fbtn:hover{border-color:var(--navy);color:var(--navy)}
 .fbtn.on{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:700}
+/* [v83] 상태 필터 색상+건수 칩 */
+.sfChip{display:inline-flex;align-items:center;gap:5px}
+.sfDot{width:7px;height:7px;border-radius:50%;display:inline-block;flex:0 0 auto}
+.sfCnt{font-size:10.5px;font-weight:800;background:#eef0f4;color:#5a6478;border-radius:9px;padding:0 6px;min-width:16px;text-align:center}
+.fbtn.on .sfCnt{background:rgba(255,255,255,.28);color:#fff}
+.d-now .sfDot{background:#C0392B}.d-soon .sfDot{background:#E67E22}.d-ok .sfDot{background:#1E9E63}.d-na .sfDot{background:#b7bdca}.d-slow .sfDot{background:#8E44AD}
 .legend{font-size:10px;color:var(--mut);display:flex;gap:12px;align-items:center}
 .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:3px}
 
@@ -4878,7 +4884,8 @@ function renderStock(){
       else if(stockFilter==='soon'&&c.status!=='soon')return false;
       else if(stockFilter==='ok'&&c.status!=='ok')return false;
       else if(stockFilter==='na'&&c.status!=='na')return false;
-      else if(['now','soon','ok','na'].indexOf(stockFilter)<0 && s.cat!==stockFilter)return false;
+      else if(stockFilter==='slow'&&!stockSlowSignal(s,c))return false;
+      else if(['now','soon','ok','na','slow'].indexOf(stockFilter)<0 && s.cat!==stockFilter)return false;
     }
     if(q){ const hay=`${s.nm} ${s.cat} ${s.oem||''} ${s.round||''} ${s.ch||''}`.toLowerCase();
       if(!hay.includes(q))return false; }
@@ -5076,18 +5083,20 @@ function renderStock(){
   // 필터 버튼(상태 + 카테고리)
   const cats=[...new Set(DATA.stock.map(s=>s.cat).filter(Boolean))];
   const f=document.getElementById('stockFilters');
-  const sig='v2|'+cats.join('|');
-  if(f.dataset.sig!==sig){   // 카테고리 집합이 바뀌면 재생성(신규 품목 카테고리 자동 반영) · 활성 필터 유지
-    f.dataset.sig=sig;
-    const cur=stockFilter||'all', on=v=>cur===v?' on':'';
-    f.innerHTML=`<button class="fbtn${on('all')}" data-sf="all">전체</button>`+
-      `<button class="fbtn${on('now')}" data-sf="now">지금 발주</button>`+
-      `<button class="fbtn${on('soon')}" data-sf="soon">14일 내</button>`+
-      `<button class="fbtn${on('ok')}" data-sf="ok">여유</button>`+
-      `<button class="fbtn${on('na')}" data-sf="na">판매 없음</button>`+
-      `<span class="fsep"></span>`+
-      cats.map(c=>`<button class="fbtn${on(c)}" data-sf="${c}">${c}</button>`).join('');
-  }
+  // [v83] 상태 필터 = 색상+건수 칩 (한눈 요약 + 필터 겸용) · 소진지연 칩 포함
+  const cur=stockFilter||'all', on=v=>cur===v?' on':'';
+  const total=DATA.stock.length;
+  const chip=(v,label,cnt,dot)=>`<button class="fbtn sfChip${on(v)}${dot?' d-'+dot:''}" data-sf="${v}">${dot?`<i class="sfDot"></i>`:''}${label}<b class="sfCnt">${cnt}</b></button>`;
+  const statusHtml=
+    chip('all','전체',total,'')+
+    chip('now','지금 발주',needNow,'now')+
+    chip('soon','14일 내',needSoon,'soon')+
+    chip('ok','여유',okCnt,'ok')+
+    chip('na','판매 없음',naCnt,'na')+
+    chip('slow','소진 지연',slowCnt,'slow');
+  const catHtml=`<span class="fsep"></span>`+cats.map(c=>`<button class="fbtn${on(c)}" data-sf="${c}">${c}</button>`).join('');
+  const sig='v3|'+cur+'|'+[total,needNow,needSoon,okCnt,naCnt,slowCnt].join(',')+'|'+cats.join('|');
+  if(f.dataset.sig!==sig){ f.dataset.sig=sig; f.innerHTML=statusHtml+catHtml; }
   document.getElementById('stockFooter').innerHTML=
     `월판매 평균 = 최근 설정개월(기본 3개월)의 월별 출고량 평균입니다. 월별 채널 3개월 추이는 판매 방향성 참고용으로 표시하며, 최근 3개월 평균에 중복 가산하지 않습니다. 데일리 현재고 감소 추이는 오늘 재고 업데이트 이력 기준 실제 재고 감소 속도이며, 유효 이력이 쌓이면 예상 소진일·권장 발주량에 우선 반영합니다. 예상 소진일 = 현재고 ÷ 발주 판단 적용 일판매. ROP(발주점) = 발주 판단 적용 일판매×(품목별 리드타임+안전버퍼). 권장발주 = 목표 보유 개월 기준으로 오늘 재고와 품목별 리드타임을 반영해 동적 재계산.<br>품목 행을 클릭하면 월평균 기준·월별 채널 3개월 추이·데일리 현재고 감소 추이·발주 판단 적용 기준별 예상 소진일과 근거, 발주 시뮬레이션, 데이터 이상치 경고를 확인할 수 있습니다.`;
   renderOrderDecision();
