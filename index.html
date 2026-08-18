@@ -450,6 +450,13 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .tblPurpose .tpSub{font-size:11px;font-weight:600;opacity:.85;margin-left:6px}
 .tblPurpose.t1{background:#eef2fe;color:#1E2761;border-left:4px solid #3355FF}
 .tblPurpose.t2{background:#eafaf1;color:#1E7A44;border-left:4px solid #1E9E63}
+.tblPurpose.t3{background:#eef1f5;color:#3a4252;border-left:4px solid #64748b}
+.bpTbl{width:100%;border-collapse:collapse;font-size:12px}
+.bpTbl th,.bpTbl td{padding:6px 9px;border-bottom:1px solid #eef0f4;text-align:right;white-space:nowrap}
+.bpTbl th{background:#3a4252;color:#fff;font-size:11px}
+.bpTbl th.l,.bpTbl td.l{text-align:left;white-space:normal}
+.bpTbl tr.bpMem td{background:#eef1f5;font-weight:700;color:#3a4252;text-align:left}
+.bpTbl tr.bpTot td{background:#e6e9f0;font-weight:800}
 /* [v83] 재고 테이블 간단히 보기 — 부가 설명 숨겨 밀도 완화 (핵심 값·신호·뱃지는 유지) */
 #stockTableWrap.simple .pmeta,
 #stockTableWrap.simple .runfaster,
@@ -5378,7 +5385,26 @@ function groupViewHtml(g){
   const money=(g.id==='multi_cleaner'||g.orderPrices)?groupOrderMoneyHtml(g,M):'';
   // [v83] 두 표의 목적을 색으로 구분 (혼동 방지)
   const t1head=`<div class="tblPurpose t1">① 원가 기준 · 매입액 <span class="tpSub">자동 발주수량 × 생산원가 — 원가·마진 파악용(참고)</span></div>`;
-  return card+t1head+table+money;
+  return card+t1head+table+money+bundlePurchaseHtml(g);
+}
+// [v83] 묶음 발주 뷰: 구성품 전체의 이번 차수 매입 명세(단품 명세를 합산) — 실제 묶음 발주 시 총 매입 내역
+function bundlePurchaseHtml(g){
+  const members=(g.items||[]).filter(nm=>DATA.costDetail[nm] && (DATA.costDetail[nm].purchase||[]).length);
+  if(!members.length) return '';
+  let grand=0;
+  const secs=members.map(nm=>{
+    const d=DATA.costDetail[nm];
+    const sub=d.purchase.reduce((a,p)=>a+(+p[3]||0)*(+p[4]||0),0); grand+=sub;
+    const rows=d.purchase.map(p=>`<tr><td>${p[0]||'-'}</td><td>${p[1]||'-'}</td><td class="l">${p[2]||'-'}</td><td class="n">${won(p[3])}</td><td class="n">${won(p[4])}</td><td class="n">${won((+p[3]||0)*(+p[4]||0))}</td></tr>`).join('');
+    return `<tr class="bpMem"><td colspan="6">📦 ${nm} <span style="font-weight:400;color:#8a90a2;font-size:11px">· 소계 ${won(sub)}원</span></td></tr>${rows}`;
+  }).join('');
+  const vat=Math.round(grand*1.1);
+  return `<div class="tblPurpose t3">이번 차수 매입 명세 · 묶음 전체 <span class="tpSub">구성품 ${members.length}종 합산 — 실제 묶음 발주 시 매입 내역 · VAT별도</span></div>
+    <div class="otblWrap"><table class="bpTbl"><thead><tr><th class="l">거래처</th><th class="l">구분</th><th class="l">상품명</th><th class="n">MOQ(EA)</th><th class="n">단가</th><th class="n">소계</th></tr></thead>
+    <tbody>${secs}
+    <tr class="bpTot"><td colspan="5" class="l">묶음 전체 매입 합계 (VAT별도)</td><td class="n">${won(grand)}원</td></tr>
+    <tr class="bpTot"><td colspan="5" class="l">VAT 포함</td><td class="n">${won(vat)}원</td></tr>
+    </tbody></table></div>`;
 }
 // ===== [발주금액] 묶음 발주 그룹: 권장수량×객단가 = 발주금액, 정수 환산·MOQ 검토 =====
 function groupOrderMoneyHtml(g,M){
