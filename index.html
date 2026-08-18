@@ -666,6 +666,26 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .cdpt .n,.cdst .n{text-align:right;font-variant-numeric:tabular-nums}
 .cdpt th.n{text-align:right}
 .cdpt .sumr td,.cdst .sumr td{background:#f1f3f8;font-weight:800;color:var(--navy);border-top:2px solid var(--navy)}
+/* 생산원가 구성 — 단품 세로형 */
+.cdcomp{width:100%;border-collapse:collapse;font-size:11px}
+.cdcomp th,.cdcomp td{padding:5px 9px;border-bottom:1px solid var(--grid)}
+.cdcomp th{background:#f4f6fb;color:var(--navy);font-weight:700;font-size:10px;text-align:left}
+.cdcomp th.n{text-align:right}
+.cdcomp .n{text-align:right;font-variant-numeric:tabular-nums}
+.cdcomp .ccGrp td{background:#f7f9ff;font-weight:800;color:var(--navy)}
+.cdcomp .ccGrp .ccG{display:flex;align-items:center;gap:6px}
+.cdcomp .ccDot{width:9px;height:9px;border-radius:3px;display:inline-block;flex:none}
+.cdcomp .ccItem td{color:#5a6478}
+.cdcomp .ccItem .ccGi{padding-left:22px}
+.cdcomp .ccTot td{background:#eef2fe;font-weight:800;color:#1E2761;border-top:2px solid var(--navy);font-size:12px}
+/* 생산원가 구성 — 묶음 가로 매트릭스 */
+.compMatrix{width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap}
+.compMatrix th,.compMatrix td{padding:5px 8px;border:1px solid var(--grid);text-align:right;font-variant-numeric:tabular-nums}
+.compMatrix th{background:#eef2fe;color:#1E2761;font-weight:700;font-size:10px;text-align:center}
+.compMatrix th.l,.compMatrix td.l{text-align:left;white-space:normal}
+.compMatrix td.hlite,.compMatrix th.hlite{background:#fff8e6;font-weight:800;color:#8a5a00}
+.compMatrix tbody tr:nth-child(even) td{background:#fafbfe}
+.compMatrix tbody tr:nth-child(even) td.hlite{background:#fff3d4}
 @media(max-width:760px){.cdgrid{flex-direction:column}.cdgrid .cdnarrow{flex:auto}}
 .cdedit{width:100%;border-collapse:collapse;font-size:11px}
 .cdedit th,.cdedit td{padding:3px 5px;border-bottom:1px solid var(--grid);text-align:left}
@@ -5240,6 +5260,73 @@ function roundMiniChart(rounds,color){
   svg+='</svg>';
   return svg;
 }
+// [v84] 생산원가 구성: 한 품목의 매입 명세(단가=EA당)를 원료/부자재/가공/완제품으로 분해. '발주' 행 제외.
+function costComposition(nm){
+  const d=DATA.costDetail&&DATA.costDetail[nm]; if(!d||!Array.isArray(d.purchase)) return null;
+  const BUCKETS=[{key:'원료',gu:['원료']},{key:'부자재',gu:['부자재']},{key:'가공·기타',gu:['가공비','가공']},{key:'완제품',gu:['완제품']}];
+  const guToBucket=gu=>{ for(const b of BUCKETS){ if(b.gu.indexOf(gu)>=0) return b.key; } return '부자재'; };
+  const subCat=(gu,name)=>{ const s=String(name||'');
+    if(gu==='원료') return '원료비';
+    if(gu==='완제품') return '완제품';
+    if(gu==='가공비'||gu==='가공'){ if(s.indexOf('부착')>=0) return '스티커 부착비'; if(s.indexOf('삽지')>=0) return '삽지 작업비'; if(s.indexOf('작업')>=0) return '작업비'; return '가공비'; }
+    if(s.indexOf('단상자')>=0) return '단상자';
+    if(s.indexOf('파우치')>=0) return '파우치';
+    if(s.indexOf('스티커')>=0) return '스티커';
+    if(s.indexOf('삽지')>=0) return '삽지';
+    if(s.indexOf('용기')>=0) return '용기';
+    if(s.indexOf('원재료')>=0) return '원재료';
+    const base=s.split('_')[0]; return base||'기타';
+  };
+  const grp={}; BUCKETS.forEach(b=>grp[b.key]={items:[],sum:0});
+  d.purchase.forEach(p=>{ const gu=String(p[1]||''); if(gu==='발주') return;
+    const bk=guToBucket(gu), unit=+p[4]||0;
+    grp[bk].items.push({cat:subCat(gu,p[2]),name:String(p[2]||'-'),unit}); grp[bk].sum+=unit; });
+  const order=BUCKETS.map(b=>b.key).filter(k=>grp[k].items.length);
+  const cost=order.reduce((a,k)=>a+grp[k].sum,0);
+  // 명세 합이 어느 차수 생산원가와 일치/근접하는지(근거 표기용)
+  let basisRound=''; const RK=Object.keys(d.rounds||{});
+  if(RK.length&&cost>0){ let best=null,bd=Infinity; RK.forEach(r=>{ const diff=Math.abs((+d.rounds[r]||0)-cost); if(diff<bd){bd=diff;best=r;} }); if(best&&bd<=Math.max(3,cost*0.01)) basisRound=best; }
+  return {grp,order,cost,basisRound};
+}
+// [v84] 단품 상세 — 세로형 생산원가 구성표
+function compVerticalHtml(nm){
+  const cc=costComposition(nm); if(!cc||!cc.order.length) return '';
+  const grpColor={'원료':'#3a6ea5','부자재':'#1E9E63','가공·기타':'#b5822a','완제품':'#6b5bd6'};
+  const rows=cc.order.map(k=>{
+    const g=cc.grp[k], pct=cc.cost>0?(g.sum/cc.cost*100):0;
+    const head=`<tr class="ccGrp"><td><span class="ccG"><span class="ccDot" style="background:${grpColor[k]||'#888'}"></span>${k}</span></td><td></td><td class="n">${won(g.sum)}</td><td class="n">${pct.toFixed(1)}%</td></tr>`;
+    const byCat={}, co=[]; g.items.forEach(it=>{ if(byCat[it.cat]==null){byCat[it.cat]=0;co.push(it.cat);} byCat[it.cat]+=it.unit; });
+    const items=co.map(c=>`<tr class="ccItem"><td></td><td class="ccGi">${c}</td><td class="n">${won(byCat[c])}</td><td></td></tr>`).join('');
+    return head+items;
+  }).join('');
+  return `<div class="cdsec"><div class="cdlbl">생산원가 구성 <span class="vatnote">※ 원료+부자재+가공 · EA당 · VAT별도 · 매입 명세 기준${cc.basisRound?' ('+cc.basisRound+')':''}</span></div>
+    <table class="cdcomp"><thead><tr><th class="l">구분</th><th class="l">세부 항목</th><th class="n">단가(원)</th><th class="n">구성비</th></tr></thead>
+    <tbody>${rows}<tr class="ccTot"><td class="l" colspan="2">생산원가 (${cc.order.join('+')})</td><td class="n">${won(cc.cost)}</td><td class="n">100%</td></tr></tbody></table></div>`;
+}
+// [v84] 묶음 뷰 — 가로 매트릭스(구성품별 원료/부자재세부/가공 → 생산원가)
+function groupCompMatrixHtml(g){
+  const members=(g.items||[]).map(nm=>({nm,cc:costComposition(nm)})).filter(x=>x.cc&&x.cc.order.length);
+  if(!members.length) return '';
+  const pref=['단상자','파우치','스티커','삽지','용기','원재료'];
+  const subSet=new Set(); members.forEach(m=>m.cc.grp['부자재'].items.forEach(it=>subSet.add(it.cat)));
+  const subCols=pref.filter(s=>subSet.has(s)).concat([...subSet].filter(s=>pref.indexOf(s)<0));
+  const catSum=(cc,bk,cat)=>cc.grp[bk].items.filter(it=>it.cat===cat).reduce((a,it)=>a+it.unit,0);
+  const hasGa=members.some(m=>m.cc.grp['가공·기타'].sum>0);
+  const hasWan=members.some(m=>m.cc.grp['완제품'].sum>0);
+  const head=`<tr>
+    <th class="l" rowspan="2">상품명</th><th rowspan="2">원료</th>
+    ${subCols.length?`<th colspan="${subCols.length+1}">부자재</th>`:''}
+    ${hasGa?'<th rowspan="2">가공·기타</th>':''}${hasWan?'<th rowspan="2">완제품</th>':''}
+    <th class="hlite" rowspan="2">생산원가</th></tr>
+    <tr>${subCols.map(s=>`<th>${s}</th>`).join('')}${subCols.length?'<th>부자재 합</th>':''}</tr>`;
+  const body=members.map(m=>{ const cc=m.cc;
+    return `<tr><td class="l">${m.nm}</td><td>${won(cc.grp['원료'].sum)}</td>
+      ${subCols.map(s=>{ const v=catSum(cc,'부자재',s); return `<td>${v?won(v):'-'}</td>`; }).join('')}${subCols.length?`<td>${won(cc.grp['부자재'].sum)}</td>`:''}
+      ${hasGa?`<td>${won(cc.grp['가공·기타'].sum)}</td>`:''}${hasWan?`<td>${won(cc.grp['완제품'].sum)}</td>`:''}
+      <td class="hlite"><b>${won(cc.cost)}</b></td></tr>`; }).join('');
+  return `<div class="tblPurpose t1">② 생산원가 구성 <span class="tpSub">구성품별 원료·부자재·가공 분해 → 생산원가 · EA당 · VAT별도 · 매입 명세 기준</span></div>
+    <div class="otblWrap"><table class="compMatrix"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+}
 function costDetailHtml(nm){
   const d=DATA.costDetail[nm]; if(!d) return '';
   const ROUNDS=Object.keys(d.rounds);
@@ -5303,6 +5390,7 @@ function costDetailHtml(nm){
   return `<div class="costdetail">
     <div class="cdhead"><b>${nm} · 원가·매입 상세 보고</b><span class="cdcur">이번 차수(${curRound}) · 발주 <b>${won(orderQty)}EA</b> · 생산원가 <b>${won(cur)}원</b><small>/EA·VAT별도</small></span><button class="tbtn accent" style="font-size:11px;padding:4px 10px;margin-left:auto" onclick="addItemToCart('${nm}')">🛒 발주 담기</button></div>
     <div class="cdsec"><div class="cdlbl">차수별 생산원가 추이 <span class="vatnote">※ 전 차수 대비 <b style="color:#c0392b">▲인상</b>·<b style="color:#1E9E63">▼인하</b> / VAT 별도 / 단위 원</span></div>${rt}<div class="cdchart">${roundMiniChart(d.rounds)}</div></div>
+    ${compVerticalHtml(nm)}
     <div class="cdgrid">
       <div>
         <div class="orderbanner"><span class="obl">이번 차수 발주량</span><span class="obv">${won(orderQty)} <small>EA</small></span><span class="obsub">매입액 ${won(sub)}원 (VAT별도) · VAT포함 ${won(subVat)}원</span></div>
@@ -5422,7 +5510,7 @@ function groupViewHtml(g){
   const money=(g.id==='multi_cleaner'||g.orderPrices)?groupOrderMoneyHtml(g,M):'';
   // [v83] 두 표의 목적을 색으로 구분 (혼동 방지)
   const t1head=`<div class="tblPurpose t1">① 원가 기준 · 매입액 <span class="tpSub">자동 발주수량 × 생산원가 — 원가·마진 파악용(참고)</span></div>`;
-  return card+t1head+table+money+bundlePurchaseHtml(g);
+  return card+t1head+table+groupCompMatrixHtml(g)+money+bundlePurchaseHtml(g);
 }
 // [v83] 묶음 발주 뷰: 구성품 전체의 이번 차수 매입 명세(단품 명세를 합산) — 실제 묶음 발주 시 총 매입 내역
 function bundlePurchaseHtml(g){
