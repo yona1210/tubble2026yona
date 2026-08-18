@@ -690,6 +690,7 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .compMatrix .cmDot{width:8px;height:8px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:middle}
 .compMatrix.cmSingle td{font-size:12px;padding:6px 9px}
 .compMatrix.cmSingle .ein.n{font-size:12px}
+.compMatrix .cmNameIn{width:120px;font-size:10px;text-align:center;font-weight:700;color:#1E2761}
 @media(max-width:760px){.cdgrid{flex-direction:column}.cdgrid .cdnarrow{flex:auto}}
 .cdedit{width:100%;border-collapse:collapse;font-size:11px}
 .cdedit th,.cdedit td{padding:3px 5px;border-bottom:1px solid var(--grid);text-align:left}
@@ -5310,11 +5311,14 @@ function compShortLabel(gu,name){ const s=String(name||''); const b=compBucketOf
 function compMatrixHtml(nm, editable){
   const cc=costComposition(nm); if(!cc||!cc.order.length) return '';
   const ed=!!editable, esc=String(nm).replace(/'/g,"\\'");
+  const escAttr=s=>String(s==null?'':s).replace(/"/g,'&quot;');
   let sup='', comp='', data='';
   cc.order.forEach(k=>{
     const g=cc.grp[k], pct=cc.cost>0?(g.sum/cc.cost*100):0, col=COMP_COLOR[k]||'#64748b';
     sup+=`<th colspan="${g.items.length}" style="border-bottom:2px solid ${col}"><span class="cmDot" style="background:${col}"></span>${k} <small>합 ${won(g.sum)} · ${pct.toFixed(1)}%</small></th>`;
-    g.items.forEach(it=>{ comp+=`<th>${compShortLabel(it.gu,it.name)}</th>`; });
+    g.items.forEach(it=>{ comp+= ed
+      ? `<th><input class="ein cmNameIn" value="${escAttr(it.name)}" onchange="editPur('${esc}',${it.pi},2,this.value)" title="항목명(상품명) 수정"></th>`
+      : `<th>${compShortLabel(it.gu,it.name)}</th>`; });
     g.items.forEach(it=>{ data+= ed
       ? `<td><input class="ein n" type="number" value="${it.unit}" onchange="editPur('${esc}',${it.pi},4,this.value)" style="width:74px"></td>`
       : `<td>${won(it.unit)}</td>`; });
@@ -5325,7 +5329,7 @@ function compMatrixHtml(nm, editable){
 }
 function compCostSection(nm, editable){
   const cc=costComposition(nm); if(!cc||!cc.order.length) return editable?`<div class="cdsec"><div class="cdlbl">생산원가 구성</div><div style="font-size:11px;color:#8a90a2;padding:8px 2px">매입 명세가 없습니다. 아래 [이번 차수 매입 명세]에서 [+ 행 추가]로 원료·부자재·가공 구성을 등록하면 여기에 자동 집계됩니다.</div></div>`:'';
-  return `<div class="cdsec"><div class="cdlbl">생산원가 구성 <span class="vatnote">※ 원료+부자재+가공 · EA당 · VAT별도 · 매입 명세 기준${cc.basisRound?' ('+cc.basisRound+')':''}${editable?' · <b style="color:#1E7A44">단가 직접 수정</b>':''}</span></div>${compMatrixHtml(nm,!!editable)}${editable?'<div style="font-size:10px;color:#8a90a2;margin-top:5px">💡 단가를 고치면 생산원가가 자동 갱신됩니다. 항목 추가·삭제·거래처·MOQ 수정은 아래 [이번 차수 매입 명세]에서 하세요.</div>':''}</div>`;
+  return `<div class="cdsec"><div class="cdlbl">생산원가 구성 <span class="vatnote">※ 원료+부자재+가공 · EA당 · VAT별도 · 매입 명세 기준${cc.basisRound?' ('+cc.basisRound+')':''}${editable?' · <b style="color:#1E7A44">단가 직접 수정</b>':''}</span></div>${compMatrixHtml(nm,!!editable)}${editable?'<div style="font-size:10px;color:#8a90a2;margin-top:5px">💡 <b>항목명(머리글)</b>과 <b>단가</b>를 직접 고치면 생산원가가 자동 갱신됩니다. 항목 추가·삭제·구분(원료/부자재/가공)·거래처·MOQ 변경은 아래 [이번 차수 매입 명세]에서 하세요.</div>':''}</div>`;
 }
 // [v85] 묶음 뷰 — 가로 매트릭스(구성품별 원료/부자재세부/가공 → 생산원가)
 function groupCompMatrixHtml(g){
