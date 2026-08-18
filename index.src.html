@@ -2986,12 +2986,14 @@ if(window.__TUBBLE_DATA__){ DATA = window.__TUBBLE_DATA__; }
 if(DATA.leadtime && DATA.leadtime.length===11){ LEADTIME = DATA.leadtime.slice(); }
 // 원가·매입 데이터를 DATA에 통합(저장/불러오기 포함, 편집 가능)
 if(!DATA.costDetail){ DATA.costDetail = (typeof COST_DETAIL!=='undefined') ? JSON.parse(JSON.stringify(COST_DETAIL)) : {}; }
+if(!Array.isArray(DATA.costExcluded)) DATA.costExcluded=[];   // 사용자가 원가에서 삭제한 품목 — 재고에 있어도 자동 재생성하지 않음
 // 차수별 발주량(qtys) 없는 품목 보강
 Object.keys(DATA.costDetail||{}).forEach(nm=>{ const d=DATA.costDetail[nm];
   if(!d.qtys){ d.qtys={}; Object.keys(d.rounds||{}).forEach(r=>d.qtys[r]=0); } });
 // [신규 재고 → 원가 자동 생성] 재고 품목인데 원가·매입 항목이 없으면 빈 항목 생성 (원가 탭 표시 + 신규 상품 자동 반영)
 (DATA.stock||[]).forEach(function(s){
   if(!s || !s.nm || DATA.costDetail[s.nm]) return;
+  if(DATA.costExcluded.indexOf(s.nm)>=0) return;   // 원가에서 삭제한 품목은 재생성하지 않음(빈 항목 되살아남 방지)
   var rd = s.round || '1차';
   var cd = { rounds:{}, qtys:{}, purchase:[], stock:Object.assign({}, (s.inventory&&s.inventory.warehouses)||{}) };
   cd.rounds[rd] = +s.cost || 0;
@@ -3404,8 +3406,9 @@ function saveEdit(tab){
     DATA.stock=DATA.stock.filter(s=>!s._pendingDel);
     delCount=before-DATA.stock.length;
   } else if(tab==='cost'){
+    if(!Array.isArray(DATA.costExcluded)) DATA.costExcluded=[];
     Object.keys(DATA.costDetail||{}).forEach(nm=>{
-      if(DATA.costDetail[nm]._pendingDel){ delete DATA.costDetail[nm]; delCount++; }
+      if(DATA.costDetail[nm]._pendingDel){ delete DATA.costDetail[nm]; if(DATA.costExcluded.indexOf(nm)<0) DATA.costExcluded.push(nm); delCount++; }   // 삭제 시 제외 목록에 기록 → 재고에서 자동 재생성 방지
     });
     if(costSel && !DATA.costDetail[costSel]) costSel=Object.keys(DATA.costDetail)[0]||null;
   }
@@ -6039,6 +6042,7 @@ function doAddCostItem(){
   if(DATA.costDetail[nm]){ toast('이미 있는 품목'); return; }
   if(!editState.cost) beginEdit('cost');  // 수정 모드가 아니면 진입
   DATA.costDetail[nm]={rounds:{'1차':0},qtys:{'1차':0},purchase:[['','','',0,0,0]],stock:{}};
+  if(Array.isArray(DATA.costExcluded)){ const ei=DATA.costExcluded.indexOf(nm); if(ei>=0) DATA.costExcluded.splice(ei,1); }   // 다시 추가하면 제외 목록에서 해제
   costSel=nm; costEdit=true;
   document.getElementById('costAddModal').classList.remove('open');
   markDirty(); renderCost(); toast('품목 추가됨 · 차수·매입·현재고 입력 후 [저장]');
