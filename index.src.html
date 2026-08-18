@@ -457,6 +457,21 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .bpTbl th.l,.bpTbl td.l{text-align:left;white-space:normal}
 .bpTbl tr.bpMem td{background:#eef1f5;font-weight:700;color:#3a4252;text-align:left}
 .bpTbl tr.bpTot td{background:#e6e9f0;font-weight:800}
+/* [v83] 매입 보고(장바구니) */
+.ocSummary{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.ocBox{flex:1;min-width:110px;background:#f4f5f8;border-radius:8px;padding:9px 12px;text-align:center}
+.ocBox.accent{background:#eef2fe}
+.ocBox .rv{font-size:17px;font-weight:800;color:#1E2761}
+.ocBox .rl{font-size:10.5px;color:#8a90a2;margin-top:2px}
+.octbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.octbl th,.octbl td{padding:6px 8px;border-bottom:1px solid #eef0f4;text-align:right;white-space:nowrap}
+.octbl th{background:#1E2761;color:#fff;font-size:11px}
+.octbl th.l,.octbl td.l{text-align:left;white-space:normal}
+.octbl th.c,.octbl td.c{text-align:center}
+.octbl tr.ocMfr td{background:#eef1f5;font-weight:700;color:#3a4252;text-align:left}
+.octbl tr.octot td{background:#eef1f8;font-weight:800;border-top:2px solid #1E2761}
+.ocInp{width:76px;text-align:right;padding:2px 5px;border:1px solid #d6dbe7;border-radius:5px;font-size:12px}
+.ocDel{border:none;background:transparent;color:#c0392b;cursor:pointer;font-size:13px}
 /* [v83] 재고 테이블 간단히 보기 — 부가 설명 숨겨 밀도 완화 (핵심 값·신호·뱃지는 유지) */
 #stockTableWrap.simple .pmeta,
 #stockTableWrap.simple .runfaster,
@@ -2045,6 +2060,7 @@ body{padding-bottom:48px}
     <button class="tbtn" id="btnCostEditSave" style="display:none">수정 반영</button>
     <button class="tbtn" id="btnCostEditCancel" style="display:none">수정 취소</button>
     <button class="tbtn accent" id="btnCostItemAdd">+ 품목 추가</button>
+    <button class="tbtn primary" id="btnOrderCart">🛒 매입 보고 <span id="cartCount">0</span></button>
     <span class="editmodehint" id="costEditHint" style="display:none">수정 모드 · 선택 품목의 차수·매입·현재고 편집 · [수정 반영] 또는 [수정 취소]</span>
     <div class="searchbox" style="margin-left:auto;max-width:300px"><input id="costSearch" placeholder="🔍 품목명 검색" oninput="renderCost()"></div>
     <!-- 파일관리: 공통바로 이동, 핸들러 보존용 숨김 -->
@@ -2381,6 +2397,19 @@ body{padding-bottom:48px}
     <div class="efactions">
       <button class="tbtn accent" id="btnOrderReportCopy">텍스트 복사</button>
       <button class="tbtn" id="btnOrderReportClose">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 매입 보고 요약(발주 예정 장바구니) 모달 -->
+<div class="modal" id="orderCartModal">
+  <div class="mbox" style="max-width:840px">
+    <h3>🛒 매입 보고 요약 <span style="font-size:11px;font-weight:400;color:#888">오늘 매입할 품목 · 총 매입금액</span></h3>
+    <div id="orderCartBody" style="max-height:62vh;overflow-y:auto"></div>
+    <div class="efactions">
+      <button class="tbtn accent" id="btnCartCopy">텍스트 복사</button>
+      <button class="tbtn" id="btnCartClear">전체 비우기</button>
+      <button class="tbtn" id="btnCartClose">닫기</button>
     </div>
   </div>
 </div>
@@ -5264,7 +5293,7 @@ function costDetailHtml(nm){
   // 매입 VAT 포함 합계
   const subVat=Math.round(sub*1.1);
   return `<div class="costdetail">
-    <div class="cdhead"><b>${nm} · 원가·매입 상세 보고</b><span class="cdcur">이번 차수(${curRound}) · 발주 <b>${won(orderQty)}EA</b> · 생산원가 <b>${won(cur)}원</b><small>/EA·VAT별도</small></span></div>
+    <div class="cdhead"><b>${nm} · 원가·매입 상세 보고</b><span class="cdcur">이번 차수(${curRound}) · 발주 <b>${won(orderQty)}EA</b> · 생산원가 <b>${won(cur)}원</b><small>/EA·VAT별도</small></span><button class="tbtn accent" style="font-size:11px;padding:4px 10px;margin-left:auto" onclick="addItemToCart('${nm}')">🛒 발주 담기</button></div>
     <div class="cdsec"><div class="cdlbl">차수별 생산원가 추이 <span class="vatnote">※ 전 차수 대비 <b style="color:#c0392b">▲인상</b>·<b style="color:#1E9E63">▼인하</b> / VAT 별도 / 단위 원</span></div>${rt}<div class="cdchart">${roundMiniChart(d.rounds)}</div></div>
     <div class="cdgrid">
       <div>
@@ -5406,6 +5435,69 @@ function bundlePurchaseHtml(g){
     <tr class="bpTot"><td colspan="5" class="l">VAT 포함</td><td class="n">${won(vat)}원</td></tr>
     </tbody></table></div>`;
 }
+// ===== [v83] 매입 보고 (발주 예정 장바구니) =====
+function ensureCart(){ if(!Array.isArray(DATA.orderCart)) DATA.orderCart=[]; return DATA.orderCart; }
+function updateCartBadge(){ const el=document.getElementById('cartCount'); if(el) el.textContent=ensureCart().length; }
+function cartUpsert(nm,qty,price,mfr,unit){ const c=ensureCart(); const ex=c.find(x=>x.nm===nm);
+  if(ex){ ex.qty=Math.round(+qty||0); ex.price=Math.round(+price||0); if(mfr)ex.mfr=mfr; if(unit)ex.unit=unit; }
+  else c.push({nm,qty:Math.round(+qty||0),price:Math.round(+price||0),mfr:mfr||'',unit:unit||'EA'}); }
+window.addItemToCart=function(nm){
+  const st=(DATA.stock||[]).find(x=>x.nm===nm);
+  let qty=0; if(st){ const c=calcStock(st); qty=c.orderQty||0; }
+  cartUpsert(nm, qty, getCurrentCost(nm, st?st.cost:0), st&&st.oem&&st.oem!=='-'?st.oem:'', st?st.stockUnit:'EA');
+  if(typeof markDirty==='function')markDirty(); updateCartBadge();
+  if(typeof toast==='function')toast('매입 보고에 담김: '+nm);
+};
+window.addBundleToCart=function(gid){
+  const g=(DATA.costGroups||[]).find(x=>x.id===gid); if(!g)return;
+  const M=groupMetrics(g); let n=0;
+  M.items.filter(m=>m.exists).forEach(m=>{
+    const ov=(g.recOverrides||{})[m.nm]; const qty=(ov!=null&&ov!=='')?Number(ov):(m.qty||0);
+    if(!(qty>0)) return;
+    const price=(g.orderPrices&&g.orderPrices[m.nm]!=null)?Number(g.orderPrices[m.nm]):getCurrentCost(m.nm,0);
+    const st=(DATA.stock||[]).find(x=>x.nm===m.nm);
+    const mfr=(g.orderMfrs&&g.orderMfrs[m.nm])||(st&&st.oem&&st.oem!=='-'?st.oem:'');
+    cartUpsert(m.nm, qty, price, mfr, st?st.stockUnit:'EA'); n++;
+  });
+  if(typeof markDirty==='function')markDirty(); updateCartBadge();
+  if(typeof toast==='function')toast(g.name+' · '+n+'개 담김');
+};
+window.removeCartItem=function(i){ ensureCart().splice(i,1); if(typeof markDirty==='function')markDirty(); renderCartModal(); updateCartBadge(); };
+window.clearCart=function(){ if(!confirm('매입 보고 목록을 모두 비울까요?'))return; DATA.orderCart=[]; if(typeof markDirty==='function')markDirty(); renderCartModal(); updateCartBadge(); };
+window.setCartField=function(i,f,v){ const c=ensureCart(); if(!c[i])return; c[i][f]=Math.round(+v||0); if(typeof markDirty==='function')markDirty(); renderCartModal(); };
+function cartReportHtml(){
+  const c=ensureCart();
+  if(!c.length) return `<div style="padding:26px;text-align:center;color:#9aa1b2">담긴 매입 예정 품목이 없습니다.<br><span style="font-size:11px">원가·매입에서 묶음 [🛒 이 묶음 담기] 또는 품목 [🛒 발주 담기]로 추가하세요.</span></div>`;
+  const byMfr={}; c.forEach((x,i)=>{ const m=x.mfr||'(제조사 미지정)'; (byMfr[m]=byMfr[m]||[]).push(Object.assign({},x,{i})); });
+  let grand=0;
+  const secs=Object.keys(byMfr).map(mfr=>{
+    const items=byMfr[mfr]; let sub=0;
+    const rows=items.map(x=>{ const amt=(+x.qty||0)*(+x.price||0); sub+=amt;
+      return `<tr><td class="l">${x.nm}</td>
+        <td class="n"><input type="number" class="ocInp" value="${x.qty}" onchange="setCartField(${x.i},'qty',this.value)">${x.unit&&x.unit!=='EA'?x.unit:''}</td>
+        <td class="n"><input type="number" class="ocInp" value="${x.price}" onchange="setCartField(${x.i},'price',this.value)"></td>
+        <td class="n">${won(amt)}</td>
+        <td class="c"><button class="ocDel" onclick="removeCartItem(${x.i})" title="삭제">✕</button></td></tr>`;
+    }).join('');
+    grand+=sub;
+    return `<tr class="ocMfr"><td class="l" colspan="5">🏭 ${mfr} <span style="font-weight:400;color:#8a90a2;font-size:11px">· 소계 ${won(sub)}원</span></td></tr>${rows}`;
+  }).join('');
+  const vat=Math.round(grand*1.1);
+  return `<div class="ocSummary"><div class="ocBox accent"><div class="rv">${c.length}</div><div class="rl">매입 품목</div></div>
+      <div class="ocBox"><div class="rv">${won(grand)}</div><div class="rl">총 매입금액(별도)</div></div>
+      <div class="ocBox"><div class="rv">${won(vat)}</div><div class="rl">VAT 포함</div></div></div>
+    <div class="otblWrap"><table class="octbl"><thead><tr><th class="l">품목</th><th class="n">발주수량</th><th class="n">단가</th><th class="n">매입금액</th><th class="c"></th></tr></thead>
+    <tbody>${secs}<tr class="octot"><td class="l">총 매입금액 (VAT별도)</td><td colspan="2"></td><td class="n">${won(grand)}원</td><td></td></tr></tbody></table></div>
+    <div style="font-size:10.5px;color:#8a90a2;margin-top:6px">수량·단가는 여기서 바로 수정 가능 · 제조사별 소계로 실제 발주에 활용</div>`;
+}
+function cartReportText(){ const c=ensureCart(); if(!c.length)return '매입 예정 품목 없음';
+  const byMfr={}; c.forEach(x=>{const m=x.mfr||'(미지정)';(byMfr[m]=byMfr[m]||[]).push(x);});
+  let grand=0,out='[매입 보고 요약] '+fmt(NOW)+'\n';
+  Object.keys(byMfr).forEach(mfr=>{ let sub=0; out+='\n■ '+mfr+'\n'; byMfr[mfr].forEach(x=>{const amt=(+x.qty||0)*(+x.price||0);sub+=amt;out+='  - '+x.nm+' : '+won(x.qty)+' × '+won(x.price)+' = '+won(amt)+'원\n';}); out+='  소계 '+won(sub)+'원\n'; grand+=sub; });
+  out+='\n총 매입금액 '+won(grand)+'원(VAT별도) / '+won(Math.round(grand*1.1))+'원(VAT포함)'; return out;
+}
+function renderCartModal(){ const b=document.getElementById('orderCartBody'); if(b)b.innerHTML=cartReportHtml(); }
+window.openOrderCart=function(){ renderCartModal(); document.getElementById('orderCartModal').classList.add('open'); };
 // ===== [발주금액] 묶음 발주 그룹: 권장수량×객단가 = 발주금액, 정수 환산·MOQ 검토 =====
 function groupOrderMoneyHtml(g,M){
   if(!g.orderPrices) g.orderPrices={};
@@ -5468,8 +5560,9 @@ function groupOrderMoneyHtml(g,M){
     ${editable?`<div class="gomConfirm" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span style="font-size:12px;font-weight:700;color:#3a3d47">발주 차수</span>
       <input type="text" id="gomRound_${g.id}" value="${sugRound}" placeholder="예: 22차" style="width:80px;text-align:center;padding:4px 6px;border:1px solid #d6dbe7;border-radius:5px">
+      <button class="tbtn accent" onclick="addBundleToCart('${g.id}')">🛒 이 묶음 매입 보고 담기</button>
       <button class="tbtn primary" onclick="confirmGroupOrder('${g.id}')">이 묶음 발주 확정 · 원가·매입 기록</button>
-      <span class="gomHint">확정 시 각 품목 원가·매입에 새 차수(매입단가·발주수량·제조사)로 저장 + 재고 최신 차수·원가 갱신</span>
+      <span class="gomHint">담기 = 매입 보고 요약에 추가(집계용) · 확정 = 각 품목 원가·매입에 새 차수로 저장</span>
     </div>`:''}
   </div>`;
 }
@@ -5749,6 +5842,7 @@ window.delCostItem=async function(nm){
   markDirty(); renderCost(); toast('삭제 예정으로 표시됨 — [저장] 시 확정'); };
 function renderCost(){
   const body=document.getElementById('costBody'); if(!body)return;
+  updateCartBadge();   // [v83] 매입 보고 담긴 수 갱신
   const q=(document.getElementById('costSearch')?.value||'').trim().toLowerCase();
   const keys=Object.keys(DATA.costDetail||{});
   const shown=keys.filter(k=>!q||k.toLowerCase().includes(q));
@@ -7771,6 +7865,13 @@ document.getElementById('btnReportCopy').onclick=()=>{
 };
 
 document.getElementById('btnOrderReport').onclick=openOrderReport;
+// [v83] 매입 보고 요약(장바구니) 핸들러
+(function(){ const b=document.getElementById('btnOrderCart'); if(b) b.onclick=openOrderCart;
+  const cl=document.getElementById('btnCartClose'); if(cl) cl.onclick=()=>document.getElementById('orderCartModal').classList.remove('open');
+  const cc=document.getElementById('btnCartClear'); if(cc) cc.onclick=()=>clearCart();
+  const cp=document.getElementById('btnCartCopy'); if(cp) cp.onclick=()=>{ const t=cartReportText();
+    navigator.clipboard.writeText(t).then(()=>toast('매입 보고 텍스트 복사됨'),()=>{ try{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('매입 보고 텍스트 복사됨');}catch(e){toast('복사 실패');} }); };
+})();
 // [v83] 재고 테이블 간단/자세히 뷰 토글 — 간단히 모드에서 부가 설명(pmeta·원가율·평균기준 등) 숨김
 let stockSimpleView=false;
 document.getElementById('btnStockDensity').onclick=function(){
