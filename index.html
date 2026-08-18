@@ -2513,8 +2513,9 @@ body{padding-bottom:48px}
   <div class="mbox" style="max-width:380px">
     <h3>원가·매입 품목 추가</h3>
     <div class="efield" style="margin-top:10px"><label>품목명</label>
-      <input id="ca_nm" placeholder="예: 캡슐세제 시트러스" style="width:100%"></div>
-    <div style="font-size:11px;color:var(--mut);margin-top:8px">추가 후 차수별 원가·매입 명세·현재고를 입력합니다.</div>
+      <input id="ca_nm" list="ca_nm_list" placeholder="출시일정·재고에서 선택하거나 직접 입력" style="width:100%" autocomplete="off">
+      <datalist id="ca_nm_list"></datalist></div>
+    <div style="font-size:11px;color:var(--mut);margin-top:8px">출시일정·재고 품목명을 자동 제안합니다(클릭해 선택). 원하면 직접 타이핑·수정도 가능. 추가 후 차수별 원가·매입 명세·현재고를 입력합니다.</div>
     <div class="efactions" style="margin-top:14px">
       <button class="tbtn accent" id="btnCostAddSave">추가</button>
       <button class="tbtn" id="btnCostAddCancel">취소</button>
@@ -5836,8 +5837,18 @@ window.pushStockToInventory=async function(nm){
   toast(`[${nm}] inventory 동기화 완료 — 재고·발주 탭 현재고 ${won(invTotal(si))}${si.stockUnit||'EA'} (자동 반영)`);
 };
 // (자동 동기화 폐지) 원가탭 창고 합계 → 재고탭 반영은 [재고탭 반영] 버튼으로만 수행
+// [v83] 원가 품목 후보: 출시일정(sku)+재고(stock) 품목명 중 아직 원가·매입에 없는 것
+function costNameCandidates(){
+  const have=new Set(Object.keys(DATA.costDetail||{}));
+  const set=new Set();
+  (DATA.sku||[]).forEach(x=>{ if(x&&x.nm) set.add(String(x.nm).trim()); });
+  (DATA.stock||[]).forEach(x=>{ if(x&&x.nm) set.add(String(x.nm).trim()); });
+  return Array.from(set).filter(n=>n && !have.has(n)).sort((a,b)=>a.localeCompare(b));
+}
 window.addCostItem=function(){
   document.getElementById('ca_nm').value='';
+  const dl=document.getElementById('ca_nm_list');
+  if(dl) dl.innerHTML=costNameCandidates().map(n=>`<option value="${String(n).replace(/"/g,'&quot;')}"></option>`).join('');
   document.getElementById('costAddModal').classList.add('open');
   setTimeout(()=>document.getElementById('ca_nm').focus(),50);
 };
