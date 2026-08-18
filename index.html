@@ -5427,8 +5427,9 @@ function bundlePurchaseHtml(g){
   let grand=0;
   const secs=members.map(nm=>{
     const d=DATA.costDetail[nm];
-    const sub=d.purchase.reduce((a,p)=>a+(+p[3]||0)*(+p[4]||0),0); grand+=sub;
-    const rows=d.purchase.map(p=>`<tr><td>${p[0]||'-'}</td><td>${p[1]||'-'}</td><td class="l">${p[2]||'-'}</td><td class="n">${won(p[3])}</td><td class="n">${won(p[4])}</td><td class="n">${won((+p[3]||0)*(+p[4]||0))}</td></tr>`).join('');
+    const pur=(d.purchase||[]).filter(p=>String(p[1]||'')!=='발주');   // '발주' 라인 제외(완제품 발주 요약이라 원가 명세에 이중 포함 방지)
+    const sub=pur.reduce((a,p)=>a+(+p[3]||0)*(+p[4]||0),0); grand+=sub;
+    const rows=pur.map(p=>`<tr><td>${p[0]||'-'}</td><td>${p[1]||'-'}</td><td class="l">${p[2]||'-'}</td><td class="n">${won(p[3])}</td><td class="n">${won(p[4])}</td><td class="n">${won((+p[3]||0)*(+p[4]||0))}</td></tr>`).join('');
     return `<tr class="bpMem"><td colspan="6">📦 ${nm} <span style="font-weight:400;color:#8a90a2;font-size:11px">· 소계 ${won(sub)}원</span></td></tr>${rows}`;
   }).join('');
   const vat=Math.round(grand*1.1);
@@ -5475,8 +5476,9 @@ function cartLines(){
   const c=ensureCart(); const lines=[];
   c.forEach(x=>{
     const d=DATA.costDetail[x.nm];
-    if(d && d.purchase && d.purchase.length){
-      d.purchase.forEach(p=>lines.push({v:p[0]||'(거래처 미지정)',gu:p[1]||'-',nm:p[2]||x.nm,moq:+p[3]||0,price:+p[4]||0,amt:(+p[3]||0)*(+p[4]||0),src:x.nm}));
+    const pur=(d&&d.purchase||[]).filter(p=>String(p[1]||'')!=='발주');   // '발주' 라인 제외(원가 이중 포함 방지)
+    if(pur.length){
+      pur.forEach(p=>lines.push({v:p[0]||'(거래처 미지정)',gu:p[1]||'-',nm:p[2]||x.nm,moq:+p[3]||0,price:+p[4]||0,amt:(+p[3]||0)*(+p[4]||0),src:x.nm}));
     } else {
       lines.push({v:x.mfr||'(거래처 미지정)',gu:'완제품',nm:x.nm,moq:+x.qty||0,price:+x.price||0,amt:(+x.qty||0)*(+x.price||0),src:x.nm});
     }
