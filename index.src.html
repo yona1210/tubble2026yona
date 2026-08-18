@@ -5425,20 +5425,39 @@ function groupViewHtml(g){
 function bundlePurchaseHtml(g){
   const members=(g.items||[]).filter(nm=>DATA.costDetail[nm] && (DATA.costDetail[nm].purchase||[]).length);
   if(!members.length) return '';
+  const ed=(typeof costEdit!=='undefined' && costEdit);   // 수정 모드면 편집 셀
+  const esc=s=>String(s==null?'':s).replace(/"/g,'&quot;');
+  const nmA=nm=>String(nm).replace(/'/g,"\\'");
   let grand=0;
   const secs=members.map(nm=>{
     const d=DATA.costDetail[nm];
-    const pur=(d.purchase||[]).filter(p=>String(p[1]||'')!=='발주');   // '발주' 라인 제외(완제품 발주 요약이라 원가 명세에 이중 포함 방지)
-    const sub=pur.reduce((a,p)=>a+(+p[3]||0)*(+p[4]||0),0); grand+=sub;
-    const rows=pur.map(p=>`<tr><td>${p[0]||'-'}</td><td>${p[1]||'-'}</td><td class="l">${p[2]||'-'}</td><td class="n">${won(p[3])}</td><td class="n">${won(p[4])}</td><td class="n">${won((+p[3]||0)*(+p[4]||0))}</td></tr>`).join('');
-    return `<tr class="bpMem"><td colspan="6">📦 ${nm} <span style="font-weight:400;color:#8a90a2;font-size:11px">· 소계 ${won(sub)}원</span></td></tr>${rows}`;
+    let sub=0; const rr=[];
+    (d.purchase||[]).forEach((p,pi)=>{
+      if(String(p[1]||'')==='발주') return;   // '발주' 라인 제외(원가 이중 포함 방지)
+      const amt=(+p[3]||0)*(+p[4]||0); sub+=amt;
+      if(ed){
+        rr.push(`<tr>
+          <td><input class="ein" value="${esc(p[0])}" onchange="editPur('${nmA(nm)}',${pi},0,this.value)" style="width:92px"></td>
+          <td><input class="ein" value="${esc(p[1])}" onchange="editPur('${nmA(nm)}',${pi},1,this.value)" style="width:58px"></td>
+          <td><input class="ein" value="${esc(p[2])}" onchange="editPur('${nmA(nm)}',${pi},2,this.value)" style="width:200px"></td>
+          <td class="n"><input class="ein n" type="number" value="${p[3]}" onchange="editPur('${nmA(nm)}',${pi},3,this.value)" style="width:74px"></td>
+          <td class="n"><input class="ein n" type="number" value="${p[4]}" onchange="editPur('${nmA(nm)}',${pi},4,this.value)" style="width:74px"></td>
+          <td class="n">${won(amt)}</td>
+          <td><button class="xbtn" onclick="delPur('${nmA(nm)}',${pi})">×</button></td></tr>`);
+      } else {
+        rr.push(`<tr><td>${p[0]||'-'}</td><td>${p[1]||'-'}</td><td class="l">${p[2]||'-'}</td><td class="n">${won(p[3])}</td><td class="n">${won(p[4])}</td><td class="n">${won(amt)}</td></tr>`);
+      }
+    });
+    grand+=sub;
+    const addBtn=ed?` <button class="tbtn" style="font-size:10px;padding:1px 7px" onclick="addPur('${nmA(nm)}')">+ 행 추가</button>`:'';
+    return `<tr class="bpMem"><td colspan="${ed?7:6}">📦 ${nm} <span style="font-weight:400;color:#8a90a2;font-size:11px">· 소계 ${won(sub)}원</span>${addBtn}</td></tr>${rr.join('')}`;
   }).join('');
   const vat=Math.round(grand*1.1);
-  return `<div class="tblPurpose t3">이번 차수 매입 명세 · 묶음 전체 <span class="tpSub">구성품 ${members.length}종 합산 — 실제 묶음 발주 시 매입 내역 · VAT별도</span></div>
-    <div class="otblWrap"><table class="bpTbl"><thead><tr><th class="l">거래처</th><th class="l">구분</th><th class="l">상품명</th><th class="n">MOQ(EA)</th><th class="n">단가</th><th class="n">소계</th></tr></thead>
+  return `<div class="tblPurpose t3">이번 차수 매입 명세 · 묶음 전체 <span class="tpSub">구성품 ${members.length}종 합산 — ${ed?'수정 모드: 거래처·구분·상품명·MOQ·단가 편집/추가/삭제 가능':'실제 묶음 발주 시 매입 내역'} · VAT별도</span></div>
+    <div class="otblWrap"><table class="bpTbl"><thead><tr><th class="l">거래처</th><th class="l">구분</th><th class="l">상품명</th><th class="n">MOQ(EA)</th><th class="n">단가</th><th class="n">소계</th>${ed?'<th></th>':''}</tr></thead>
     <tbody>${secs}
-    <tr class="bpTot"><td colspan="5" class="l">묶음 전체 매입 합계 (VAT별도)</td><td class="n">${won(grand)}원</td></tr>
-    <tr class="bpTot"><td colspan="5" class="l">VAT 포함</td><td class="n">${won(vat)}원</td></tr>
+    <tr class="bpTot"><td colspan="5" class="l">묶음 전체 매입 합계 (VAT별도)</td><td class="n">${won(grand)}원</td>${ed?'<td></td>':''}</tr>
+    <tr class="bpTot"><td colspan="5" class="l">VAT 포함</td><td class="n">${won(vat)}원</td>${ed?'<td></td>':''}</tr>
     </tbody></table></div>`;
 }
 // ===== [v83] 매입 보고 (발주 예정 장바구니) =====
