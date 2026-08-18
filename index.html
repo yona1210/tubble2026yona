@@ -686,6 +686,10 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .compMatrix td.hlite,.compMatrix th.hlite{background:#fff8e6;font-weight:800;color:#8a5a00}
 .compMatrix tbody tr:nth-child(even) td{background:#fafbfe}
 .compMatrix tbody tr:nth-child(even) td.hlite{background:#fff3d4}
+.compMatrix small{font-weight:400;color:#7a8194;font-size:9px}
+.compMatrix .cmDot{width:8px;height:8px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:middle}
+.compMatrix.cmSingle td{font-size:12px;padding:6px 9px}
+.compMatrix.cmSingle .ein.n{font-size:12px}
 @media(max-width:760px){.cdgrid{flex-direction:column}.cdgrid .cdnarrow{flex:auto}}
 .cdedit{width:100%;border-collapse:collapse;font-size:11px}
 .cdedit th,.cdedit td{padding:3px 5px;border-bottom:1px solid var(--grid);text-align:left}
@@ -5260,50 +5264,70 @@ function roundMiniChart(rounds,color){
   svg+='</svg>';
   return svg;
 }
-// [v84] 생산원가 구성: 한 품목의 매입 명세(단가=EA당)를 원료/부자재/가공/완제품으로 분해. '발주' 행 제외.
+// [v85] 생산원가 구성: 한 품목의 매입 명세(단가=EA당)를 원료/부자재/가공/완제품 등으로 분해. '발주' 행 제외. 모든 구분값 견고 처리.
+function compBucketOf(gu){ gu=String(gu||'').trim();
+  if(gu.indexOf('원료')>=0||gu.indexOf('원재료')>=0) return '원료';
+  if(gu.indexOf('가공')>=0||gu.indexOf('임가공')>=0||gu.indexOf('작업')>=0) return '가공·기타';
+  if(gu==='완제품') return '완제품';
+  if(gu==='부자재'||gu.indexOf('부자재')>=0||gu.indexOf('부재료')>=0||['단상자','파우치','스티커','삽지','용기','라벨','캡','박스'].indexOf(gu)>=0) return '부자재';
+  return gu||'기타';   // 미지의 구분(예: 얼룩제거제·기타)은 그대로 그룹명으로
+}
 function costComposition(nm){
   const d=DATA.costDetail&&DATA.costDetail[nm]; if(!d||!Array.isArray(d.purchase)) return null;
-  const BUCKETS=[{key:'원료',gu:['원료']},{key:'부자재',gu:['부자재']},{key:'가공·기타',gu:['가공비','가공']},{key:'완제품',gu:['완제품']}];
-  const guToBucket=gu=>{ for(const b of BUCKETS){ if(b.gu.indexOf(gu)>=0) return b.key; } return '부자재'; };
-  const subCat=(gu,name)=>{ const s=String(name||'');
-    if(gu==='원료') return '원료비';
-    if(gu==='완제품') return '완제품';
-    if(gu==='가공비'||gu==='가공'){ if(s.indexOf('부착')>=0) return '스티커 부착비'; if(s.indexOf('삽지')>=0) return '삽지 작업비'; if(s.indexOf('작업')>=0) return '작업비'; return '가공비'; }
-    if(s.indexOf('단상자')>=0) return '단상자';
-    if(s.indexOf('파우치')>=0) return '파우치';
-    if(s.indexOf('스티커')>=0) return '스티커';
-    if(s.indexOf('삽지')>=0) return '삽지';
-    if(s.indexOf('용기')>=0) return '용기';
-    if(s.indexOf('원재료')>=0) return '원재료';
-    const base=s.split('_')[0]; return base||'기타';
+  const subCat=(gu,name)=>{ const s=String(name||''); const b=compBucketOf(gu);
+    if(b==='원료') return s.indexOf('원재료')>=0?'원재료':'원료비';
+    if(b==='완제품') return '완제품';
+    if(b==='가공·기타'){ if(s.indexOf('부착')>=0) return '스티커 부착비'; if(s.indexOf('삽지')>=0) return '삽지 작업비'; if(s.indexOf('작업')>=0) return '작업비'; return '가공비'; }
+    if(b==='부자재'){ if(s.indexOf('단상자')>=0) return '단상자'; if(s.indexOf('파우치')>=0) return '파우치'; if(s.indexOf('스티커')>=0) return '스티커'; if(s.indexOf('삽지')>=0) return '삽지'; if(s.indexOf('용기')>=0) return '용기'; const base=s.split('_')[0]; return base||'부자재'; }
+    return b;
   };
-  const grp={}; BUCKETS.forEach(b=>grp[b.key]={items:[],sum:0});
-  d.purchase.forEach(p=>{ const gu=String(p[1]||''); if(gu==='발주') return;
-    const bk=guToBucket(gu), unit=+p[4]||0;
-    grp[bk].items.push({cat:subCat(gu,p[2]),name:String(p[2]||'-'),unit}); grp[bk].sum+=unit; });
-  const order=BUCKETS.map(b=>b.key).filter(k=>grp[k].items.length);
+  const KNOWN=['원료','부자재','가공·기타','완제품'];
+  const grp={}; KNOWN.forEach(k=>grp[k]={items:[],sum:0});
+  d.purchase.forEach((p,pi)=>{ const gu=String(p[1]||''); if(gu==='발주') return;
+    const bk=compBucketOf(gu), unit=+p[4]||0;
+    if(!grp[bk]) grp[bk]={items:[],sum:0};
+    grp[bk].items.push({pi,gu,cat:subCat(gu,p[2]),name:String(p[2]||'-'),unit}); grp[bk].sum+=unit; });
+  const order=[]; KNOWN.forEach(k=>{ if(grp[k].items.length) order.push(k); });
+  Object.keys(grp).forEach(k=>{ if(order.indexOf(k)<0 && grp[k].items.length) order.push(k); });
   const cost=order.reduce((a,k)=>a+grp[k].sum,0);
   // 명세 합이 어느 차수 생산원가와 일치/근접하는지(근거 표기용)
   let basisRound=''; const RK=Object.keys(d.rounds||{});
   if(RK.length&&cost>0){ let best=null,bd=Infinity; RK.forEach(r=>{ const diff=Math.abs((+d.rounds[r]||0)-cost); if(diff<bd){bd=diff;best=r;} }); if(best&&bd<=Math.max(3,cost*0.01)) basisRound=best; }
   return {grp,order,cost,basisRound};
 }
-// [v84] 단품 상세 — 세로형 생산원가 구성표
-function compVerticalHtml(nm){
-  const cc=costComposition(nm); if(!cc||!cc.order.length) return '';
-  const grpColor={'원료':'#3a6ea5','부자재':'#1E9E63','가공·기타':'#b5822a','완제품':'#6b5bd6'};
-  const rows=cc.order.map(k=>{
-    const g=cc.grp[k], pct=cc.cost>0?(g.sum/cc.cost*100):0;
-    const head=`<tr class="ccGrp"><td><span class="ccG"><span class="ccDot" style="background:${grpColor[k]||'#888'}"></span>${k}</span></td><td></td><td class="n">${won(g.sum)}</td><td class="n">${pct.toFixed(1)}%</td></tr>`;
-    const byCat={}, co=[]; g.items.forEach(it=>{ if(byCat[it.cat]==null){byCat[it.cat]=0;co.push(it.cat);} byCat[it.cat]+=it.unit; });
-    const items=co.map(c=>`<tr class="ccItem"><td></td><td class="ccGi">${c}</td><td class="n">${won(byCat[c])}</td><td></td></tr>`).join('');
-    return head+items;
-  }).join('');
-  return `<div class="cdsec"><div class="cdlbl">생산원가 구성 <span class="vatnote">※ 원료+부자재+가공 · EA당 · VAT별도 · 매입 명세 기준${cc.basisRound?' ('+cc.basisRound+')':''}</span></div>
-    <table class="cdcomp"><thead><tr><th class="l">구분</th><th class="l">세부 항목</th><th class="n">단가(원)</th><th class="n">구성비</th></tr></thead>
-    <tbody>${rows}<tr class="ccTot"><td class="l" colspan="2">생산원가 (${cc.order.join('+')})</td><td class="n">${won(cc.cost)}</td><td class="n">100%</td></tr></tbody></table></div>`;
+const COMP_COLOR={'원료':'#3a6ea5','부자재':'#1E9E63','가공·기타':'#b5822a','완제품':'#6b5bd6'};
+function compShortLabel(gu,name){ const s=String(name||''); const b=compBucketOf(gu);
+  if(b==='원료') return s.indexOf('원재료')>=0?'원재료':'원료';
+  if(b==='완제품') return '완제품';
+  if(b==='가공·기타'){ if(s.indexOf('부착')>=0)return '스티커 부착비'; if(s.indexOf('삽지')>=0)return '삽지 작업비'; return '가공비'; }
+  if(b==='부자재'){ let base='부자재';
+    if(s.indexOf('단상자')>=0)base='단상자'; else if(s.indexOf('파우치')>=0)base='파우치'; else if(s.indexOf('스티커')>=0)base='스티커'; else if(s.indexOf('삽지')>=0)base='삽지'; else if(s.indexOf('용기')>=0)base='용기'; else { const bb=s.split('_')[0]; base=bb||'부자재'; }
+    const parts=s.split('_'); const suf=parts.length>1?parts[parts.length-1]:'';
+    return base+((suf==='전면'||suf==='후면')?'('+suf+')':''); }
+  return b;
 }
-// [v84] 묶음 뷰 — 가로 매트릭스(구성품별 원료/부자재세부/가공 → 생산원가)
+// [v85] 단품 — 가로형 생산원가 구성 매트릭스(구성요소=열). editable면 단가 직접 편집.
+function compMatrixHtml(nm, editable){
+  const cc=costComposition(nm); if(!cc||!cc.order.length) return '';
+  const ed=!!editable, esc=String(nm).replace(/'/g,"\\'");
+  let sup='', comp='', data='';
+  cc.order.forEach(k=>{
+    const g=cc.grp[k], pct=cc.cost>0?(g.sum/cc.cost*100):0, col=COMP_COLOR[k]||'#64748b';
+    sup+=`<th colspan="${g.items.length}" style="border-bottom:2px solid ${col}"><span class="cmDot" style="background:${col}"></span>${k} <small>합 ${won(g.sum)} · ${pct.toFixed(1)}%</small></th>`;
+    g.items.forEach(it=>{ comp+=`<th>${compShortLabel(it.gu,it.name)}</th>`; });
+    g.items.forEach(it=>{ data+= ed
+      ? `<td><input class="ein n" type="number" value="${it.unit}" onchange="editPur('${esc}',${it.pi},4,this.value)" style="width:74px"></td>`
+      : `<td>${won(it.unit)}</td>`; });
+  });
+  return `<div class="otblWrap"><table class="compMatrix cmSingle"><thead>
+    <tr>${sup}<th class="hlite" rowspan="2">생산원가</th></tr><tr>${comp}</tr></thead>
+    <tbody><tr>${data}<td class="hlite"><b>${won(cc.cost)}</b></td></tr></tbody></table></div>`;
+}
+function compCostSection(nm, editable){
+  const cc=costComposition(nm); if(!cc||!cc.order.length) return editable?`<div class="cdsec"><div class="cdlbl">생산원가 구성</div><div style="font-size:11px;color:#8a90a2;padding:8px 2px">매입 명세가 없습니다. 아래 [이번 차수 매입 명세]에서 [+ 행 추가]로 원료·부자재·가공 구성을 등록하면 여기에 자동 집계됩니다.</div></div>`:'';
+  return `<div class="cdsec"><div class="cdlbl">생산원가 구성 <span class="vatnote">※ 원료+부자재+가공 · EA당 · VAT별도 · 매입 명세 기준${cc.basisRound?' ('+cc.basisRound+')':''}${editable?' · <b style="color:#1E7A44">단가 직접 수정</b>':''}</span></div>${compMatrixHtml(nm,!!editable)}${editable?'<div style="font-size:10px;color:#8a90a2;margin-top:5px">💡 단가를 고치면 생산원가가 자동 갱신됩니다. 항목 추가·삭제·거래처·MOQ 수정은 아래 [이번 차수 매입 명세]에서 하세요.</div>':''}</div>`;
+}
+// [v85] 묶음 뷰 — 가로 매트릭스(구성품별 원료/부자재세부/가공 → 생산원가)
 function groupCompMatrixHtml(g){
   const members=(g.items||[]).map(nm=>({nm,cc:costComposition(nm)})).filter(x=>x.cc&&x.cc.order.length);
   if(!members.length) return '';
@@ -5311,16 +5335,17 @@ function groupCompMatrixHtml(g){
   const subSet=new Set(); members.forEach(m=>m.cc.grp['부자재'].items.forEach(it=>subSet.add(it.cat)));
   const subCols=pref.filter(s=>subSet.has(s)).concat([...subSet].filter(s=>pref.indexOf(s)<0));
   const catSum=(cc,bk,cat)=>cc.grp[bk].items.filter(it=>it.cat===cat).reduce((a,it)=>a+it.unit,0);
+  const hasRaw=members.some(m=>m.cc.grp['원료'].sum>0);
   const hasGa=members.some(m=>m.cc.grp['가공·기타'].sum>0);
   const hasWan=members.some(m=>m.cc.grp['완제품'].sum>0);
   const head=`<tr>
-    <th class="l" rowspan="2">상품명</th><th rowspan="2">원료</th>
+    <th class="l" rowspan="2">상품명</th>${hasRaw?'<th rowspan="2">원료</th>':''}
     ${subCols.length?`<th colspan="${subCols.length+1}">부자재</th>`:''}
     ${hasGa?'<th rowspan="2">가공·기타</th>':''}${hasWan?'<th rowspan="2">완제품</th>':''}
     <th class="hlite" rowspan="2">생산원가</th></tr>
     <tr>${subCols.map(s=>`<th>${s}</th>`).join('')}${subCols.length?'<th>부자재 합</th>':''}</tr>`;
   const body=members.map(m=>{ const cc=m.cc;
-    return `<tr><td class="l">${m.nm}</td><td>${won(cc.grp['원료'].sum)}</td>
+    return `<tr><td class="l">${m.nm}</td>${hasRaw?`<td>${won(cc.grp['원료'].sum)}</td>`:''}
       ${subCols.map(s=>{ const v=catSum(cc,'부자재',s); return `<td>${v?won(v):'-'}</td>`; }).join('')}${subCols.length?`<td>${won(cc.grp['부자재'].sum)}</td>`:''}
       ${hasGa?`<td>${won(cc.grp['가공·기타'].sum)}</td>`:''}${hasWan?`<td>${won(cc.grp['완제품'].sum)}</td>`:''}
       <td class="hlite"><b>${won(cc.cost)}</b></td></tr>`; }).join('');
@@ -5390,7 +5415,7 @@ function costDetailHtml(nm){
   return `<div class="costdetail">
     <div class="cdhead"><b>${nm} · 원가·매입 상세 보고</b><span class="cdcur">이번 차수(${curRound}) · 발주 <b>${won(orderQty)}EA</b> · 생산원가 <b>${won(cur)}원</b><small>/EA·VAT별도</small></span><button class="tbtn accent" style="font-size:11px;padding:4px 10px;margin-left:auto" onclick="addItemToCart('${nm}')">🛒 발주 담기</button></div>
     <div class="cdsec"><div class="cdlbl">차수별 생산원가 추이 <span class="vatnote">※ 전 차수 대비 <b style="color:#c0392b">▲인상</b>·<b style="color:#1E9E63">▼인하</b> / VAT 별도 / 단위 원</span></div>${rt}<div class="cdchart">${roundMiniChart(d.rounds)}</div></div>
-    ${compVerticalHtml(nm)}
+    ${compCostSection(nm,false)}
     <div class="cdgrid">
       <div>
         <div class="orderbanner"><span class="obl">이번 차수 발주량</span><span class="obv">${won(orderQty)} <small>EA</small></span><span class="obsub">매입액 ${won(sub)}원 (VAT별도) · VAT포함 ${won(subVat)}원</span></div>
@@ -5891,7 +5916,7 @@ function costEditHtml(nm){
     <td><button class="xbtn" onclick="delRound('${nm}','${r}')">×</button></td></tr>`).join('');
   const prows=d.purchase.map((p,pi)=>`<tr>
     <td><input class="ein" value="${p[0]}" onchange="editPur('${nm}',${pi},0,this.value)" style="width:80px"></td>
-    <td><input class="ein" value="${p[1]}" onchange="editPur('${nm}',${pi},1,this.value)" style="width:70px"></td>
+    <td><input class="ein" list="gubunList" value="${p[1]}" onchange="editPur('${nm}',${pi},1,this.value)" style="width:70px"></td>
     <td><input class="ein" value="${p[2]||''}" onchange="editPur('${nm}',${pi},2,this.value)" style="width:130px"></td>
     <td><input class="ein n" type="number" value="${p[3]}" onchange="editPur('${nm}',${pi},3,this.value)" style="width:65px"></td>
     <td><input class="ein n" type="number" value="${p[4]}" onchange="editPur('${nm}',${pi},4,this.value)" style="width:65px"></td>
@@ -5907,6 +5932,8 @@ function costEditHtml(nm){
       <div class="cdlbl">차수별 생산원가·발주량 <button class="tbtn" style="font-size:10px;padding:2px 8px" onclick="addRound('${nm}')">+ 차수 추가</button></div>
       <table class="cdedit"><thead><tr><th>차수</th><th>생산원가</th><th>발주량(EA)</th><th></th></tr></thead><tbody>${rrows}</tbody></table>
     </div>
+    ${compCostSection(nm,true)}
+    <datalist id="gubunList"><option value="원료"><option value="원재료"><option value="부자재"><option value="단상자"><option value="파우치"><option value="스티커"><option value="삽지"><option value="용기"><option value="가공비"><option value="임가공비"><option value="완제품"></datalist>
     <div class="cdgrid">
       <div><div class="cdlbl">이번 차수 매입 명세 <button class="tbtn" style="font-size:10px;padding:2px 8px" onclick="addPur('${nm}')">+ 행 추가</button></div>
         <table class="cdedit"><thead><tr><th>거래처</th><th>구분</th><th>상품명</th><th>MOQ(EA 기준)</th><th>단가</th><th>소계<span style="font-weight:400;color:#aaa">(자동)</span></th><th></th></tr></thead><tbody>${prows}</tbody></table></div>
