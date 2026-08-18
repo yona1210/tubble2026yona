@@ -688,9 +688,24 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .compMatrix tbody tr:nth-child(even) td.hlite{background:#fff3d4}
 .compMatrix small{font-weight:400;color:#7a8194;font-size:9px}
 .compMatrix .cmDot{width:8px;height:8px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:middle}
+.compMatrix.cmSingle{width:auto;min-width:0}
 .compMatrix.cmSingle td{font-size:12px;padding:6px 9px}
 .compMatrix.cmSingle .ein.n{font-size:12px}
-.compMatrix .cmNameIn{width:120px;font-size:10px;text-align:center;font-weight:700;color:#1E2761}
+.compMatrix .cmNameIn{width:118px;font-size:10px;text-align:center;font-weight:700;color:#1E2761}
+/* 수정 화면 섹션 헤더 — 색·아이콘으로 구분 */
+.editSec{margin:16px 0 7px;display:flex;align-items:center;gap:8px;padding:8px 13px;border-radius:9px;font-weight:800;font-size:12.5px}
+.editSec .esIco{font-size:14px;line-height:1}
+.editSec .esRight{margin-left:auto;font-weight:600;font-size:10.5px;opacity:.9;display:flex;align-items:center;gap:9px}
+.editSec .esRight .tbtn{font-size:10px;padding:3px 9px}
+.editSec.blue{background:#eef2fe;color:#1E2761;border-left:4px solid #3355FF}
+.editSec.green{background:#eafaf1;color:#1E7A44;border-left:4px solid #1E9E63}
+.editSec.slate{background:#eef1f5;color:#3a4252;border-left:4px solid #64748b}
+.editSec.amber{background:#fdf4e3;color:#96631a;border-left:4px solid #e0a52e}
+.reconWarn{margin-top:8px;padding:8px 12px;background:#fdeceb;border:1px solid #f0c9c5;border-radius:8px;font-size:11px;color:#b23b30;line-height:1.55}
+.reconOk{margin-top:8px;padding:6px 12px;background:#eef7f0;border:1px solid #cfe6d6;border-radius:8px;font-size:11px;color:#1E7A44}
+.editmode .cdgrid{gap:22px;margin-top:2px}
+.cdSecWrap{padding:2px 14px 8px}
+.cdSecWrap .editSec:first-child{margin-top:10px}
 @media(max-width:760px){.cdgrid{flex-direction:column}.cdgrid .cdnarrow{flex:auto}}
 .cdedit{width:100%;border-collapse:collapse;font-size:11px}
 .cdedit th,.cdedit td{padding:3px 5px;border-bottom:1px solid var(--grid);text-align:left}
@@ -5327,9 +5342,20 @@ function compMatrixHtml(nm, editable){
     <tr>${sup}<th class="hlite" rowspan="2">생산원가</th></tr><tr>${comp}</tr></thead>
     <tbody><tr>${data}<td class="hlite"><b>${won(cc.cost)}</b></td></tr></tbody></table></div>`;
 }
+// [v86] 차수 최신 생산원가 vs 명세 구성 합 대조 — 값이 여러 군데 다를 때 명확히 표시
+function compReconcileNote(nm){
+  const d=DATA.costDetail&&DATA.costDetail[nm]; const cc=costComposition(nm); if(!d||!cc||!cc.order.length) return '';
+  const RK=Object.keys(d.rounds||{}); if(!RK.length) return '';
+  const rLabel=RK[RK.length-1], latest=+d.rounds[rLabel]||0; if(!latest) return '';
+  const diff=cc.cost-latest;
+  if(Math.abs(diff)>Math.max(3,latest*0.01))
+    return `<div class="reconWarn">⚠ <b>값 불일치</b> — 차수 추이 최신(${rLabel}) 생산원가 <b>${won(latest)}원</b> ≠ 명세 구성 합 <b>${won(cc.cost)}원</b> (차이 ${diff>0?'+':''}${won(diff)}원). 어느 쪽이 맞는지 확인 후 <b>명세 단가</b> 또는 <b>차수 값</b>을 맞춰주세요.</div>`;
+  return `<div class="reconOk">✓ 차수 최신 생산원가와 명세 구성 합 일치 · <b>${won(cc.cost)}원</b></div>`;
+}
 function compCostSection(nm, editable){
-  const cc=costComposition(nm); if(!cc||!cc.order.length) return editable?`<div class="cdsec"><div class="cdlbl">생산원가 구성</div><div style="font-size:11px;color:#8a90a2;padding:8px 2px">매입 명세가 없습니다. 아래 [이번 차수 매입 명세]에서 [+ 행 추가]로 원료·부자재·가공 구성을 등록하면 여기에 자동 집계됩니다.</div></div>`:'';
-  return `<div class="cdsec"><div class="cdlbl">생산원가 구성 <span class="vatnote">※ 원료+부자재+가공 · EA당 · VAT별도 · 매입 명세 기준${cc.basisRound?' ('+cc.basisRound+')':''}${editable?' · <b style="color:#1E7A44">단가 직접 수정</b>':''}</span></div>${compMatrixHtml(nm,!!editable)}${editable?'<div style="font-size:10px;color:#8a90a2;margin-top:5px">💡 <b>항목명(머리글)</b>과 <b>단가</b>를 직접 고치면 생산원가가 자동 갱신됩니다. 항목 추가·삭제·구분(원료/부자재/가공)·거래처·MOQ 변경은 아래 [이번 차수 매입 명세]에서 하세요.</div>':''}</div>`;
+  const cc=costComposition(nm); if(!cc||!cc.order.length) return editable?`<div class="editSec green"><span class="esIco">🧩</span>생산원가 구성</div><div style="font-size:11px;color:#8a90a2;padding:6px 2px">매입 명세가 없습니다. 아래 [이번 차수 매입 명세]에서 [+ 행 추가]로 원료·부자재·가공 구성을 등록하면 여기에 자동 집계됩니다.</div>`:'';
+  const head=`<div class="editSec green"><span class="esIco">🧩</span>생산원가 구성 <span class="esRight">원료+부자재+가공 · EA당 · VAT별도 · 매입 명세 기준${cc.basisRound?' ('+cc.basisRound+')':''}${editable?' · <b>단가·항목 직접 수정</b>':''}</span></div>`;
+  return `${head}${compMatrixHtml(nm,!!editable)}${compReconcileNote(nm)}${editable?'<div style="font-size:10px;color:#8a90a2;margin-top:5px">💡 <b>항목명(머리글)</b>과 <b>단가</b>를 고치면 생산원가가 자동 갱신됩니다. 항목 추가·삭제·구분(원료/부자재/가공)·거래처·MOQ 변경은 아래 [매입 명세]에서 하세요.</div>':''}`;
 }
 // [v85] 묶음 뷰 — 가로 매트릭스(구성품별 원료/부자재세부/가공 → 생산원가)
 function groupCompMatrixHtml(g){
@@ -5419,7 +5445,7 @@ function costDetailHtml(nm){
   return `<div class="costdetail">
     <div class="cdhead"><b>${nm} · 원가·매입 상세 보고</b><span class="cdcur">이번 차수(${curRound}) · 발주 <b>${won(orderQty)}EA</b> · 생산원가 <b>${won(cur)}원</b><small>/EA·VAT별도</small></span><button class="tbtn accent" style="font-size:11px;padding:4px 10px;margin-left:auto" onclick="addItemToCart('${nm}')">🛒 발주 담기</button></div>
     <div class="cdsec"><div class="cdlbl">차수별 생산원가 추이 <span class="vatnote">※ 전 차수 대비 <b style="color:#c0392b">▲인상</b>·<b style="color:#1E9E63">▼인하</b> / VAT 별도 / 단위 원</span></div>${rt}<div class="cdchart">${roundMiniChart(d.rounds)}</div></div>
-    ${compCostSection(nm,false)}
+    <div class="cdSecWrap">${compCostSection(nm,false)}</div>
     <div class="cdgrid">
       <div>
         <div class="orderbanner"><span class="obl">이번 차수 발주량</span><span class="obv">${won(orderQty)} <small>EA</small></span><span class="obsub">매입액 ${won(sub)}원 (VAT별도) · VAT포함 ${won(subVat)}원</span></div>
@@ -5930,18 +5956,21 @@ function costEditHtml(nm){
   const whs=Object.keys(st).filter(k=>k!=='합계');
   const whTotal=whs.reduce((a,k)=>{ const v=st[k]; return (v===null||v===undefined)?a:a+(+v||0); },0);
   const si=(DATA.stock||[]).find(x=>x.nm===nm);
+  const esc=nm.replace(/'/g,"\\'");
   return `<div class="costdetail editmode">
-    <div class="cdhead"><b>${nm}</b><button class="tbtn ${d._pendingDel?'':'danger'}" style="font-size:10px;padding:3px 8px" onclick="delCostItem('${nm.replace(/'/g,"\\'")}')">${d._pendingDel?'삭제 예정 취소':'품목 삭제'}</button></div>
-    <div class="cdsec">
-      <div class="cdlbl">차수별 생산원가·발주량 <button class="tbtn" style="font-size:10px;padding:2px 8px" onclick="addRound('${nm}')">+ 차수 추가</button></div>
+    <div class="cdhead"><b>${nm}</b><span style="font-size:10px;color:#fff;opacity:.85;margin-left:8px">수정 모드 — 값을 고치면 자동 저장 대기(끝나면 [저장])</span><button class="tbtn ${d._pendingDel?'':'danger'}" style="font-size:10px;padding:3px 8px;margin-left:auto" onclick="delCostItem('${esc}')">${d._pendingDel?'삭제 예정 취소':'품목 삭제'}</button></div>
+    <div class="cdSecWrap">
+      <div class="editSec blue"><span class="esIco">📈</span>차수별 생산원가·발주량 <span class="esRight">차수마다 생산원가·발주량 기록 <button class="tbtn" onclick="addRound('${esc}')">+ 차수 추가</button></span></div>
       <table class="cdedit"><thead><tr><th>차수</th><th>생산원가</th><th>발주량(EA)</th><th></th></tr></thead><tbody>${rrows}</tbody></table>
+      ${compCostSection(nm,true)}
     </div>
-    ${compCostSection(nm,true)}
     <datalist id="gubunList"><option value="원료"><option value="원재료"><option value="부자재"><option value="단상자"><option value="파우치"><option value="스티커"><option value="삽지"><option value="용기"><option value="가공비"><option value="임가공비"><option value="완제품"></datalist>
     <div class="cdgrid">
-      <div><div class="cdlbl">이번 차수 매입 명세 <button class="tbtn" style="font-size:10px;padding:2px 8px" onclick="addPur('${nm}')">+ 행 추가</button></div>
+      <div>
+        <div class="editSec slate"><span class="esIco">🧾</span>이번 차수 매입 명세 <span class="esRight">거래처·구분·MOQ·단가·항목 추가/삭제 <button class="tbtn" onclick="addPur('${esc}')">+ 행 추가</button></span></div>
         <table class="cdedit"><thead><tr><th>거래처</th><th>구분</th><th>상품명</th><th>MOQ(EA 기준)</th><th>단가</th><th>소계<span style="font-weight:400;color:#aaa">(자동)</span></th><th></th></tr></thead><tbody>${prows}</tbody></table></div>
-      <div class="cdnarrow"><div class="cdlbl">현재고 <button class="tbtn" style="font-size:10px;padding:2px 8px" onclick="addWh('${nm}')">+ 창고 추가</button></div>
+      <div class="cdnarrow">
+        <div class="editSec amber"><span class="esIco">📦</span>현재고 <span class="esRight"><button class="tbtn" onclick="addWh('${esc}')">+ 창고 추가</button></span></div>
         <table class="cdedit"><thead><tr><th>창고명</th><th>수량</th><th></th></tr></thead><tbody>
           ${whs.length?whs.map(k=>{ const v=st[k]; const isNull=(v===null||v===undefined); return `<tr>
             <td><input class="ein" value="${k}" onchange="renameWh('${nm}','${k}',this.value)" style="width:70px"></td>
