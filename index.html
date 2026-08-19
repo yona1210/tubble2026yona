@@ -9380,7 +9380,7 @@ function aggregateSalesRows(rows){
   const months=new Set(), dayKeys=new Set(), itemMap={}, catMap={}, chMap={}, clientMap={}, whMap={}, monthMap={};
   const itemChannelDailyQty={}, itemClientMonthlyQty={};
   let totalAmt=0, totalQty=0, rowCnt=0;
-  const acc=(map,key,ym,amt,qty)=>{ if(!map[key])map[key]={amt:0,qty:0,byMonth:{}}; map[key].amt+=amt; map[key].qty+=qty; map[key].byMonth[ym]=(map[key].byMonth[ym]||0)+amt; };
+  const acc=(map,key,ym,amt,qty)=>{ if(!map[key])map[key]={amt:0,qty:0,byMonth:{},qtyByMonth:{}}; map[key].amt+=amt; map[key].qty+=qty; map[key].byMonth[ym]=(map[key].byMonth[ym]||0)+amt; map[key].qtyByMonth[ym]=(map[key].qtyByMonth[ym]||0)+qty; };
   const addDailyQty=(itemNm,ch,dateKey,qty)=>{ if(!itemNm||!ch||!dateKey||!qty)return; if(!itemChannelDailyQty[itemNm])itemChannelDailyQty[itemNm]={}; if(!itemChannelDailyQty[itemNm][ch])itemChannelDailyQty[itemNm][ch]={}; itemChannelDailyQty[itemNm][ch][dateKey]=(itemChannelDailyQty[itemNm][ch][dateKey]||0)+qty; };
   rows.forEach(r=>{
     const dk=String(r[0]||''), ym=dk.slice(0,7); if(!ym) return;
@@ -9519,9 +9519,9 @@ function handleSalesUpload(file){
 // KPI + 본문 렌더
 function renderSales(){
   // [v83] 배포 시드의 salesData는 예전 분류 규칙으로 집계돼 있을 수 있음 → 원본(salesAcc)에서 1회 재집계해 최신 분류 반영
-  if(!DATA._salesReagg && DATA.salesAcc && DATA.salesAcc.rows && DATA.salesAcc.rows.length){
-    try{ rebuildSalesData(); }catch(e){ console.warn('salesData 재집계 실패', e); }
-    DATA._salesReagg = true;
+  if(!DATA._salesReaggV84 && DATA.salesAcc && DATA.salesAcc.rows && DATA.salesAcc.rows.length){
+    try{ rebuildSalesData(); }catch(e){ console.warn('salesData 재집계 실패', e); }   // v84: qtyByMonth(월별 수량) 반영 위해 1회 재집계
+    DATA._salesReaggV84 = true;
   }
   const meta=document.getElementById('salesMeta');
   const kpis=document.getElementById('salesKpis');
@@ -9598,13 +9598,15 @@ function salesGroupHierarchy(sd){
   const groups={};
   Object.entries(catMap).forEach(([c,o])=>{
     let amt=0; Object.entries(o.byMonth||{}).forEach(([ym,a])=>{ if(ym.slice(0,4)===cy) amt+=a; });
+    let qty=0; Object.entries(o.qtyByMonth||{}).forEach(([ym,a])=>{ if(ym.slice(0,4)===cy) qty+=a; });
     const g=gmap[c]||'미분류';
-    if(!groups[g]) groups[g]={amt:0,cats:[]};
-    groups[g].amt+=amt; groups[g].cats.push({cat:c,amt});
+    if(!groups[g]) groups[g]={amt:0,qty:0,cats:[]};
+    groups[g].amt+=amt; groups[g].qty+=qty; groups[g].cats.push({cat:c,amt,qty});
   });
   const total=Object.values(groups).reduce((s,g)=>s+g.amt,0)||1;
+  const totalQty=Object.values(groups).reduce((s,g)=>s+g.qty,0)||0;
   const order=CAT_GROUPS.concat(['미분류']).filter(g=>groups[g]);
-  return {cy,total,order,groups};
+  return {cy,total,totalQty,order,groups};
 }
 function salesGroupHtml(sd){
   const h=salesGroupHierarchy(sd);
@@ -9621,31 +9623,31 @@ function salesGroupHtml(sd){
     const o=sd.item[nm]; const amt=salesYearAmt(o, h.cy);
     if(amt<=0) return;
     const cat=salesCategory(nm);
-    (itemBuckets[cat]=itemBuckets[cat]||[]).push({nm,amt,o});
+    (itemBuckets[cat]=itemBuckets[cat]||[]).push({nm,amt,qty:salesYearQty(o,h.cy),o});
   });
   Object.values(itemBuckets).forEach(arr=>arr.sort((a,b)=>b.amt-a.amt));
   let itemSeq=0;
   const rows=h.order.map((g,gi)=>{
     const grp=h.groups[g], gpct=(grp.amt/h.total*100);
-    const head=`<tr class="grpRow"><td style="text-align:left">${g}</td><td><b>${salesEok(grp.amt)}</b></td><td><b>${gpct.toFixed(1)}%</b></td></tr>`;
+    const head=`<tr class="grpRow"><td style="text-align:left">${g}</td><td><b>${salesEok(grp.amt)}</b></td><td><b>${won(Math.round(grp.qty))}</b></td><td><b>${gpct.toFixed(1)}%</b></td></tr>`;
     const subs=grp.cats.slice().sort((a,b)=>b.amt-a.amt).map((c,ci)=>{
       const key=`g${gi}c${ci}`;
       const items=itemBuckets[c.cat]||[];
       const catTotal=items.reduce((s,it)=>s+it.amt,0)||c.amt||1;
       const has=items.length>0;
       const caret=has?'<span class="catCaret" style="display:inline-block;width:11px;color:#9aa1b2;font-size:9px">▶</span>':'<span style="display:inline-block;width:11px"></span>';
-      const sub=`<tr class="subRow${has?' catExpandable':''}" data-cat-key="${key}"${has?` onclick="toggleSalesCatItems('${key}',this)" style="cursor:pointer"`:''}><td style="text-align:left;padding-left:20px;color:#5f6470">${caret} └ ${c.cat}${has?` <span style="color:#aab;font-weight:400;font-size:10.5px">(${items.length}품목)</span>`:''}</td><td>${salesEok(c.amt)}</td><td>${(c.amt/h.total*100).toFixed(1)}%</td></tr>`;
+      const sub=`<tr class="subRow${has?' catExpandable':''}" data-cat-key="${key}"${has?` onclick="toggleSalesCatItems('${key}',this)" style="cursor:pointer"`:''}><td style="text-align:left;padding-left:20px;color:#5f6470">${caret} └ ${c.cat}${has?` <span style="color:#aab;font-weight:400;font-size:10.5px">(${items.length}품목)</span>`:''}</td><td>${salesEok(c.amt)}</td><td>${won(Math.round(c.qty))}</td><td>${(c.amt/h.total*100).toFixed(1)}%</td></tr>`;
       const itemRows=items.map(it=>{
         const ikey=key+'i'+(itemSeq++);
         const inPct=it.amt/catTotal*100, ofT=it.amt/h.total*100;
         const hasMon=cyMonths.length>0;
         const icaret=hasMon?'<span class="itmCaret" style="display:inline-block;width:10px;color:#b6bccb;font-size:8px">▶</span>':'<span style="display:inline-block;width:10px"></span>';
-        const itemTr=`<tr class="itemRow${hasMon?' itemExpandable':''}" data-cat-parent="${key}" data-item-key="${ikey}"${hasMon?` onclick="toggleSalesItemMonths('${ikey}',this)" style="display:none;background:#fafbfe;cursor:pointer"`:' style="display:none;background:#fafbfe"'}><td style="text-align:left;padding-left:40px;color:#8a90a2;font-size:12px" title="${pEsc(it.nm)}">${icaret} · ${pEsc(clipLabel(it.nm,26))}</td><td style="color:#8a90a2">${salesEok(it.amt)}</td><td><b style="color:#3a3d47">${inPct.toFixed(1)}%</b> <span style="color:#aab;font-size:10.5px">(${ofT.toFixed(1)}%)</span></td></tr>`;
+        const itemTr=`<tr class="itemRow${hasMon?' itemExpandable':''}" data-cat-parent="${key}" data-item-key="${ikey}"${hasMon?` onclick="toggleSalesItemMonths('${ikey}',this)" style="display:none;background:#fafbfe;cursor:pointer"`:' style="display:none;background:#fafbfe"'}><td style="text-align:left;padding-left:40px;color:#8a90a2;font-size:12px" title="${pEsc(it.nm)}">${icaret} · ${pEsc(clipLabel(it.nm,26))}</td><td style="color:#8a90a2">${salesEok(it.amt)}</td><td style="color:#8a90a2">${won(Math.round(it.qty))}</td><td><b style="color:#3a3d47">${inPct.toFixed(1)}%</b> <span style="color:#aab;font-size:10.5px">(${ofT.toFixed(1)}%)</span></td></tr>`;
         let monTr='';
         if(hasMon){
-          const chips=cyMonths.map(mo=>{ const v=(it.o.byMonth||{})[h.cy+'-'+mo]||0; const mt=(ymObj[h.cy]&&ymObj[h.cy][mo])||0; const p=(v&&mt)?(v/mt*100):0; const on=v>0;
-            return `<span style="display:inline-flex;flex-direction:column;align-items:center;min-width:46px;padding:3px 5px;border-radius:6px;background:${on?'#eef2fe':'#f4f5f8'};font-size:10px;line-height:1.4"><b style="color:#5a6478">${mo}월</b><span style="color:${on?'#1E2761':'#c8ccd6'};font-weight:700">${on?salesWon(Math.round(v/1e4))+'만':'-'}</span>${on?`<span style="color:#9aa1b2">${p.toFixed(1)}%</span>`:''}</span>`; }).join('');
-          monTr=`<tr class="itemMonRow" data-cat-parent="${key}" data-mon-parent="${ikey}" style="display:none"><td colspan="3" style="padding:6px 8px 10px 40px;background:#f7f9ff;text-align:left"><div style="font-size:10.5px;color:#8a90a2;margin-bottom:5px">${h.cy} 월별 매출(만원) · 그 달 내 비중</div><div style="display:flex;flex-wrap:wrap;gap:4px">${chips}</div></td></tr>`;
+          const chips=cyMonths.map(mo=>{ const v=(it.o.byMonth||{})[h.cy+'-'+mo]||0; const q=(it.o.qtyByMonth||{})[h.cy+'-'+mo]||0; const mt=(ymObj[h.cy]&&ymObj[h.cy][mo])||0; const p=(v&&mt)?(v/mt*100):0; const on=v>0;
+            return `<span style="display:inline-flex;flex-direction:column;align-items:center;min-width:50px;padding:3px 5px;border-radius:6px;background:${on?'#eef2fe':'#f4f5f8'};font-size:10px;line-height:1.4"><b style="color:#5a6478">${mo}월</b><span style="color:${on?'#1E2761':'#c8ccd6'};font-weight:700">${on?salesWon(Math.round(v/1e4))+'만':'-'}</span>${on?`<span style="color:#7a8194;font-size:9px">${won(Math.round(q))}개</span>`:''}${on?`<span style="color:#9aa1b2">${p.toFixed(1)}%</span>`:''}</span>`; }).join('');
+          monTr=`<tr class="itemMonRow" data-cat-parent="${key}" data-mon-parent="${ikey}" style="display:none"><td colspan="4" style="padding:6px 8px 10px 40px;background:#f7f9ff;text-align:left"><div style="font-size:10.5px;color:#8a90a2;margin-bottom:5px">${h.cy} 월별 매출(만원)·수량(개) · 그 달 내 비중</div><div style="display:flex;flex-wrap:wrap;gap:4px">${chips}</div></td></tr>`;
         }
         return itemTr+monTr;
       }).join('');
@@ -9659,8 +9661,8 @@ function salesGroupHtml(sd){
     <div class="salesSec"><h4>품목별 월별 추이 <span class="secSub">상위 5 · 최근 12개월</span></h4>${chartBox('groupItemLine',260)}</div>
   </div>
   <div class="salesSec"><h4>대분류 → 세부 → 품목 <span class="secSub">${h.cy} · 세부(└) 클릭→품목 · 품목(·) 클릭→월별 추이 · 품목%=카테고리 내 비중(괄호=전체 대비)</span></h4>
-    <div class="salesTblWrap"><table class="salesTbl groupTbl"><thead><tr><th style="text-align:left">대분류 / 세부 / 품목</th><th>${h.cy} 매출</th><th>비중</th></tr></thead>
-    <tbody>${rows}<tr class="tot"><td style="text-align:left">합계</td><td><b>${salesEok(h.total)}</b></td><td>100%</td></tr></tbody></table></div></div>`;
+    <div class="salesTblWrap"><table class="salesTbl groupTbl"><thead><tr><th style="text-align:left">대분류 / 세부 / 품목</th><th>${h.cy} 매출</th><th>${h.cy} 수량</th><th>비중</th></tr></thead>
+    <tbody>${rows}<tr class="tot"><td style="text-align:left">합계</td><td><b>${salesEok(h.total)}</b></td><td><b>${won(Math.round(h.totalQty))}</b></td><td>100%</td></tr></tbody></table></div></div>`;
 }
 // [v83] 세부 카테고리 행 클릭 → 품목 펼침/접기 (접을 땐 하위 월별 행도 함께 숨김)
 function toggleSalesCatItems(key,rowEl){
@@ -9698,6 +9700,7 @@ function drawSalesGroupChart(sd){
 }
 // [v78] 특정 연도 기준 집계 — byMonth에서 해당 연도만 합산
 function salesYearAmt(o, year){ let a=0; Object.entries(o.byMonth||{}).forEach(([ym,v])=>{ if(ym.slice(0,4)===year) a+=v; }); return a; }
+function salesYearQty(o, year){ let q=0; Object.entries((o&&o.qtyByMonth)||{}).forEach(([ym,v])=>{ if(ym.slice(0,4)===year) q+=v; }); return q; }
 function salesDimYear(sd, view, year){
   const map=salesDimMap(sd,view);
   return Object.entries(map).map(([k,o])=>[k, salesYearAmt(o,year)]).filter(([,a])=>a>0).sort((a,b)=>b[1]-a[1]);
