@@ -7812,6 +7812,12 @@ function buildWeeklyFormRows(){
     if(nextStepIdx<0) for(let k=0;k<STEPS.length;k++){ if(s.st9[k]==='plan'){nextStepIdx=k;break;} }
     const nextStep = nextStepIdx>=0? STEPS[nextStepIdx] : '전 공정 완료';
     const nextStepDue = nextStepIdx>=0? ((s.d9[nextStepIdx]||[])[1]||'') : '';
+    // [v87] 결과(H) 전용: "현재 진행 공정" 다음의 실제 다음 미완 공정 (현재 공정 중복·역행 방지)
+    const _curIdx = (s.st9.indexOf('doing')>=0) ? s.st9.indexOf('doing') : s.st9.lastIndexOf('done');
+    let afterIdx=-1; for(let k=_curIdx+1;k<STEPS.length;k++){ if(s.st9[k]==='plan'||s.st9[k]==='doing'){ afterIdx=k; break; } }
+    const afterStep = afterIdx>=0? STEPS[afterIdx] : '';
+    const afterDue  = afterIdx>=0? ((s.d9[afterIdx]||[])[1]||'') : '';
+    const dueOk = v=>{ v=String(v||'').trim(); return v && v!=='-' && /\d{1,2}\s*[.\/]\s*\d{1,2}/.test(v); };
     // 차주 완료예정 공정
     const dueNext=[];
     s.st9.forEach((st,k)=>{ if((st==='plan'||st==='doing') && inRange((s.d9[k]||[])[1],NOW,weekAhead)) dueNext.push(`${STEPS[k]}(${s.d9[k][1]})`); });
@@ -7872,13 +7878,16 @@ function buildWeeklyFormRows(){
       } else {
         G = memoCleanFirst || `${w.cur} 준비 중`;
       }
-      // [v71] H 결과(상태·판단·다음 예정): 메모[결과] 우선 → 현재단계 + 다음공정 예정일
+      // [v87] H 결과(상태·판단·다음 예정): 메모[결과] 우선 → 상태별로 현재단계 + '실제 다음 공정' 예정
       if(tagResult){
         H = tagResult;
-      } else {
-        const nextBit = (nextStep!=='전 공정 완료' && nextStepDue)? `${nextStep} 예정(~${nextStepDue})`
-                       : (nextStep!=='전 공정 완료'? `${nextStep} 예정` : '전 공정 완료');
+      } else if(w.state==='done'){
+        H = '전 공정 완료';
+      } else if(w.state==='doing'){
+        const nextBit = afterStep ? `다음 ${afterStep}${dueOk(afterDue)?` 예정(${afterDue})`:''}` : '마지막 공정 진행 중';
         H = `${w.cur} 진행 중 · ${nextBit}`;
+      } else {   // wait: "X 대기" — '진행 중' 붙이지 않음
+        H = w.cur;
       }
       // J 계획(다음주): 다음 미완 공정
       J = nextStep!=='전 공정 완료'? `${nextStep} 진행${nextStepDue?'('+nextStepDue+')':''}` : '출시·판매 모니터링';
