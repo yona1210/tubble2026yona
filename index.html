@@ -545,6 +545,12 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .channelTbl .sum td{background:#fafbfd;font-weight:800;color:var(--navy);border-top:1px solid #dce3f7}
 .channelTbl .pos{color:var(--red);font-weight:800}.channelTbl .neg{color:var(--green);font-weight:800}.channelTbl .zero{color:var(--mut);font-weight:700}
 .channelTbl .t-up{color:var(--red)}.channelTbl .t-down{color:#2563c9}.channelTbl .t-flat{color:var(--mut)}
+.clientTbl .clGrp td{background:#eef2fe;color:var(--navy);font-weight:800;border-top:1px solid #d7def5}
+.clientTbl .clGrp td:first-child{text-align:left}
+.clientTbl .clCnt{font-weight:600;font-size:8.5px;color:#8a90a2;margin-left:4px}
+.clientTbl .clRow td{color:#5a6478}
+.clientTbl .clRow .clNm{padding-left:16px;color:#3a4252}
+.clientTbl .clRow.clRest .clNm{color:#9aa1b2;font-style:italic}
 @media(max-width:760px){.basisTbl,.channelTbl{font-size:9.5px}.basisTbl th,.basisTbl td,.channelTbl th,.channelTbl td{padding:4px 5px}.channelBasis{overflow-x:auto}}
 /* [v58] 단계별 추이 */
 .stepTrend{margin-top:10px;padding-top:8px;border-top:1px dashed #d0d6e4}
@@ -4649,6 +4655,41 @@ function channelBasisHtml(nm,c){
     ${trendBlock}
   </div>`;
 }
+// [v88] 거래처별 출고 상세 — 채널을 한 단계 더 파고들어 실제 나가는 거래처(client) 표시. 원본: salesData.itemClientMonthlyQty[품목][거래처][월]
+function clientBasisHtml(nm){
+  const sd=DATA.salesData||{};
+  const map=(sd.itemClientMonthlyQty||{})[nm];
+  const allMonths=(sd.months||[]);
+  if(!map || !allMonths.length) return '';
+  const sumOver=(bym,ms)=>ms.reduce((a,m)=>a+(bym[m]||0),0);
+  let months=allMonths.slice(-3), scope='최근 3개월';
+  let clients=Object.keys(map).map(client=>{ const bym=map[client]||{}; return {client, ch:resolveSalesChannel(client), bym, vals:months.map(m=>bym[m]||0), sum:sumOver(bym,months)}; });
+  if(!clients.some(c=>c.sum>0)){   // 최근 3개월 출고 없으면 최근 6개월로 확장
+    months=allMonths.slice(-6); scope='최근 6개월';
+    clients=clients.map(c=>({...c, vals:months.map(m=>c.bym[m]||0), sum:sumOver(c.bym,months)}));
+  }
+  clients=clients.filter(c=>c.sum>0);
+  if(!clients.length) return '';
+  clients.sort((a,b)=>b.sum-a.sum);
+  const grand=clients.reduce((a,c)=>a+c.sum,0)||1;
+  const byCh={}; clients.forEach(c=>{ (byCh[c.ch]=byCh[c.ch]||[]).push(c); });
+  const chOrder=Object.keys(byCh).sort((a,b)=>byCh[b].reduce((x,c)=>x+c.sum,0)-byCh[a].reduce((x,c)=>x+c.sum,0));
+  const CAP=8, mLab=months.map(m=>m.slice(2));
+  let body='';
+  chOrder.forEach(ch=>{
+    const list=byCh[ch], chVals=months.map((m,i)=>list.reduce((a,c)=>a+c.vals[i],0)), chSum=list.reduce((a,c)=>a+c.sum,0);
+    body+=`<tr class="clGrp"><td>${pEsc(ch)}<span class="clCnt">${list.length}거래처</span></td>${chVals.map(v=>`<td>${won(v)}</td>`).join('')}<td>${won(chSum)}</td><td>${(chSum/grand*100).toFixed(1)}%</td></tr>`;
+    list.slice(0,CAP).forEach(c=>{ body+=`<tr class="clRow"><td class="clNm">└ ${pEsc(c.client)}</td>${c.vals.map(v=>`<td>${won(v)}</td>`).join('')}<td>${won(c.sum)}</td><td>${(c.sum/grand*100).toFixed(1)}%</td></tr>`; });
+    if(list.length>CAP){ const rest=list.slice(CAP), rVals=months.map((m,i)=>rest.reduce((a,c)=>a+c.vals[i],0)), rSum=rest.reduce((a,c)=>a+c.sum,0);
+      body+=`<tr class="clRow clRest"><td class="clNm">└ 그 외 ${rest.length}개 거래처</td>${rVals.map(v=>`<td>${won(v)}</td>`).join('')}<td>${won(rSum)}</td><td>${(rSum/grand*100).toFixed(1)}%</td></tr>`; }
+  });
+  const totVals=months.map((m,i)=>clients.reduce((a,c)=>a+c.vals[i],0));
+  return `<div class="channelBasis">
+    <div class="ctitle">거래처별 출고 상세 <span style="font-weight:400;font-size:10px;color:#9aa1b2">${scope} · 채널 안에서 실제 나가는 거래처(수량 EA)</span></div>
+    <table class="channelTbl clientTbl"><thead><tr><th>채널 / 거래처</th>${mLab.map(m=>`<th>${m}</th>`).join('')}<th>합계</th><th>비중</th></tr></thead>
+    <tbody>${body}<tr class="sum"><td>전체 거래처 ${clients.length}곳</td>${totVals.map(v=>`<td>${won(v)}</td>`).join('')}<td>${won(grand)}</td><td>100%</td></tr></tbody></table>
+  </div>`;
+}
 function stockIssues(s,c){
   const issues=[];
   const hist=getDailyHistory(s.nm);
@@ -5042,6 +5083,7 @@ function renderStock(){
           <div class="brow final"><span>발주판단</span><b>${won(Math.round(c.daily))} ${su}/일</b> <span class="bsrc">${c.sourceLabel||'월평균 기준'} · ${c.status==='unverified'?'재고 기준 미확정 — 잠정 시나리오는 아래 확인':'예상 소진일 '+(c.runout?fmtMDfull(c.runout):'-')+' · 권장발주 '+won(c.orderQty)+su+' · 발주점 '+won(c.rop)+su} · 리드타임 ${s.lead||0}일</span></div>
           ${stepTrendHtml(s.nm)}
           ${channelBasisHtml(s.nm,c)}
+          ${clientBasisHtml(s.nm)}
           <div class="basisNote"><b>해석:</b> 월평균 기준은 기본 전망, 월별 채널 3개월 추이는 월초에 갱신되는 판매 방향성, 데일리 현재고 감소 추이는 매일 확인 가능한 실제 소진 속도입니다. 데일리 기준 소진일이 월평균보다 빠르면 발주 시점을 앞당겨 보는 구조입니다.</div>
           ${stockIssueHtml(s,c)}
           ${orderSimHtml(s,i,c)}
