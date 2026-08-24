@@ -40,13 +40,13 @@ try {
   & (Join-Path $dir 'bake-json.ps1') $f.FullName
 
   # 4) 변경이 없으면 종료
-  $changed = git status --porcelain -- index.html data/tubble-data.js
+  $changed = git status --porcelain -- index.html data/tubble-data.js data/tubble-data.json
   if(-not $changed){ Write-Host "`n변경 사항이 없습니다 (이미 최신입니다)." -ForegroundColor Green; PauseExit 0 }
 
   # 5) commit + push  (커밋 메시지는 인코딩 안전하게 ASCII 날짜로)
   $d = if($f.Name -match '(\d{4}-\d{2}-\d{2})'){ $Matches[1] } else { 'update' }
   Write-Host "`n[2/3] 커밋 중..." -ForegroundColor Cyan
-  git add index.html data/tubble-data.js
+  git add index.html data/tubble-data.js data/tubble-data.json
   git commit -m ("data update " + $d)
   Write-Host "`n[3/3] 푸시 중... (깃허브 로그인 창이 뜨면 로그인하세요)" -ForegroundColor Cyan
   git push origin main

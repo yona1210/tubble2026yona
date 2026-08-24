@@ -39,5 +39,9 @@ New-Item -ItemType Directory -Force -Path (Join-Path $dir 'data') | Out-Null
 [IO.File]::WriteAllText((Join-Path $dir 'data\tubble-data.js'), $dataJs, $L1)
 Write-Host ("[OK] data/tubble-data.js 갱신 : {0:N0} bytes" -f $dataJs.Length)
 
+# 외부 공유용 순수 JSON(래퍼 없음) 동시 갱신 - raw URL 로 바로 읽히는 파일
+[IO.File]::WriteAllText((Join-Path $dir 'data\tubble-data.json'), $compact, $L1)
+Write-Host ("[OK] data/tubble-data.json 갱신 : {0:N0} bytes" -f $compact.Length)
+
 # 베이크
 & (Join-Path $dir 'build.ps1')
