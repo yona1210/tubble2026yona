@@ -1090,9 +1090,12 @@ tr.main.arch:hover{opacity:1}
 .riMetric b{display:block;font-size:14px;color:#2d3448;line-height:1.05;font-variant-numeric:tabular-nums}
 .riMetric span{display:block;margin-top:3px;font-size:9.5px;color:#8a93a8;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .riQuoteGrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.riQuote{font-size:10.5px;line-height:1.42;color:#4b5264;background:#fafbfd;border-left:3px solid #1E9E63;border-radius:6px;padding:7px 8px;min-height:44px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+/* [v83] line-clamp 대상에 블록 자식(.qtag)이 섞여 있어 줄이 중간에서 잘려 보이던 문제 수정.
+   태그는 클램프 밖으로 빼고 본문(.qtxt)만 3줄로 자른다 — 잘릴 때 말줄임표가 정상 표시된다. */
+.riQuote{font-size:10.5px;line-height:1.42;color:#4b5264;background:#fafbfd;border-left:3px solid #1E9E63;border-radius:6px;padding:7px 8px;min-height:44px;overflow:hidden}
 .riQuote.neg{border-left-color:#D64541}
 .riQuote .qtag{display:block;font-size:9px;font-weight:850;color:#8a93a8;margin-bottom:2px}
+.riQuote .qtxt{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
 .riRevs{display:flex;flex-direction:column;gap:6px}
 .riRev{font-size:11px;line-height:1.45;padding:7px 9px;border-radius:7px;background:#f7f9fc;border-left:3px solid #1E9E63}
 .riRev.neg{border-left-color:#D64541}
@@ -10375,7 +10378,15 @@ function reviewInsightStats(rd){
   return {from,to,total:list.length,avg,positive,neutral,negative,photo,monthRows,byCat:sortMap(byCat),byGood:sortMap(byGood),byBad:sortMap(byBad),byKind:sortMap(byKind),list};
 }
 
-function reviewInsightRate(n,total){ return total?Math.round(n/total*100):0; }
+// [v83] 건수가 0이 아닌데 0%로 표시되던 문제 수정.
+// 리뷰가 3만건대로 늘면서 1~2점 83건(0.22%)이 반올림돼 '0%'로 보였다.
+// 10% 이상은 정수, 그 미만은 소수 첫째자리, 0.05% 미만이지만 0건은 아닌 경우는 0.1%로 바닥을 둔다.
+function reviewInsightRate(n,total){
+  if(!total||!n) return 0;
+  const p=n/total*100;
+  if(p>=10) return Math.round(p);
+  return Math.max(0.1, Math.round(p*10)/10);
+}
 
 function reviewInsightDashboardHtml(rd){
   const st=reviewInsightStats(rd);
@@ -10458,7 +10469,7 @@ function reviewItemInsightText(g){
     const sev=strongDislike>=1?`강한 불만 ${strongDislike}건 포함`:'개선 신호';
     html=`평균 <b>${avg.toFixed(2)}점</b> · 긍정 ${Math.round(g.pos/g.cnt*100)}%. <b>강점</b> ${strengthTxt}. <b>주의</b> ${concernTop[0]} 관련 ${sev}(${concernTop[1]}건). <span class="rec" style="color:#C0392B">→ ${concernTop[0]} 개선 우선 검토</span>`;
   } else if(strengths.length){
-    html=`평균 <b>${avg.toFixed(2)}점</b> · 긍정 ${Math.round(g.pos/g.cnt*100)}%. <b>강점</b> ${strengthTxt}(${salesWon(g.pos)}건). 부정 신호 미미(${negPct}%). <span class="rec" style="color:#1E9E63">→ ${strengths[0]} 강점을 셀링포인트로</span>`;
+    html=`평균 <b>${avg.toFixed(2)}점</b> · 긍정 ${Math.round(g.pos/g.cnt*100)}%. <b>강점</b> ${strengthTxt}(${salesWon(g.pos)}건). 부정 신호 미미(${reviewInsightRate(g.neg,g.cnt)}%). <span class="rec" style="color:#1E9E63">→ ${strengths[0]} 강점을 셀링포인트로</span>`;
   } else {
     html=`리뷰 ${salesWon(g.cnt)}건 · 평균 <b>${avg.toFixed(2)}점</b>. 주제 키워드가 적어 표본 보강 필요.`;
   }
@@ -10526,8 +10537,8 @@ function reviewItemOverviewHtml(rd){
       </div>
       <div class="riInsight">${ins.html}<div class="riChips" style="margin-top:7px">${chips}</div></div>
       <div class="riQuoteGrid">
-        <div class="riQuote"><span class="qtag">대표 호평</span>${good?reviewEsc(reviewShort(good.body,74)):'표본 없음'}</div>
-        <div class="riQuote neg"><span class="qtag">확인할 리뷰</span>${bad?reviewEsc(reviewShort(bad.body,74)):'낮은 평점 없음'}</div>
+        <div class="riQuote"><span class="qtag">대표 호평</span><span class="qtxt">${good?reviewEsc(reviewShort(good.body,74)):'표본 없음'}</span></div>
+        <div class="riQuote neg"><span class="qtag">확인할 리뷰</span><span class="qtxt">${bad?reviewEsc(reviewShort(bad.body,74)):'낮은 평점 없음'}</span></div>
       </div>
       <div class="riCardMeta">${act.text} · 포토 ${reviewInsightRate(g.photo,g.cnt)}%</div>
     </div>`;
