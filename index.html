@@ -2676,7 +2676,8 @@ body{padding-bottom:48px}
 
 <div id="tab-review" style="display: none;">
   <div class="toolbar">
-    <button class="tbtn primary" id="reviewUploadBtn">리뷰 데이터 업로드</button>
+    <button class="tbtn primary" id="reviewUploadBtn" title="기존 리뷰에 누적됩니다. 이미 있는 리뷰는 자동으로 제외돼요.">리뷰 데이터 업로드 (누적)</button>
+    <button class="tbtn" id="reviewReplaceBtn" title="기존 리뷰를 모두 지우고 이 파일 내용만 반영합니다.">전체 교체</button>
     <input type="file" id="reviewFileInput" accept=".xlsx,.xls,.csv" style="display:none">
     <span class="salesMeta" id="reviewMeta">review_20260626_123427.xlsx · 15,361건 · 2025-06~2026-06 · 2026-06-26 반영</span>
     <div class="reviewDateControls">
@@ -10194,7 +10195,14 @@ function reviewPurchase(t){
   return found;
 }
 
-// 리뷰 엑셀 파싱
+// [v81] 리뷰 레코드 식별키 — 업로드 누적 시 중복 판정용
+// 등록자(마스킹)+등록일시+상품명+평점+본문앞부분 조합. 스마트스토어 리뷰에 고유 ID가 없어 이 조합을 대용.
+function reviewRecKey(r){
+  return [String(r.user||''), String(r.date||''), String(r.nm||''), String(r.rate||''),
+          String(r.kind||''), r.photo?'1':'0', r.best?'1':'0', String(r.body||'')].join('|~|');
+}
+
+// 리뷰 엑셀 파싱 — [v81] 집계와 분리. 레코드 배열만 반환한다.
 function parseReviewWorkbook(wb){
   const ws=wb.Sheets[wb.SheetNames[0]];
   const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
@@ -10208,14 +10216,7 @@ function parseReviewWorkbook(wb){
   const ci={ nm:hdr.indexOf('상품명'), rate:hdr.indexOf('구매자평점'), photo:hdr.indexOf('포토/영상'),
     body:hdr.indexOf('리뷰상세내용'), user:hdr.indexOf('등록자'), date:hdr.indexOf('리뷰등록일'),
     kind:hdr.indexOf('리뷰구분'), best:hdr.indexOf('베스트리뷰'), help:hdr.indexOf('리뷰도움수') };
-  const dist={1:0,2:0,3:0,4:0,5:0}, sentiMap={만족:0,보통:0,불만:0}, catMap={}, monthMap={}, kindMap={};
-  // [v63] 주제 집계: 전체 / 긍정(만족) / 부정(불만+보통) / 카테고리별
-  const topicAll={}, topicPos={}, topicNeg={}, topicByCat={};
-  // [v64] 감정 7종 / 구매평 3종 — 전체 + 품목별
-  const emotionAll={}, emotionByCat={}, purchaseAll={}, purchaseByCat={};
-  const addTopic=(map,tp)=>{ map[tp]=(map[tp]||0)+1; };
-  let total=0, sum=0, photoCnt=0, bestCnt=0, satKept=0;
-  const list=[], allList=[];
+  const recs=[];
   for(let i=hi+1;i<rows.length;i++){
     const r=rows[i]; if(!r||!r.length) continue;
     const rate=Number(String(r[ci.rate]).replace(/[^0-9.]/g,''));
@@ -10229,13 +10230,35 @@ function parseReviewWorkbook(wb){
     const photo=ci.photo>=0 && String(r[ci.photo]||'').trim()!=='' && String(r[ci.photo]).toLowerCase()!=='nan';
     const best=ci.best>=0 && String(r[ci.best]).trim()==='Y';
     const kind=String(r[ci.kind]||'일반').trim()||'일반';
-    total++; sum+=rate; dist[Math.round(rate)]++; sentiMap[senti]++;
-    if(photo) photoCnt++; if(best) bestCnt++;
+    // [v81] 주제·감정·구매평을 레코드에 저장 — 누적 재집계 때 본문 재분석 없이 그대로 쓴다
+    recs.push({ nm, cat, rate, senti, body:body.slice(0,200), user, date:dateRaw.slice(0,16),
+      ym, photo, best, kind, topics:reviewTopics(body), emo:reviewEmotion(body,rate), purch:reviewPurchase(body) });
+  }
+  return recs;
+}
+
+// [v81] 레코드 배열 -> 리뷰 집계. 업로드 누적 후 전체를 다시 계산할 때 쓴다.
+function aggregateReviewRecs(recs, fileName){
+  const dist={1:0,2:0,3:0,4:0,5:0}, sentiMap={만족:0,보통:0,불만:0}, catMap={}, monthMap={}, kindMap={};
+  // [v63] 주제 집계: 전체 / 긍정(만족) / 부정(불만+보통) / 카테고리별
+  const topicAll={}, topicPos={}, topicNeg={}, topicByCat={};
+  // [v64] 감정 7종 / 구매평 3종 — 전체 + 품목별
+  const emotionAll={}, emotionByCat={}, purchaseAll={}, purchaseByCat={};
+  const addTopic=(map,tp)=>{ map[tp]=(map[tp]||0)+1; };
+  let total=0, sum=0, photoCnt=0, bestCnt=0, satKept=0;
+  const list=[];
+  (recs||[]).forEach(r=>{
+    const rate=Number(r.rate)||0; if(!rate||rate<1||rate>5) return;
+    const cat=r.cat||reviewCategory(r.nm||'');
+    const senti=r.senti||reviewSenti(rate);
+    const ym=r.ym||'', kind=r.kind||'일반';
+    total++; sum+=rate; dist[Math.round(rate)]++; sentiMap[senti]=(sentiMap[senti]||0)+1;
+    if(r.photo) photoCnt++; if(r.best) bestCnt++;
     if(!catMap[cat]) catMap[cat]={cnt:0,sum:0}; catMap[cat].cnt++; catMap[cat].sum+=rate;
     if(ym){ if(!monthMap[ym])monthMap[ym]={cnt:0,sum:0}; monthMap[ym].cnt++; monthMap[ym].sum+=rate; }
     kindMap[kind]=(kindMap[kind]||0)+1;
     // [v63] 주제 분류 — 긍정(5점)/부정(1~3점). 4점은 중립으로 주제 분석서 제외
-    const tps=reviewTopics(body);
+    const tps=r.topics||reviewTopics(r.body||'');
     if(!topicByCat[cat]) topicByCat[cat]={};
     tps.forEach(tp=>{
       addTopic(topicAll,tp);
@@ -10243,40 +10266,56 @@ function parseReviewWorkbook(wb){
       addTopic(topicByCat[cat],tp);
     });
     // [v64] 감정 7종 — 전체 + 품목별
-    const emo=reviewEmotion(body,rate);
+    const emo=r.emo||reviewEmotion(r.body||'',rate);
     addTopic(emotionAll,emo);
     if(!emotionByCat[cat]) emotionByCat[cat]={};
     addTopic(emotionByCat[cat],emo);
-    // [v64] 구매평 분류 — 전체 + 품목별 (복수 가능)
+    // [v64] 구매평 분류 — 전체 + 품목별 (복수 가능). 예전 레코드엔 purch 가 없어 본문으로 보정
     if(!purchaseByCat[cat]) purchaseByCat[cat]={};
-    reviewPurchase(body).forEach(pc=>{ addTopic(purchaseAll,pc); addTopic(purchaseByCat[cat],pc); });
+    (r.purch||reviewPurchase(r.body||'')).forEach(pc=>{ addTopic(purchaseAll,pc); addTopic(purchaseByCat[cat],pc); });
     // 목록 보관: 불만·보통은 전량(CS 중요), 만족은 앞 600개까지
-    const rec={nm,cat,rate,senti,body:body.slice(0,200),user,date:dateRaw.slice(0,16),ym,photo,best,kind,topics:tps,emo};
-    allList.push(rec);
-    if(senti!=='만족') list.push(rec);
-    else if(satKept<600){ list.push(rec); satKept++; }
-  }
+    if(senti!=='만족') list.push(r);
+    else if(satKept<600){ list.push(r); satKept++; }
+  });
   const months=Object.keys(monthMap).sort();
   // [v63] 주제 분석 대상 부정 = 1~3점 (4점 중립 제외)
   const negTotal=(dist[1]||0)+(dist[2]||0)+(dist[3]||0);
   return { total, avg: total?sum/total:0, dist, senti:sentiMap, category:catMap, month:monthMap, months,
-    kind:kindMap, photoCnt, bestCnt, list, allList, topicAll, topicPos, topicNeg, topicByCat, negTotal,
+    kind:kindMap, photoCnt, bestCnt, list, allList:(recs||[]), topicAll, topicPos, topicNeg, topicByCat, negTotal,
     emotionAll, emotionByCat, purchaseAll, purchaseByCat,
-    uploadedAt:fmt(NOW), fileName:DATA._reviewFileName||'' };
+    uploadedAt:fmt(NOW), fileName:fileName||DATA._reviewFileName||'' };
 }
 
-function handleReviewUpload(file){
+// [v81] 리뷰 업로드 — 기본은 기존 데이터에 누적(중복 자동 제외). replace=true 면 전체 교체.
+function handleReviewUpload(file, replace){
   const proceed=()=>{
     const reader=new FileReader();
     reader.onload=e=>{
       try{
         const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+        const fresh=parseReviewWorkbook(wb);
+        if(!fresh.length) throw new Error('읽어들인 리뷰가 0건입니다 (파일/시트 확인)');
+        const prev=(!replace && DATA.reviewData && Array.isArray(DATA.reviewData.allList)) ? DATA.reviewData.allList : [];
+        // 새 파일 레코드를 앞에 두고, 기존 것 중 새 파일에 없는 건만 뒤에 붙인다(최신순 유지).
+        // 중복은 전 구간에서 제거한다 — 새 파일 내부 중복, 새 파일↔기존 중복, 기존 내부 중복 모두.
+        const seen=new Set();
+        const uniqFresh=[];
+        fresh.forEach(r=>{ const k=reviewRecKey(r); if(seen.has(k)) return; seen.add(k); uniqFresh.push(r); });
+        const kept=[];
+        prev.forEach(r=>{ const k=reviewRecKey(r); if(seen.has(k)) return; seen.add(k); kept.push(r); });
+        const merged=uniqFresh.concat(kept);
+        // 이번 파일에서 실제로 새로 들어온 건수(기존에 없던 것)
+        const prevKeys=new Set(prev.map(reviewRecKey));
+        const addedNew=uniqFresh.filter(r=>!prevKeys.has(reviewRecKey(r))).length;
+        const dup=(fresh.length+prev.length)-merged.length;
         DATA._reviewFileName=file.name;
-        const agg=parseReviewWorkbook(wb); agg.fileName=file.name;
-        DATA.reviewData=agg;
+        DATA.reviewData=aggregateReviewRecs(merged,file.name);
         reviewPeriod.from=''; reviewPeriod.to='';   // 새 업로드는 기간을 전체 범위(최신 달 포함)로 리셋 — 이전 기간(예: 2026-06)이 남아 최신 달이 빠지는 문제 방지
         if(typeof markDirty==='function') markDirty();
-        toast(`리뷰 데이터 반영 완료 — ${salesWon(agg.total)}건 · 평균 ${agg.avg.toFixed(2)}점`);
+        const rd=DATA.reviewData;
+        toast(replace
+          ? `리뷰 전체 교체 — ${salesWon(rd.total)}건 · 중복 ${salesWon(dup)}건 제외 · 평균 ${rd.avg.toFixed(2)}점`
+          : `리뷰 누적 반영 — 신규 ${salesWon(addedNew)}건 추가 · 중복 ${salesWon(dup)}건 제외 · 누적 ${salesWon(rd.total)}건 · 평균 ${rd.avg.toFixed(2)}점`);
         renderReview();
       }catch(err){ toast('리뷰 파싱 실패: '+err.message); console.error(err); }
     };
@@ -10972,8 +11011,16 @@ function bindReviewFilters(){
   if(af) af.ontoggle=()=>{ if(af.open && DATA.reviewData){ setTimeout(()=>{ drawReviewCharts(DATA.reviewData); queueVisibleTabLayoutSync(); },30); } };
 }
 (function bindReviewUpload(){
-  const up=document.getElementById('reviewUploadBtn'), fi=document.getElementById('reviewFileInput');
-  if(up&&fi){ up.onclick=()=>fi.click(); fi.onchange=e=>{ if(e.target.files[0]) handleReviewUpload(e.target.files[0]); e.target.value=''; }; }
+  const up=document.getElementById('reviewUploadBtn'), fi=document.getElementById('reviewFileInput'),
+        rp=document.getElementById('reviewReplaceBtn');
+  let replaceMode=false;   // [v81] '전체 교체' 버튼으로 들어온 업로드만 true
+  if(up&&fi){ up.onclick=()=>{ replaceMode=false; fi.click(); }; }
+  if(rp&&fi){ rp.onclick=()=>{
+      const n=(DATA.reviewData&&DATA.reviewData.total)||0;
+      if(n && !confirm('기존 리뷰 '+salesWon(n)+'건을 모두 지우고 새 파일 내용만 반영합니다.\n계속할까요?')) return;
+      replaceMode=true; fi.click();
+    }; }
+  if(fi){ fi.onchange=e=>{ const f=e.target.files[0]; const rep=replaceMode; replaceMode=false; e.target.value=''; if(f) handleReviewUpload(f,rep); }; }
 })();
 
 // ===== [v72] 제조사 신용도 관리 =====
