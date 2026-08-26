@@ -12379,7 +12379,9 @@ function computeRepurchaseFromAcc(store){
   var pAgg={}, coBuy={};     // 품목별 {buyers,same,cross} · 크로스셀 co-buy 매트릭스(pIdx a<->b)
   var COH_WINS=[30,60,90,180], cohortsByWin={};   // 첫 구매 월별 코호트: 기간창별 재구매율(관측창 확보 고객만)
   COH_WINS.forEach(function(w){ cohortsByWin[w]={}; });
-  var WIN_ALL=[30,60,90,180,365], winAgg={};      // 기간별 누적 재구매율(관측창 확보 고객 분모 — 코호트와 동일 기준)
+  // 기간별 누적 재구매율: 모든 창이 '최장 창(365일) 관측 확보' 고객 하나의 고정 코호트를 공유 — 분모가 동일해야 창 간 비교가 성립하고 누적 단조성이 보장됨
+  // (창마다 분모를 따로 잡으면 창별로 고객 집단이 달라져 3개월<2개월 같은 역전이 발생)
+  var WIN_ALL=[30,60,90,180,365], WIN_BASE=365, winAgg={};
   WIN_ALL.forEach(function(w){ winAgg[w]={obs:0,rep:0}; });
   custs.forEach(function(c){
     var os=Object.keys(custOrders[c]).map(function(o){return custOrders[c][o];});
@@ -12408,7 +12410,9 @@ function computeRepurchaseFromAcc(store){
         COH_WINS.forEach(function(w){ var cm=cohortsByWin[w]; var ch=cm[fMonth]||(cm[fMonth]={size:0,obs:0,rep:0}); ch.size++;
           if(maxDay!=null && (fDay+w)<=maxDay){ ch.obs++; if(nextGap!=null && nextGap<=w) ch.rep++; }
         });
-        WIN_ALL.forEach(function(w){ if(maxDay!=null && (fDay+w)<=maxDay){ winAgg[w].obs++; if(nextGap!=null && nextGap<=w) winAgg[w].rep++; } });
+        if(maxDay!=null && (fDay+WIN_BASE)<=maxDay){   // 고정 코호트 — 분모 조건을 창별이 아닌 최장 창 기준으로 한 번만 판정
+          WIN_ALL.forEach(function(w){ winAgg[w].obs++; if(nextGap!=null && nextGap<=w) winAgg[w].rep++; });
+        }
       }
     }
   });
@@ -12419,8 +12423,8 @@ function computeRepurchaseFromAcc(store){
   counts.forEach(function(n){ if(n>=4)dist[3].n++; else if(n===3)dist[2].n++; else if(n===2)dist[1].n++; else dist[0].n++; });
   var avgCycle=allIntervals.length?allIntervals.reduce(function(a,b){return a+b;},0)/allIntervals.length:null;
   var sIv=allIntervals.slice().sort(function(a,b){return a-b;}); var medCycle=sIv.length?sIv[Math.floor(sIv.length/2)]:null;
-  var WLAB={30:'1개월',60:'2개월',90:'3개월',180:'6개월',365:'12개월'};   // 관측 고객 분모(코호트와 동일 기준) — 최근 유입으로 인한 과소평가 제거
-  var windowRates=WIN_ALL.map(function(w){ var a=winAgg[w]; return {days:w, label:WLAB[w], n:a.rep, obs:a.obs, rate:a.obs?a.rep/a.obs*100:0}; });
+  var WLAB={30:'1개월',60:'2개월',90:'3개월',180:'6개월',365:'12개월'};   // 전 창 동일 분모(12개월 관측 확보 고객) — 최근 유입에 의한 창별 왜곡 제거
+  var windowRates=WIN_ALL.map(function(w){ var a=winAgg[w]; return {days:w, label:WLAB[w], n:a.rep, obs:a.obs, base:WIN_BASE, rate:a.obs?a.rep/a.obs*100:0}; });
   var cycleDist=[{label:'~1개월',n:0},{label:'1~2개월',n:0},{label:'2~3개월',n:0},{label:'3~6개월',n:0},{label:'6~12개월',n:0},{label:'12개월+',n:0}];
   allIntervals.forEach(function(g){ if(g<=30)cycleDist[0].n++; else if(g<=60)cycleDist[1].n++; else if(g<=90)cycleDist[2].n++; else if(g<=180)cycleDist[3].n++; else if(g<=365)cycleDist[4].n++; else cycleDist[5].n++; });
   var byProduct=Object.keys(pAgg).map(function(pi){ var pa=pAgg[pi], pm=prodMap[pi]||{revenue:0,qty:0};
@@ -12931,7 +12935,7 @@ function drawRepurchaseCharts(rd){
   var wr=rd.windowRates||[];
   makeChart('repWindow',{ type:'bar',
     data:{ labels:wr.map(function(w){return w.label+' 이내';}), datasets:[{ label:'재구매율', data:wr.map(function(w){return Math.round(w.rate*10)/10;}), backgroundColor:CC.blue, borderRadius:5 }] },
-    options:{ plugins:{legend:{display:false}, title:{display:true,text:'기간별 누적 재구매율 (관측 고객 기준)'},
+    options:{ plugins:{legend:{display:false}, title:{display:true,text:(function(){ var b=wr.length?wr[0]:null; return b&&b.obs ? '기간별 누적 재구매율 (12개월 관측 확보 고객 '+b.obs.toLocaleString('ko-KR')+'명 기준)' : '기간별 누적 재구매율'; })()},
       tooltip:{callbacks:{label:function(c){ var w=wr[c.dataIndex]; return ' '+w.rate.toFixed(1)+'% (재구매 '+(w.n||0).toLocaleString('ko-KR')+' / 관측 '+(w.obs||0).toLocaleString('ko-KR')+'명)'; }}}},
       scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, grid:{color:CC.grid}, ticks:{callback:function(v){return v+'%';}}} } }, plugins:[repurValueLabel({suffix:'%',id:'win'})] });
   // (재구매 유형 도넛은 퍼널의 2단과 중복이라 제거 — repurFunnelHtml 참조)
