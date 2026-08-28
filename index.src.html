@@ -7916,7 +7916,8 @@ function buildWeeklyFormRows(){
     const tagResult=tagPick('결과'); // 이번주 결과·수치
     // 태그를 뺀 순수 메모 (기존 폴백용)
     const memoClean=memo.replace(/\[(금주|결과)\][^\[\n]*/g,'').trim();
-    const memoCleanFirst=(memoClean.split(/\n|\s+\/\s+/)[0]||'').trim();
+    const memoCleanParts=memoSplit(memoClean);          // G가 첫 문장을 쓰면 H는 뒷문장을 쓴다(같은 문장 반복 방지)
+    const memoCleanFirst=(memoCleanParts[0]||'').trim();
     // [v70] 재발주 품목(발주 키워드 + 입고/출시 이력) 판정 — 보관 여부 무관
     const txt2=((s.nextAction||'')+' '+(s.memo||''));
     const isReorder = /발주|재입고/.test(txt2) && s.st9.some((st,k)=>k>=9 && st==='done') && w.state!=='doing';
@@ -7954,8 +7955,9 @@ function buildWeeklyFormRows(){
       } else if(w.state==='done'){
         H = '전 공정 완료';
       } else if(w.state==='doing'){
-        const nextBit = afterStep ? `다음 ${afterStep}${dueOk(afterDue)?` 예정(${afterDue})`:''}` : '마지막 공정 진행 중';
-        H = `${w.cur} 진행 중 · ${nextBit}`;
+        // 다음 공정이 없을 때 '마지막 공정 진행 중'은 아무 정보가 없는 문장이라, G가 안 쓴 메모 뒷문장을 결과로 올린다
+        const nextBit = afterStep ? `다음 ${afterStep}${dueOk(afterDue)?` 예정(${afterDue})`:''}` : (memoCleanParts[1]||'');
+        H = nextBit ? `${w.cur} 진행 중 · ${nextBit}` : `${w.cur} 진행 중`;
       } else {   // wait: "X 대기" — '진행 중' 붙이지 않음
         H = w.cur;
       }
@@ -7964,11 +7966,15 @@ function buildWeeklyFormRows(){
       // K 액션(방법): nextAction 우선
       K = s.nextAction? s.nextAction.trim() : (memoParts.slice(0,2).join(' / ')||nextStep);
       // L 목표(달성치·날짜): 차주 완료예정 + 출시일
-      L = dueNext.length ? `${dueNext.join(', ')}${s.launch?' · 출시 '+s.launch:''}` : (s.launch? `${s.launch} 출시 목표` : nextStep+' 완료');
+      // 재생산·재입고 건은 신규 '출시'가 아니므로 목표 표현을 바꾼다 (isReorder는 진행 중이면 false라 여기로 온다)
+      const restock = /재생산|재입고/.test(`${s.nm} ${txt2}`);
+      const goalWord = restock ? '재입고' : '출시';
+      L = dueNext.length ? `${dueNext.join(', ')}${s.launch?` · ${goalWord} `+s.launch:''}` : (s.launch? `${s.launch} ${goalWord} 목표` : nextStep+' 완료');
     }
     const Fest = !snapL;  // 추정 여부 (스냅샷 없으면 추정)
+    const BR_ALIAS={'키플':'키친플래그'};   // 보고서에는 축약형 대신 정식 명칭
     return {
-      item:'개발', owner:'이현아', gubun:s.br||'터블', naeyong:'제품명',
+      item:'개발', owner:'이현아', gubun:(BR_ALIAS[s.br]||s.br||'터블'), naeyong:'제품명',
       prev:s.nm, F, Fest, G, H, cur:s.nm, J, K, L
     };
   });
