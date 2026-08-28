@@ -511,6 +511,7 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .linktag{display:inline-block;font-size:8px;background:#eef0f7;color:var(--navy);padding:1px 5px;border-radius:6px;margin-left:3px;vertical-align:1px}
 .months{font-size:11px;color:var(--green);font-weight:700}
 .months.short{color:var(--red)}
+.months .mArrow{color:var(--mut);font-weight:600;margin:0 2px}   /* 발주 물량 → 입고 후 총 확보기간 */
 .costinfo{font-size:9px;color:var(--mut);margin-top:2px}
 .costinfo b{font-weight:700}
 .costinfo .cok{color:var(--green)} .costinfo .cng{color:var(--red)}
@@ -5071,7 +5072,7 @@ function renderStock(){
     const cellQty = EXTERNAL?MASK:(c.status==='unverified' ? unverifiedOrderCellHtml(s,c) : (!c.unitReady?'<span style="color:#c0392b;font-size:10px">단위 설정 필요</span>':(c.orderQty?`<span class="qtybig">${won(c.orderQty)}<small>${su}</small></span>${su!==s.orderUnit?`<div class="pmeta">제조 ${won(c.orderQtyOrderUnit)}${s.orderUnit}</div>`:''}${c.stockoutBeforeArrive?'<div class="pmeta" style="color:#c0392b">입고 전 품절 위험</div>':''}`:'-')));
     const _uc=getCurrentCost(s.nm,s.cost); const _needRev=costNeedsReview(s.nm);
     const _costLabel=_needRev?'<span style="color:#c0392b;font-weight:700">최신 원가 확인 필요</span>':`생산원가 @${won(_uc)}`;
-    const cellAmt = EXTERNAL?MASK:(c.amt?`<span class="amtbig">${wonMan(c.amt)}</span><div class="months">${c.orderMonths?'이 수량 = '+c.orderMonths.toFixed(1)+'개월분':''}</div><div class="costinfo">${_costLabel}${c.costRate!=null?` · 원가율 <b class="${c.costRate<=0.5?'cok':'cng'}">${(c.costRate*100).toFixed(0)}%</b>`:''}</div>`:(_uc?`<div class="costinfo">${_costLabel}${c.costRate!=null?` · ${(c.costRate*100).toFixed(0)}%`:''}</div>`:`<div class="costinfo">${_costLabel}</div>`));
+    const cellAmt = EXTERNAL?MASK:(c.amt?`<span class="amtbig">${wonMan(c.amt)}</span><div class="months">${c.orderMonths?c.orderMonths.toFixed(1)+'개월분 <span class="mArrow">→</span> 입고 후 '+(c.months!=null?c.months.toFixed(1):'-')+'개월':''}</div><div class="costinfo">${_costLabel}${c.costRate!=null?` · 원가율 <b class="${c.costRate<=0.5?'cok':'cng'}">${(c.costRate*100).toFixed(0)}%</b>`:''}</div>`:(_uc?`<div class="costinfo">${_costLabel}${c.costRate!=null?` · ${(c.costRate*100).toFixed(0)}%`:''}</div>`:`<div class="costinfo">${_costLabel}</div>`));
     const ti=trendInfo(s.nm);
     const trendBadge = (!EXTERNAL && ti.dir!=='na' && ti.dir!=='flat') ? `<span class="tbadge ${ti.cls}">${ti.icon} ${ti.label}</span>${ti.recentDip?`<span class="tbadge t-dip" title="장기 추세는 ${ti.label}이나 최근 3개월 연속 하락 · 정점 대비 ${ti.momPct}%">▼ 최근 둔화</span>`:''}` : '';
     const slowBadge = slowBadgeHtml(slowSig);   // [v83] 소진 지연/정체 뱃지
