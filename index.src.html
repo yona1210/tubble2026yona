@@ -7429,17 +7429,21 @@ function aliasResolve(nm){
   }
   return null;
 }
+// 끝에 붙는 주문 수량 표기('x 1개')는 품목 식별과 무관하다.
+// 신규 등록 시에는 이 꼬리를 떼고 저장하므로, 매칭할 때도 양쪽에서 같이 떼야 등록한 품목이 다시 잡힌다.
+function stripQtyTail(nm){ return String(nm||'').replace(/\s*x\s*\d+\s*개\s*$/i,'').trim(); }
 function findStockByName(nm){
-  const key=normName(nm);
+  const raw=stripQtyTail(nm);
+  const key=normName(raw);
   if(!key) return null;
-  // 1) 별칭표 우선 (ERP 정식명 ↔ 시스템 약칭)
-  const al=aliasResolve(nm);
-  if(al) return al;
-  // 2) 정확 일치
-  let row=(DATA.stock||[]).find(s=>normName(s.nm)===key);
+  // 1) 정확 일치 우선 — 낱개와 '(N개입)' 세트를 따로 등록한 경우, 별칭이 둘을 한 품목으로 끌어가면 안 된다
+  let row=(DATA.stock||[]).find(s=>normName(stripQtyTail(s.nm))===key);
   if(row) return row;
+  // 2) 별칭표 (ERP 정식명 ↔ 시스템 약칭)
+  const al=aliasResolve(raw);
+  if(al) return al;
   // 3) 부분 일치
-  row=(DATA.stock||[]).find(s=>normName(s.nm).includes(key)||key.includes(normName(s.nm)));
+  row=(DATA.stock||[]).find(s=>{const t=normName(stripQtyTail(s.nm)); return t.includes(key)||key.includes(t);});
   return row||null;
 }
 // 업로드 품명에 포장 규격이 붙어 있는지 — '(6개입)', '5개입', '10P', '60매', '100정'.
