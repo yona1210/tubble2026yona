@@ -7949,8 +7949,8 @@ function buildWeeklyFormRows(){
     const tagResult=tagPick('결과'); // 이번주 결과·수치
     // 태그를 뺀 순수 메모 (기존 폴백용)
     const memoClean=memo.replace(/\[(금주|결과)\][^\[\n]*/g,'').trim();
-    const memoCleanParts=memoSplit(memoClean);          // G가 첫 문장을 쓰면 H는 뒷문장을 쓴다(같은 문장 반복 방지)
-    const memoCleanFirst=(memoCleanParts[0]||'').trim();
+    const memoCleanParts=memoSplit(memoClean);
+    const memoCleanAll=memoCleanParts.join(' / ');       // 진행상황 메모 전체 — 줄바꿈은 ' / '로 이어 한 칸에 싣는다
     // [v70] 재발주 품목(발주 키워드 + 입고/출시 이력) 판정 — 보관 여부 무관
     const txt2=((s.nextAction||'')+' '+(s.memo||''));
     const isReorder = /발주|재입고/.test(txt2) && s.st9.some((st,k)=>k>=9 && st==='done') && w.state!=='doing';
@@ -7971,16 +7971,14 @@ function buildWeeklyFormRows(){
     } else {
       // F 계획(지난주 목표): 스냅샷 우선
       F = snapL ? snapL : (w.cur && w.cur!=='착수 전' ? `${w.cur.replace(' 대기','')} 진행` : (s.nextAction||'진행 점검'));
-      // [v71] G 진행(실제 한 일·날짜): 메모[금주] 우선 → 이번주 완료공정+날짜 → doing 공정+메모
+      // [v71] G 진행(실제 한 일·날짜): 메모[금주] 우선 → 공정 상태(이번주 완료공정+날짜 / doing 공정) + 진행상황 메모 전체
+      // 메모는 첫 조각만이 아니라 전부 싣고, 완료공정이 있어도 메모를 버리지 않는다 — 양식의 '진행'이 곧 품목별 진행상황
       if(tagThis){
         G = tagThis;
-      } else if(doneNow.length){
-        G = `${doneNow.join(', ')} 완료`;
-      } else if(w.state==='doing'){
-        const due=nextStepDue?` (~${nextStepDue})`:'';
-        G = `${w.cur} 진행 중${memoCleanFirst?' · '+memoCleanFirst:due}`;
       } else {
-        G = memoCleanFirst || `${w.cur} 준비 중`;
+        const stepBit = doneNow.length ? `${doneNow.join(', ')} 완료`
+                      : (w.state==='doing' ? `${w.cur} 진행 중${(!memoCleanAll&&nextStepDue)?` (~${nextStepDue})`:''}` : '');
+        G = [stepBit, memoCleanAll].filter(Boolean).join(' · ') || `${w.cur} 준비 중`;
       }
       // [v87] H 결과(상태·판단·다음 예정): 메모[결과] 우선 → 상태별로 현재단계 + '실제 다음 공정' 예정
       if(tagResult){
@@ -7988,8 +7986,8 @@ function buildWeeklyFormRows(){
       } else if(w.state==='done'){
         H = '전 공정 완료';
       } else if(w.state==='doing'){
-        // 다음 공정이 없을 때 '마지막 공정 진행 중'은 아무 정보가 없는 문장이라, G가 안 쓴 메모 뒷문장을 결과로 올린다
-        const nextBit = afterStep ? `다음 ${afterStep}${dueOk(afterDue)?` 예정(${afterDue})`:''}` : (memoCleanParts[1]||'');
+        // 메모는 G에 전부 실리므로 여기서 반복하지 않는다 — 현재 공정 + 실제 다음 공정 예정만
+        const nextBit = afterStep ? `다음 ${afterStep}${dueOk(afterDue)?` 예정(${afterDue})`:''}` : '';
         H = nextBit ? `${w.cur} 진행 중 · ${nextBit}` : `${w.cur} 진행 중`;
       } else {   // wait: "X 대기" — '진행 중' 붙이지 않음
         H = w.cur;
