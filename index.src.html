@@ -3549,7 +3549,10 @@ function work(s){
   if(!o.includes('plan')&&!o.includes('doing')&&o.includes('done')) return {state:'done',cur:'전 공정 완료',pct:100};
   const ld=o.lastIndexOf('done');
   if(o.every(x=>x==='plan'||x==='na')) return {state:'wait',cur:'착수 전',pct:0};
-  return {state:'wait',cur:(ld>=0&&ld<STEPS.length-1?STEPS[ld+1]:'대기')+' 대기',pct};
+  // 마지막 완료 공정 다음 칸을 그냥 집으면 '해당없음(na)'으로 건너뛴 공정이 대기로 잡힌다
+  // (예: 패키지 공정 전부 na인데 '패키지기획 대기'). na는 건너뛰고 실제 남은 공정을 집는다.
+  const nx=o.findIndex((x,i)=>i>ld&&x!=='na');
+  return {state:'wait',cur:(nx>=0?STEPS[nx]:'대기')+' 대기',pct};
 }
 function ddCls(dd){if(dd==null)return'gray';if(dd<0)return'green';if(dd<=7)return'red';if(dd<=21)return'amber';return'gray';}
 
