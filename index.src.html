@@ -8064,7 +8064,8 @@ function getPrevSnapshot(){
 function getPrevSnapRow(s){
   const snap=getPrevSnapshot(); if(!snap) return null;
   const rows=snap.rows||[]; const key=`${s.nm}|${s.round||''}`;
-  return rows.find(r=>r.key===key) || rows.find(r=>r.nm===s.nm) || null;
+  const row = rows.find(r=>r.key===key) || rows.find(r=>r.nm===s.nm) || null;
+  return row ? Object.assign({}, row, {_savedAt: snap.savedAt||''}) : null;   // 비교 기준일(직전 보고 저장일)을 행에 실어 보낸다
 }
 function getLastSnapshotGoal(nm){
   const snap=getPrevSnapshot(); if(!snap) return null;
@@ -8077,7 +8078,7 @@ function getLastSnapshotGoal(nm){
 function compareWithPrev(s, prev){
   const achieved=[], missed=[], slips=[];
   const pd=prev.dues||[], ps=prev.st9||[];
-  const sinceRaw = prev.savedAt ? new Date(prev.savedAt) : null;
+  const sinceRaw = prev._savedAt ? new Date(prev._savedAt) : null;   // 직전 보고 저장일(YYYY-MM-DD) — 없으면 7일 전
   const since = (sinceRaw && !isNaN(sinceRaw)) ? sinceRaw : new Date(NOW.getTime()-7*86400000);
   for(let k=0;k<STEPS.length;k++){
     const st=s.st9[k]; if(st==='na') continue;
