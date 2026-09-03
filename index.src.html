@@ -478,14 +478,19 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .octbl th.l,.octbl td.l{text-align:left;white-space:normal}
 .octbl th.c,.octbl td.c{text-align:center}
 .octbl tr.ocMfr td{background:#eef1f5;font-weight:700;color:#3a4252;text-align:left}
-/* [v90] 품목별 확보 기간 줄 — "이 수량이 몇 달치인가"가 결재 근거. 참고 정보라 본문보다 한 단계 작게, 결정 수치만 굵게 */
-.octbl tr.ocCov td{background:#fafbfd;color:#5a6478;font-size:11px;text-align:left;white-space:normal;font-weight:400;line-height:1.6;padding:5px 10px 7px 26px}
-.octbl tr.ocCov b{color:#1E2761;font-weight:800}
-.octbl tr.ocCov .src{color:#9aa1b2}
-.octbl tr.ocCov .up{color:var(--red);font-weight:700}
-.octbl tr.ocCov .dn{color:var(--green);font-weight:700}
-.octbl tr.ocCov .bad{color:var(--red);font-weight:700}
-.octbl tr.ocCov .warn{color:var(--amber);font-weight:700}
+/* [v90] 품목별 확보 기간 — "이 수량이 몇 달치인가"가 결재 근거.
+   층으로 나눈다: ① 결정 수치 5칸(라벨 위·값 아래) ② 산정 기준 한 줄(회색) ③ 경고는 배지. 한 줄에 점으로 잇지 않는다 */
+.octbl tr.ocCov td{background:#fafbfd;text-align:left;white-space:normal;font-weight:400;padding:8px 10px 9px 26px}
+.ocCov .cg{display:grid;grid-template-columns:repeat(auto-fit,minmax(138px,1fr));gap:6px 14px}
+.ocCov .cell .lbl{font-size:10.5px;color:#8a90a2}
+.ocCov .cell .val{font-size:12.5px;font-weight:800;color:#1E2761;margin-top:1px}
+.ocCov .cell .val small{font-size:10.5px;font-weight:600;color:#5a6478}
+.ocCov .cell .sub{font-size:10.5px;color:#8a90a2;margin-top:1px}
+.ocCov .basis{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:7px;font-size:10.5px;color:#9aa1b2}
+.ocCov .up{color:var(--red)} .ocCov .dn{color:var(--green)}
+.ocBadge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:10.5px;font-weight:700;line-height:16px}
+.ocBadge.bad{background:#fdecea;color:var(--red)}
+.ocBadge.warn{background:#fff4de;color:#b7791f}
 .octbl tr.octot td{background:#eef1f8;font-weight:800;border-top:2px solid #1E2761}
 .ocInp{width:76px;text-align:right;padding:2px 5px;border:1px solid #d6dbe7;border-radius:5px;font-size:12px}
 .ocDel{border:none;background:transparent;color:#c0392b;cursor:pointer;font-size:13px}
@@ -5775,21 +5780,37 @@ function cartCoverage(nm, qty){
   if(c.invStockAtArrive!=null && c.invStockAtArrive<0) flags.push({cls:'bad',txt:'입고 전 소진 위험'});
   else if(c.status==='now') flags.push({cls:'warn',txt:'재주문점 도달'});
   if(buyM>6) flags.push({cls:'warn',txt:'6개월분 초과 — 과다 여부 검토'});
-  return {s,c,u,daily,monthly,baseMonthly:c.baseMonthly||0,hist,period,windowUsed:c.salesWindowUsed||getSalesWindow(),
+  return {s,c,u,qty,daily,monthly,baseMonthly:c.baseMonthly||0,hist,period,windowUsed:c.salesWindowUsed||getSalesWindow(),
     source:c.source,stock,stockM,buyM,afterM,runoutAfter,rop:c.rop,price,flags,
     altBuyM:(c.source!=='monthly'&&c.baseMonthly>0)?qty/c.baseMonthly:null};   // 데일리 기준일 때 월평균 기준 개월분도 함께 (두 기준이 크게 갈리면 그 자체가 정보)
 }
 // 이번 매입 수량(재고 단위) = 매입 명세 중 가장 큰 MOQ(원료·가공비가 같은 수량으로 잡히므로 최대값이 곧 완제품 수량)
 function cartQtyOf(pur){ return Math.max(0, ...pur.map(p=>+p[3]||0)); }
+// 산정 기준 문구 (화면·텍스트 공용): 월평균 적용이면 기간, 데일리 적용이면 그 사실 + 월평균 병기. 월별 수치는 괄호
+function cartBasisText(cv){
+  const months = cv.hist.length ? ` (${cv.hist.map(h=>won(Math.round(h.qty))).join(' / ')})` : '';
+  return cv.source==='monthly'
+    ? `최근 ${cv.windowUsed}개월 평균 ${cv.period}${months}`
+    : `${cv.source==='daily'?'데일리 순재고 감소':'최근 상승 보정'} 적용 · 최근 ${cv.windowUsed}개월 평균 ${won(Math.round(cv.baseMonthly))}${months}`;
+}
 function cartCoverageHtml(cv){
   if(!cv) return '';
-  if(cv.none) return `<tr class="ocCov"><td colspan="6"><span class="warn">월판매 이력 없음</span> — 확보 기간 계산 불가${cv.price?` · 단가 ${cv.price.curRound} ${won(cv.price.cur)}원`:''}</td></tr>`;
-  const srcTxt = cv.source==='monthly' ? `최근 ${cv.windowUsed}개월 평균 ${cv.period}` : `발주 판단 기준 · ${cv.source==='daily'?'데일리 순재고 감소':'상승 보정'} · 최근 ${cv.windowUsed}개월 평균 ${won(Math.round(cv.baseMonthly))}`;
-  const monthsTxt = cv.hist.length ? ` · ${cv.hist.map(h=>won(Math.round(h.qty))).join(' / ')}` : '';
-  const priceTxt = cv.price ? ` · 단가 ${cv.price.curRound} <b>${won(cv.price.cur)}원</b> <span class="${cv.price.pct<0?'dn':(cv.price.pct>0?'up':'')}">${cv.price.pct<0?'▼':(cv.price.pct>0?'▲':'')}${Math.abs(cv.price.pct).toFixed(1)}%</span> <span class="src">(전 차수 ${cv.price.prevRound} ${won(cv.price.prev)}원)</span>` : '';
-  const altTxt = cv.altBuyM!=null ? ` <span class="src">(월평균 기준 ${cv.altBuyM.toFixed(1)}개월분)</span>` : '';
-  const flagTxt = cv.flags.length ? ' · ' + cv.flags.map(f=>`<span class="${f.cls}">⚠ ${f.txt}</span>`).join(' ') : '';
-  return `<tr class="ocCov"><td colspan="6">월 출고 <b>${won(Math.round(cv.monthly))} ${cv.u}/월</b> <span class="src">(${srcTxt}${monthsTxt})</span> · 현재고 <b>${won(cv.stock)}</b> = ${cv.stockM.toFixed(1)}개월분 · 이번 매입 = <b>${cv.buyM.toFixed(1)}개월분</b>${altTxt} → 입고 후 <b>${cv.afterM.toFixed(1)}개월 확보</b> <span class="src">(소진 예상 ${fmtMDfull(cv.runoutAfter)})</span>${priceTxt}${flagTxt}</td></tr>`;
+  if(cv.none) return `<tr class="ocCov"><td colspan="6"><div class="basis"><span class="ocBadge warn">월판매 이력 없음</span>확보 기간 계산 불가</div></td></tr>`;
+  const cell=(lbl,val,sub)=>`<div class="cell"><div class="lbl">${lbl}</div><div class="val">${val}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
+  const pr=cv.price;
+  const priceVal = pr ? `${won(pr.cur)}원 <span class="${pr.pct<0?'dn':(pr.pct>0?'up':'')}">${pr.pct<0?'▼':(pr.pct>0?'▲':'')}${Math.abs(pr.pct).toFixed(1)}%</span>` : '-';
+  const priceSub = pr ? `${pr.curRound} · 전 차수 ${won(pr.prev)}원` : '';
+  const badges = cv.flags.map(f=>`<span class="ocBadge ${f.cls}">⚠ ${f.txt}</span>`).join('');
+  return `<tr class="ocCov"><td colspan="6">
+    <div class="cg">
+      ${cell('월 출고', `${won(Math.round(cv.monthly))} <small>${cv.u}/월</small>`, '')}
+      ${cell('현재고', `${won(cv.stock)} <small>= ${cv.stockM.toFixed(1)}개월분</small>`, '')}
+      ${cell('이번 매입', `${won(cv.qty)} <small>= ${cv.buyM.toFixed(1)}개월분</small>`, cv.altBuyM!=null?`월평균 기준 ${cv.altBuyM.toFixed(1)}개월분`:'')}
+      ${cell('입고 후 확보', `${cv.afterM.toFixed(1)}<small>개월</small>`, `소진 예상 ${fmtMDfull(cv.runoutAfter)}`)}
+      ${cell('단가', priceVal, priceSub)}
+    </div>
+    <div class="basis"><span>기준 · ${cartBasisText(cv)}</span>${badges}</div>
+  </td></tr>`;
 }
 // 담은 품목별로 구성요소(원료·가공비·부자재/완제품)를 나열 — 거래처는 컬럼으로 표시
 function cartReportHtml(){
@@ -5838,10 +5859,11 @@ function cartReportText(){ const c=ensureCart(); if(!c.length)return '매입 예
     if(cv&&cv.none){ out+='  · 월판매 이력 없음 — 확보 기간 계산 불가\n'; }
     else if(cv){
       afters.push(cv.afterM);
-      const src = cv.source==='monthly' ? '최근 '+cv.windowUsed+'개월 평균 '+cv.period : '발주 판단 기준('+(cv.source==='daily'?'데일리 순재고 감소':'상승 보정')+') · 최근 '+cv.windowUsed+'개월 평균 '+won(Math.round(cv.baseMonthly));
-      const months = cv.hist.length ? ' · '+cv.hist.map(h=>won(Math.round(h.qty))).join(' / ') : '';
-      out+='  · 월 출고 '+won(Math.round(cv.monthly))+' '+cv.u+'/월 ('+src+months+') · 현재고 '+won(cv.stock)+' = '+cv.stockM.toFixed(1)+'개월분 · 이번 매입 = '+cv.buyM.toFixed(1)+'개월분'+(cv.altBuyM!=null?' (월평균 기준 '+cv.altBuyM.toFixed(1)+'개월분)':'')+' → 입고 후 '+cv.afterM.toFixed(1)+'개월 확보 (소진 예상 '+fmtMDfull(cv.runoutAfter)+')\n';
-      if(cv.price) out+='  · 단가 '+cv.price.curRound+' '+won(cv.price.cur)+'원 (전 차수 '+cv.price.prevRound+' '+won(cv.price.prev)+'원 대비 '+(cv.price.pct<0?'▼':(cv.price.pct>0?'▲':''))+Math.abs(cv.price.pct).toFixed(1)+'%)\n';
+      // 화면과 같은 층 구조로 줄을 나눈다: 월 출고 / 재고·매입 개월분 / 확보 / 단가 / 경고
+      out+='  · 월 출고 '+won(Math.round(cv.monthly))+' '+cv.u+'/월 — '+cartBasisText(cv)+'\n';
+      out+='  · 현재고 '+won(cv.stock)+' = '+cv.stockM.toFixed(1)+'개월분 / 이번 매입 '+won(cv.qty)+' = '+cv.buyM.toFixed(1)+'개월분'+(cv.altBuyM!=null?' (월평균 기준 '+cv.altBuyM.toFixed(1)+'개월분)':'')+'\n';
+      out+='  · 입고 후 '+cv.afterM.toFixed(1)+'개월 확보 · 소진 예상 '+fmtMDfull(cv.runoutAfter)+'\n';
+      if(cv.price) out+='  · 단가 '+won(cv.price.cur)+'원 ('+cv.price.curRound+' · 전 차수 '+cv.price.prevRound+' '+won(cv.price.prev)+'원 대비 '+(cv.price.pct<0?'▼':(cv.price.pct>0?'▲':''))+Math.abs(cv.price.pct).toFixed(1)+'%)\n';
       cv.flags.forEach(f=>{ out+='  · ⚠ '+f.txt+'\n'; });
     }
   });
