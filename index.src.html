@@ -3045,7 +3045,7 @@ function sortRounds(d){
   d.rounds=R; if(d.qtys) d.qtys=Q;
 }
 // 차수별 발주량(qtys) 없는 품목 보강 + 차수 번호순 정렬
-Object.keys(DATA.costDetail||{}).forEach(nm=>{ const d=DATA.costDetail[nm];
+Object.keys(DATA.costDetail||{}).forEach(nm=>{ const d=costDetailOf(nm);
   if(!d.qtys){ d.qtys={}; Object.keys(d.rounds||{}).forEach(r=>d.qtys[r]=0); }
   sortRounds(d); });
 // [신규 재고 → 원가 자동 생성] 재고 품목인데 원가·매입 항목이 없으면 빈 항목 생성 (원가 탭 표시 + 신규 상품 자동 반영)
@@ -3301,11 +3301,11 @@ function normalizeAfterLoad(){
   normalizeStockMeta(); normalizeDailyHistory(); syncAllInventory();
 }
 // [v32] 원가탭 창고 수정 시: inventory.warehouses → total 자동 합산 → 동기화 → 전탭 재렌더
-function findStockItem(nm){ return (DATA.stock||[]).find(s=>s.nm===nm); }
+function findStockItem(nm){ const st=DATA.stock||[]; return st.find(s=>s.nm===nm) || (typeof costNormKey==='function' && nm ? st.find(s=>costNormKey(s.nm)===costNormKey(nm)) : undefined); }   // [v92] 원가 항목명과 브랜드 접두어만 다른 재고 품목도 찾는다
 function applyWarehouseEdit(nm, mutateFn, srcLabel){
   const s=findStockItem(nm);
   if(!s){ // 재고탭에 없는 원가전용 품목은 종전 방식(costDetail 직접) 유지
-    const d=DATA.costDetail[nm]; if(!d) return false;
+    const d=costDetailOf(nm); if(!d) return false;
     if(!d.stock) d.stock={}; mutateFn(d.stock); d.stock['합계']=whSumOf(d.stock); markDirty(); renderCost(); return true;
   }
   if(!s.inventory) s.inventory={total:0,warehouses:{},updatedAt:fmtDate(NOW),source:'',updateType:'manual'};
@@ -3407,9 +3407,21 @@ function takeSnapshot(){ SNAPSHOT=JSON.stringify({DATA,LEADTIME}); }
 function markDirty(){ DIRTY=true; DATA.meta.updated=fmt(NOW); updateSaveStatus(); }
 function markSaved(){ DIRTY=false; DATA.meta.saved=fmt(NOW); takeSnapshot(); updateSaveStatus(); }
 // [v67] 최신 차수 생산원가 단일 기준 (없거나 0이면 fallback)
+// [v92] 원가 항목 이름 매칭 완화 — 재고 품목명과 원가 항목명이 브랜드 접두어(터블/트루클린/이지클린/파워클린/케어클린)·공백만 다를 때도 같은 항목으로 찾는다.
+//   원가 탭에서 자동 생성 항목을 지우고 짧은 이름으로 다시 만든 경우(예: '스팟 얼룩제거제 유성얼룩제거용') 재고 탭이 '최신 원가 확인 필요'로 뜨던 문제 대응.
+//   정확히 같은 이름이 있으면 항상 그것을 우선한다.
+function costNormKey(v){ return String(v||'').toLowerCase().replace(/\s+/g,'').replace(/^(터블)?(트루클린|이지클린|파워클린|케어클린)?/,''); }
+function costKeyOf(nm){
+  const cd=DATA.costDetail||{}; if(!nm) return null;
+  if(cd[nm]) return nm;
+  const k=costNormKey(nm); if(!k) return null;
+  const hit=Object.keys(cd).find(x=>costNormKey(x)===k);
+  return hit||null;
+}
+function costDetailOf(nm){ const k=costKeyOf(nm); return k?DATA.costDetail[k]:null; }
 function getCurrentCost(nm, fallback){
   fallback = fallback || 0;
-  const detail = DATA.costDetail ? DATA.costDetail[nm] : null;
+  const detail = costDetailOf(nm);
   const rounds = detail && detail.rounds ? Object.keys(detail.rounds) : [];
   if(rounds.length){
     const latestRound = rounds[rounds.length-1];
@@ -3420,7 +3432,7 @@ function getCurrentCost(nm, fallback){
 }
 // [v67] 최신 원가 확인 필요 여부 (차수 없음 또는 최신 0원)
 function costNeedsReview(nm){
-  const detail = DATA.costDetail ? DATA.costDetail[nm] : null;
+  const detail = costDetailOf(nm);
   const rounds = detail && detail.rounds ? Object.keys(detail.rounds) : [];
   if(!rounds.length) return true;
   const latest = Number(detail.rounds[rounds[rounds.length-1]]);
@@ -5402,7 +5414,7 @@ function compBucketOf(gu){ gu=String(gu||'').trim();
   return gu||'기타';   // 미지의 구분(예: 얼룩제거제·기타)은 그대로 그룹명으로
 }
 function costComposition(nm){
-  const d=DATA.costDetail&&DATA.costDetail[nm]; if(!d||!Array.isArray(d.purchase)) return null;
+  const d=costDetailOf(nm); if(!d||!Array.isArray(d.purchase)) return null;
   const subCat=(gu,name)=>{ const s=String(name||''); const b=compBucketOf(gu);
     if(b==='원료') return s.indexOf('원재료')>=0?'원재료':'원료비';
     if(b==='완제품') return '완제품';
@@ -5457,7 +5469,7 @@ function compMatrixHtml(nm, editable){
 }
 // [v86] 차수 최신 생산원가 vs 명세 구성 합 대조 — 값이 여러 군데 다를 때 명확히 표시
 function compReconcileNote(nm){
-  const d=DATA.costDetail&&DATA.costDetail[nm]; const cc=costComposition(nm); if(!d||!cc||!cc.order.length) return '';
+  const d=costDetailOf(nm); const cc=costComposition(nm); if(!d||!cc||!cc.order.length) return '';
   const RK=Object.keys(d.rounds||{}); if(!RK.length) return '';
   const rLabel=RK[RK.length-1], latest=+d.rounds[rLabel]||0; if(!latest) return '';
   const diff=cc.cost-latest;
@@ -5496,7 +5508,7 @@ function groupCompMatrixHtml(g){
     <div class="otblWrap"><table class="compMatrix"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
 }
 function costDetailHtml(nm){
-  const d=DATA.costDetail[nm]; if(!d) return '';
+  const d=costDetailOf(nm); if(!d) return '';
   const ROUNDS=Object.keys(d.rounds);
   const cur=d.rounds[ROUNDS[ROUNDS.length-1]];
   const curRound=ROUNDS[ROUNDS.length-1];
@@ -5584,7 +5596,7 @@ let ciOpen=false;  // v72: 기본 접힘 — 핵심(품목 상세)을 위로. KP
 // ── 품목별 분석 지표 산출 ──
 function costMetrics(){
   return Object.keys(DATA.costDetail||{}).map(nm=>{
-    const d=DATA.costDetail[nm];
+    const d=costDetailOf(nm);
     const RK=Object.keys(d.rounds);
     const cur=d.rounds[RK[RK.length-1]]||0;
     const first=d.rounds[RK[0]]||0;
@@ -5600,7 +5612,7 @@ function costMetrics(){
 let costGroupSel='all';  // 'all'(전체) | groupId | '_individual'(개별 품목)
 // 한 품목의 묶음 발주 기준 지표(최신 차수 생산원가 × 발주수량)
 function groupItemMetric(nm){
-  const d=DATA.costDetail[nm];
+  const d=costDetailOf(nm);
   // [v34 #4] 재고 단일 원본 기준
   const stockItem=(typeof findStockItem==='function'?findStockItem(nm):(DATA.stock||[]).find(s=>s.nm===nm));
   const totalStock=stockItem?invTotal(stockItem):0;
@@ -5689,7 +5701,7 @@ function bundlePurchaseHtml(g){
   const nmA=nm=>String(nm).replace(/'/g,"\\'");
   let grand=0;
   const secs=members.map(nm=>{
-    const d=DATA.costDetail[nm];
+    const d=costDetailOf(nm);
     let sub=0; const rr=[];
     (d.purchase||[]).forEach((p,pi)=>{
       if(String(p[1]||'')==='발주') return;   // '발주' 라인 제외(원가 이중 포함 방지)
@@ -5754,7 +5766,7 @@ const CART_GU_ORDER={'완제품':0,'원료':1,'가공비':2,'부자재':3};
 function cartLines(){
   const c=ensureCart(); const lines=[];
   c.forEach(x=>{
-    const d=DATA.costDetail[x.nm];
+    const d=costDetailOf(x.nm);
     const pur=(d&&d.purchase||[]).filter(p=>String(p[1]||'')!=='발주');   // '발주' 라인 제외(원가 이중 포함 방지)
     if(pur.length){
       pur.forEach(p=>lines.push({v:p[0]||'(거래처 미지정)',gu:p[1]||'-',nm:p[2]||x.nm,moq:+p[3]||0,price:+p[4]||0,amt:(+p[3]||0)*(+p[4]||0),src:x.nm}));
@@ -5770,7 +5782,7 @@ function cartLines(){
 function cartCoverage(nm, qty){
   const s=(DATA.stock||[]).find(x=>x.nm===nm); if(!s) return null;
   const c=calcStock(s); const u=s.stockUnit||'EA';
-  const d=DATA.costDetail[nm]; const rk=(d&&d.rounds)?Object.keys(d.rounds):[];
+  const d=costDetailOf(nm); const rk=(d&&d.rounds)?Object.keys(d.rounds):[];
   let price=null;
   if(rk.length>=2){ const cur=+d.rounds[rk[rk.length-1]]||0, prev=+d.rounds[rk[rk.length-2]]||0;
     if(cur>0&&prev>0) price={curRound:rk[rk.length-1],prevRound:rk[rk.length-2],cur,prev,pct:(cur-prev)/prev*100}; }
@@ -5832,7 +5844,7 @@ function cartReportHtml(){
   const chips=c.map((x,i)=>`<span class="ocChip">${x.nm}<button class="ocChipX" onclick="removeCartItem(${i})" title="빼기">✕</button></span>`).join('');
   let grand=0; const covs=[];
   const secs=c.map(x=>{
-    const d=DATA.costDetail[x.nm];
+    const d=costDetailOf(x.nm);
     let pur=(d&&d.purchase||[]).filter(p=>String(p[1]||'')!=='발주');
     if(!pur.length) pur=[[x.mfr||'(거래처 미지정)','완제품',x.nm,+x.qty||0,+x.price||0]];
     pur=pur.slice().sort((a,b)=>(CART_GU_ORDER[a[1]]||9)-(CART_GU_ORDER[b[1]]||9));
@@ -5860,7 +5872,7 @@ function cartReportHtml(){
 function cartReportText(){ const c=ensureCart(); if(!c.length)return '매입 예정 품목 없음';
   let grand=0,out='[매입 보고 요약] '+fmt(NOW)+'\n'; const afters=[];
   c.forEach(x=>{
-    const d=DATA.costDetail[x.nm];
+    const d=costDetailOf(x.nm);
     let pur=(d&&d.purchase||[]).filter(p=>String(p[1]||'')!=='발주');
     if(!pur.length) pur=[[x.mfr||'(거래처 미지정)','완제품',x.nm,+x.qty||0,+x.price||0]];
     pur=pur.slice().sort((a,b)=>(CART_GU_ORDER[a[1]]||9)-(CART_GU_ORDER[b[1]]||9));
@@ -6130,7 +6142,7 @@ function ciPanelHtml(){
 }
 // 편집용 카드
 function costEditHtml(nm){
-  const d=DATA.costDetail[nm]; if(!d) return '';
+  const d=costDetailOf(nm); if(!d) return '';
   const ROUNDS=Object.keys(d.rounds);
   const rrows=ROUNDS.map(r=>`<tr><td><input class="ein" value="${r}" onchange="editRound('${nm}','${r}','label',this.value)" style="width:70px"></td>
     <td><input class="ein n" type="number" value="${d.rounds[r]}" onchange="editRound('${nm}','${r}','val',this.value)" style="width:80px"></td>
@@ -6173,13 +6185,13 @@ function costEditHtml(nm){
     </div>
   </div>`;
 }
-window.editRound=function(nm,r,k,v){ const d=DATA.costDetail[nm]; if(!d.qtys)d.qtys={};
+window.editRound=function(nm,r,k,v){ const d=costDetailOf(nm); if(!d.qtys)d.qtys={};
   if(k==='label'){ if(v&&v!==r){ d.rounds[v]=d.rounds[r]; delete d.rounds[r]; d.qtys[v]=d.qtys[r]||0; delete d.qtys[r]; sortRounds(d); renderCost(); if(typeof renderStock==='function') renderStock(); } }   // 이름 바꾸면 번호순 재정렬 (최신 차수 판정도 같이 바뀜)
   else if(k==='qty'){ d.qtys[r]=+v||0; renderCost(); }
   else { d.rounds[r]=+v||0; renderCost(); if(typeof renderStock==='function') renderStock(); }
   markDirty(); };
-window.delRound=function(nm,r){ const d=DATA.costDetail[nm]; delete d.rounds[r]; if(d.qtys)delete d.qtys[r]; markDirty(); renderCost(); if(typeof renderStock==='function') renderStock(); };
-window.addRound=function(nm){ const d=DATA.costDetail[nm]; if(!d.qtys)d.qtys={}; const n=Object.keys(d.rounds).length+1;
+window.delRound=function(nm,r){ const d=costDetailOf(nm); delete d.rounds[r]; if(d.qtys)delete d.qtys[r]; markDirty(); renderCost(); if(typeof renderStock==='function') renderStock(); };
+window.addRound=function(nm){ const d=costDetailOf(nm); if(!d.qtys)d.qtys={}; const n=Object.keys(d.rounds).length+1;
   d.rounds['신규'+n+'차']=0; d.qtys['신규'+n+'차']=0; markDirty(); renderCost(); if(typeof renderStock==='function') renderStock(); };
 window.editPur=function(nm,pi,col,v){ const p=DATA.costDetail[nm].purchase[pi];
   p[col]=(col<3)?v:(+v||0);
@@ -6237,7 +6249,7 @@ function doAddCostItem(){
   markDirty(); renderCost(); toast('품목 추가됨 · 차수·매입·현재고 입력 후 [저장]');
 }
 window.delCostItem=async function(nm){
-  const d=DATA.costDetail[nm]; if(!d) return;
+  const d=costDetailOf(nm); if(!d) return;
   if(d._pendingDel){ delete d._pendingDel; markDirty(); renderCost(); toast('삭제 예정 취소됨'); return; }
   if(!await askConfirm(nm+'를 삭제 예정으로 표시합니다.\n[저장] 시 최종 삭제되며, [취소] 시 복구됩니다.',{okText:'삭제 예정',title:'삭제 확인'}))return;
   d._pendingDel=true;
