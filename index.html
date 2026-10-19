@@ -530,6 +530,12 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .obadge.add{background:#eef1f8;color:var(--navy);border:1px solid #d5dcec}
 .oedIn{width:78px;text-align:right;font-size:12px;padding:3px 6px;border:1px dashed #c9cfdd;border-radius:4px;background:#fffef6}
 .oedIn.oedLead{width:42px}
+.oedGrip{cursor:grab;color:#a3aac0;font-size:14px;margin-right:5px;user-select:none;vertical-align:-1px}
+.oedGrip:hover{color:var(--navy)}
+.otbl tr.oedDragging td{background:#e8eefc !important;opacity:.85}
+.rsec h4.oedH{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.oedSort{margin-left:auto;display:flex;gap:6px}
+.oedSort .tbtn{font-size:11px;padding:3px 9px;font-weight:600}
 .oedIn:focus,.oedNm:focus,.oedText:focus{outline:2px solid #9fb0d8;border-style:solid}
 .oedNm{width:calc(100% - 34px);min-width:130px;font-size:12px;padding:3px 6px;border:1px dashed #c9cfdd;border-radius:4px;background:#fffef6}
 .oedReset{cursor:pointer;color:#2f5aa8}
@@ -4964,7 +4970,19 @@ function bundleDecisionHtml(all){
 function ensureOrderEdit(){ const e=DATA.orderReportEdit||(DATA.orderReportEdit={});
   if(!e.items||typeof e.items!=='object') e.items={}; if(!Array.isArray(e.added)) e.added=[]; return e; }
 function orderEditable(){ return !(typeof VIEWONLY!=='undefined'&&VIEWONLY)&&!(typeof EXTERNAL!=='undefined'&&EXTERNAL); }
-function orderEditCount(e){ return Object.keys(e.items).length+e.added.length+(e.text!=null?1:0); }
+function orderEditCount(e){ return Object.keys(e.items).length+e.added.length+(e.text!=null?1:0)+(e.order&&e.order.length?1:0); }
+// [v97] 품목 순서 — e.order = 키 배열(자동 품목은 품목명, 직접 추가는 '+품목명'). 목록에 없는 품목은 뒤에 긴급도순
+function orderAddKey(x){ return x.nm?'+'+x.nm:'+#'+x.i; }
+function orderRankFn(e){ if(!e||!Array.isArray(e.order)||!e.order.length) return null;
+  const m=new Map(e.order.map((k,i)=>[k,i])); return k=>m.has(k)?m.get(k):1e9; }
+// 같은 종류 키: 묶음 발주 그룹 → 카테고리('기타'면 이름에 든 다른 품목의 카테고리) → 품목명
+function orderFamilyKey(nm){
+  const g=(DATA.costGroups||[]).find(g=>(g.items||[]).includes(nm)); if(g) return 'g:'+g.id;
+  const s=(DATA.stock||[]).find(x=>x.nm===nm); let cat=s&&s.cat&&s.cat!=='기타'?s.cat:'';
+  if(!cat){ const cats=[...new Set((DATA.stock||[]).map(x=>x.cat).filter(c=>c&&c!=='기타'))].sort((a,b)=>b.length-a.length);
+    cat=cats.find(c=>nm.replace(/\s/g,'').includes(c.replace(/\s/g,'')))||''; }
+  return cat?'c:'+cat:'n:'+nm;
+}
 function applyOrderEdit(o,e){
   const s=o.s, c=o.c, ov=e.items[s.nm]||{};
   const autoQty=+c.orderQty||0, autoCost=getCurrentCost(s.nm,s.cost);
@@ -5001,12 +5019,13 @@ function buildOrderReport(){
   const byDD=(a,b)=>(a.c.recDD??9999)-(b.c.recDD??9999);
   const review=all.filter(o=>o.c.status==='now').sort(byDD).concat(all.filter(o=>o.c.status==='soon').sort(byDD));   // 즉시 + 14일내, 긴급도순
   review.forEach(o=>applyOrderEdit(o,e));
+  const rank=orderRankFn(e); if(rank) review.sort((a,b)=>rank(a.s.nm)-rank(b.s.nm));   // [v97] 사용자 순서(없는 품목은 뒤에 긴급도순)
   const excluded=review.filter(o=>o.ed.excluded);
   const now=review.filter(o=>o.c.status==='now'&&!o.ed.excluded);
   const soon=review.filter(o=>o.c.status==='soon'&&!o.ed.excluded);
   const added=e.added.map((a,i)=>{ const nm=String(a.nm||'').trim(), qty=+a.qty||0, cost=+a.cost||0;
     const s=(DATA.stock||[]).find(x=>x.nm===nm)||null; return {i,nm,qty,cost,amt:Math.round(qty*cost),s,c:s?calcStock(s):null}; });
-  const addedLive=added.filter(x=>x.nm);
+  const addedLive=added.filter(x=>x.nm); if(rank) addedLive.sort((a,b)=>rank(orderAddKey(a))-rank(orderAddKey(b)));
   const issueRows=all.filter(o=>o.issues.length).sort((a,b)=>b.issues.length-a.issues.length);
   const bundles=bundleSummaries(all);
   const bundleNeed=bundles.filter(b=>b.cls!=='ok');
@@ -5054,6 +5073,7 @@ function orderTableHtml(r){
   // [v96] 리드타임은 품목 설정(DATA.stock[].lead)을 직접 바꾼다 — 권장 수량·입고일·상태가 재고 탭과 같이 다시 계산됨
   const leadCell=(s,c,k,on)=>`${ed&&on?`<input class="oedIn oedLead" data-k="${k}" type="text" inputmode="numeric" value="${+s.lead||0}" onchange="${on}"><span class="omini"> 일</span>`:`${+s.lead||0}일`}${c&&c.arriveByRec?`<div class="omini">입고 ${fmtMDfull(c.arriveByRec)}</div>`:''}`;
   const moTxt=(q,c)=>(c&&c.daily>0&&q>0)?`약 ${(q/(c.daily*30)).toFixed(1)}개월분`:'';
+  const grip=ed?'<span class="oedGrip" onmousedown="orderDragArm(this)" title="끌어서 순서 바꾸기">⠿</span>':'';
   const body=rows.map((o,i)=>{
     const s=o.s, c=o.c, d=o.ed, u=s.stockUnit||'EA', U=u!=='EA'?u:'';
     const stat=c.status==='now'?'<span class="obadge now">즉시</span>':`<span class="obadge soon">${c.recDD}일 내</span>`;
@@ -5069,8 +5089,8 @@ function orderTableHtml(r){
     qty+=`<div class="omini oMo">${moTxt(d.qty,c)}</div>`;
     if(c.unitReady&&u!==s.orderUnit) qty+=`<div class="omini">제조 ${won(toOrderUnit(s,d.qty))}${s.orderUnit}</div>`;
     const x=ed?`<button class="oedX" onclick="orderEdSet(${i},'excluded',${d.excluded?'null':'true'})" title="${d.excluded?'다시 넣기':'이번 발주에서 빼기'}">${d.excluded?'↩ 다시 넣기':'✕'}</button>`:'';
-    return `<tr class="or-${c.status}${d.excluded?' oedOff':''}" data-amt="${d.excluded?0:d.amt}" data-daily="${c.daily||0}">
-      <td class="l">${x}<b>${s.nm}</b>${d.excluded?'<div class="omini">이번 발주 제외</div>':''}${c.stockoutBeforeArrive?'<div class="omini" style="color:#c0392b">⚠ 입고 전 품절 위험</div>':''}${(s.oem&&s.oem!=='-')?`<div class="omini">${s.oem}${s.round?' · '+s.round:''}</div>`:''}</td>
+    return `<tr class="or-${c.status}${d.excluded?' oedOff':''}" data-key="${pEsc(s.nm)}" data-amt="${d.excluded?0:d.amt}" data-daily="${c.daily||0}">
+      <td class="l">${x}${grip}<b>${s.nm}</b>${d.excluded?'<div class="omini">이번 발주 제외</div>':''}${c.stockoutBeforeArrive?'<div class="omini" style="color:#c0392b">⚠ 입고 전 품절 위험</div>':''}${(s.oem&&s.oem!=='-')?`<div class="omini">${s.oem}${s.round?' · '+s.round:''}</div>`:''}</td>
       <td class="c">${stat}</td>
       <td class="r">${won(invTotal(s))}${U}</td>
       <td class="r">${monthly(s,c)}</td>
@@ -5081,12 +5101,12 @@ function orderTableHtml(r){
       <td class="r oAmt">${d.excluded?'-':won(d.amt)}</td>
       <td class="r oVat">${d.excluded?'-':won(Math.round(d.amt*1.1))}</td>
     </tr>`;
-  }).join('');
+  });
   const addRows=r.added.map(x=>{
     const c=x.c, inv=x.s?won(invTotal(x.s)):'-', mid=`<td class="r">${inv}</td><td class="r">${x.s?monthly(x.s,c):'-'}</td><td class="c">${c&&c.runout?fmtMDfull(c.runout):'-'}</td><td class="c">${x.s?leadCell(x.s,c,'al'+x.i,`orderEdLead('a',${x.i},this.value)`):'-'}</td>`;
     const mo=`<div class="omini oMo">${moTxt(x.qty,c)}</div>`;
-    if(ed) return `<tr class="oedAdd" data-amt="${x.amt}" data-daily="${(c&&c.daily)||0}">
-      <td class="l"><button class="oedX" onclick="orderEdAdd(${x.i},'del')" title="추가 품목 삭제">✕</button><input class="oedNm" data-k="an${x.i}" list="orderEdNmList" value="${pEsc(x.nm)}" placeholder="품목명 입력·선택" onchange="orderEdAdd(${x.i},'nm',this.value)"></td>
+    if(ed) return `<tr class="oedAdd" data-key="${pEsc(orderAddKey(x))}" data-amt="${x.amt}" data-daily="${(c&&c.daily)||0}">
+      <td class="l"><button class="oedX" onclick="orderEdAdd(${x.i},'del')" title="추가 품목 삭제">✕</button>${grip}<input class="oedNm" data-k="an${x.i}" list="orderEdNmList" value="${pEsc(x.nm)}" placeholder="품목명 입력·선택" onchange="orderEdAdd(${x.i},'nm',this.value)"></td>
       <td class="c"><span class="obadge add">추가</span></td>${mid}
       <td class="r">${num('aq'+x.i,'q',x.qty,`orderEdAdd(${x.i},'qty',this.value)`)}${mo}</td>
       <td class="r">${num('ac'+x.i,'c',x.cost,`orderEdAdd(${x.i},'cost',this.value)`)}</td>
@@ -5096,14 +5116,19 @@ function orderTableHtml(r){
     return `<tr class="oedAdd"><td class="l"><b>${pEsc(x.nm)}</b><div class="omini">직접 추가</div></td><td class="c"><span class="obadge add">추가</span></td>${mid}
       <td class="r"><b>${won(x.qty)}</b>${mo}</td><td class="r">${won(x.cost)}</td>
       <td class="r">${won(x.amt)}</td><td class="r">${won(Math.round(x.amt*1.1))}</td></tr>`;
-  }).join('');
+  });
+  // [v97] 자동 행 + 직접 추가 행을 한 목록으로 — 사용자 순서가 있으면 그 순서(직접 추가 품목도 원하는 자리에)
+  let items=rows.map((o,i)=>({key:o.s.nm,html:body[i]})).concat(r.added.map((x,j)=>({key:orderAddKey(x),html:addRows[j]})));
+  const rank=orderRankFn(r.edit); if(rank) items.sort((a,b)=>rank(a.key)-rank(b.key));
+  const rowsHtml=items.map(t=>t.html).join('');
   const cnt=r.now.length+r.soon.length+r.addedLive.length;
   const addBtn=ed?`<tr class="oedAddRow"><td class="l" colspan="10"><button class="oedPlus" onclick="orderEdAdd(-1,'new')">+ 품목 직접 추가</button></td></tr>`:'';
   const list=ed?`<datalist id="orderEdNmList">${(DATA.stock||[]).map(s=>`<option value="${pEsc(s.nm)}">`).join('')}</datalist>`:'';
-  return `<div class="rsec"><h4>📦 이번 발주 대상 — 품목별 발주수량·매입가</h4>
+  const sortBtns=ed?`<span class="oedSort"><button class="tbtn" onclick="orderEdGroup()" title="묶음 발주 그룹 → 카테고리 순으로, 가장 급한 품목이 있는 묶음부터">🗂 같은 종류끼리 모으기</button>${r.edit.order&&r.edit.order.length?' <button class="tbtn" onclick="orderEdOrderReset()">↕ 긴급도순으로</button>':''}</span>`:'';
+  return `<div class="rsec"><h4 class="oedH">📦 이번 발주 대상 — 품목별 발주수량·매입가${sortBtns}</h4>
     <div class="otblWrap"><table class="otbl"><thead><tr>
       <th class="l">품목</th><th class="c">상태</th><th class="r">현재고</th><th class="r">월평균 판매<div class="omini" style="color:#c9d1ea">최근 3개월</div></th><th class="c">예상 소진</th><th class="c">리드타임</th><th class="r">${ed||r.edited?'발주수량':'권장 발주수량'}</th><th class="r">단가</th><th class="r">매입가(별도)</th><th class="r">VAT포함</th>
-    </tr></thead><tbody>${body}${addRows}${addBtn}
+    </tr></thead><tbody${ed?' ondragover="orderDragOver(event)" ondrop="orderDragDrop(event)"':''}>${rowsHtml}${addBtn}
       <tr class="otot"><td class="l">합계 · ${cnt}개 품목${r.edited?`<div class="omini">자동 권장 ${won(r.autoAmt)}</div>`:''}</td><td colspan="6"></td><td class="r">발주 총액 →</td><td class="r oTot"><b>${won(r.totalAmt)}</b></td><td class="r oTotV"><b>${won(r.totalVat)}</b></td></tr>
     </tbody></table></div>${list}
     <div class="omemo">${ed?'수량·단가 칸을 고치면 매입가·총액·복사 텍스트에 바로 반영됩니다 · 리드타임을 고치면 품목 설정이 바뀌어 권장 수량·입고일이 다시 계산됩니다(재고 탭에도 반영) · ✕ 이번 발주에서 제외 · ↺ 자동값으로 · 수정값은 저장할 때 함께 저장됩니다':'매입가 = 발주수량 × 단가(생산원가) · VAT 별도 기준'}</div></div>`;
@@ -5162,6 +5187,34 @@ window.orderEdLive=function(el){
   const t=tb.querySelector('.oTot'), tv=tb.querySelector('.oTotV');
   if(t) t.innerHTML=`<b>${won(tot)}</b>`; if(tv) tv.innerHTML=`<b>${won(Math.round(tot*1.1))}</b>`;
 };
+// [v97] 순서 바꾸기 — ⠿를 잡고 끌기(잡았을 때만 행을 draggable로: 입력칸 텍스트 선택 방해 안 함), 놓으면 화면 순서를 저장
+let ORDER_DRAG=null;
+window.orderDragArm=function(h){
+  const tr=h.closest('tr'); if(!tr) return; tr.draggable=true; ORDER_DRAG=tr;
+  tr.ondragstart=ev=>{ ev.dataTransfer.effectAllowed='move'; try{ ev.dataTransfer.setData('text/plain',''); }catch(_){} tr.classList.add('oedDragging'); };
+  tr.ondragend=()=>{ tr.draggable=false; tr.classList.remove('oedDragging'); ORDER_DRAG=null; };
+  document.addEventListener('mouseup',()=>{ if(!tr.classList.contains('oedDragging')){ tr.draggable=false; ORDER_DRAG=null; } },{once:true});
+};
+window.orderDragOver=function(ev){
+  if(!ORDER_DRAG) return; ev.preventDefault();
+  const t=ev.target.closest&&ev.target.closest('tr[data-key]'); if(!t||t===ORDER_DRAG||t.parentNode!==ORDER_DRAG.parentNode) return;
+  const rc=t.getBoundingClientRect(); t.parentNode.insertBefore(ORDER_DRAG, ev.clientY>rc.top+rc.height/2?t.nextSibling:t);
+};
+window.orderDragDrop=function(ev){
+  if(!ORDER_DRAG) return; ev.preventDefault();
+  const e=ensureOrderEdit(); e.order=[...ev.currentTarget.querySelectorAll('tr[data-key]')].map(t=>t.dataset.key);
+  orderEdTouch(e);
+};
+// 같은 종류끼리 모으기 — 지금 보이는 순서에서 각 묶음이 처음 나온 자리 기준(기본은 가장 급한 품목이 있는 묶음부터)
+window.orderEdGroup=function(){
+  const body=document.getElementById('orderReportBody'); if(!body) return;
+  const keys=[...body.querySelectorAll('tbody tr[data-key]')].map(t=>t.dataset.key);
+  const fam=new Map();
+  keys.forEach(k=>{ const f=k.startsWith('+#')?'n:'+k:orderFamilyKey(k.startsWith('+')?k.slice(1):k); if(!fam.has(f)) fam.set(f,[]); fam.get(f).push(k); });
+  const e=ensureOrderEdit(); e.order=[...fam.values()].flat();
+  orderEdTouch(e); toast('묶음 발주 그룹·카테고리별로 모았습니다 · ⠿를 끌어 직접 바꿀 수 있어요');
+};
+window.orderEdOrderReset=function(){ const e=ensureOrderEdit(); delete e.order; orderEdTouch(e); };
 // [v96] 리드타임 수정 = 품목 설정 변경. 상태가 바뀌어 발주 대상에서 빠지면 알려준다
 window.orderEdLead=function(kind,i,v){
   const nm=kind==='a'?((ensureOrderEdit().added[i]||{}).nm):ORDER_ED_NAMES[i];
@@ -5191,7 +5244,9 @@ window.orderEdAdd=function(i,f,v){
   if(f==='new') e.added.push({nm:'',qty:0,cost:0});
   else if(f==='del') e.added.splice(i,1);
   else { const a=e.added[i]; if(!a) return;
-    if(f==='nm'){ a.nm=String(v||'').trim(); const st=(DATA.stock||[]).find(x=>x.nm===a.nm); if(st&&!(+a.cost)) a.cost=Math.round(getCurrentCost(st.nm,st.cost)||0); }
+    if(f==='nm'){ const oldKey=orderAddKey({nm:a.nm,i}); a.nm=String(v||'').trim();
+      if(Array.isArray(e.order)){ const k=e.order.indexOf(oldKey); if(k>=0) e.order[k]=orderAddKey({nm:a.nm,i}); }   // 이름을 바꿔도 자리 유지
+      const st=(DATA.stock||[]).find(x=>x.nm===a.nm); if(st&&!(+a.cost)) a.cost=Math.round(getCurrentCost(st.nm,st.cost)||0); }
     else a[f]=orderEdNum(v)||0; }
   orderEdTouch(e);
 };
