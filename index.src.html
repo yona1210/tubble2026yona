@@ -530,6 +530,10 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .obadge.add{background:#eef1f8;color:var(--navy);border:1px solid #d5dcec}
 .oedIn{width:78px;text-align:right;font-size:12px;padding:3px 6px;border:1px dashed #c9cfdd;border-radius:4px;background:#fffef6}
 .oedIn.oedLead{width:42px}
+.otbl td.oSub{background:#f3f5fb !important;border-left:2px solid #c9d1ea;vertical-align:middle;text-align:right;min-width:104px}
+.otbl td.oSub .oSubL{font-size:10px;color:#5a6478;font-weight:700;white-space:normal;margin-bottom:2px}
+.otbl td.oSub .oSubV{font-size:13px;color:var(--navy)}
+.otbl td.oSub0{border-left:2px solid #eef0f4}
 .oedGrip{cursor:grab;color:#a3aac0;font-size:14px;margin-right:5px;user-select:none;vertical-align:-1px}
 .oedGrip:hover{color:var(--navy)}
 .otbl tr.oedDragging td{background:#e8eefc !important;opacity:.85}
@@ -4985,6 +4989,17 @@ function orderFamilyKey(nm){
     cat=cats.find(c=>nm.replace(/\s/g,'').includes(c.replace(/\s/g,'')))||''; }
   return cat?'c:'+cat:'n:'+nm;
 }
+function orderFamilyLabel(fk){
+  if(fk.startsWith('g:')){ const g=(DATA.costGroups||[]).find(x=>x.id===fk.slice(2)); return g?g.name.replace(/\s*묶음 발주$/,''):fk.slice(2); }
+  return fk.slice(2);
+}
+// 보고 텍스트용 — 이번 발주(제외 빼고) 품목을 종류별로 모아 2개 이상인 묶음의 소계
+function orderFamilySubtotals(r){
+  const m=new Map();
+  r.now.concat(r.soon).map(o=>({nm:o.s.nm,amt:o.ed.amt})).concat(r.addedLive.map(x=>({nm:x.nm,amt:x.amt}))).forEach(t=>{
+    const f=orderFamilyKey(t.nm); if(!m.has(f)) m.set(f,{label:orderFamilyLabel(f),n:0,amt:0}); const g=m.get(f); g.n++; g.amt+=t.amt; });
+  return [...m.values()].filter(g=>g.n>1);
+}
 function applyOrderEdit(o,e){
   const s=o.s, c=o.c, ov=e.items[s.nm]||{};
   const autoQty=+c.orderQty||0, autoCost=getCurrentCost(s.nm,s.cost);
@@ -5049,12 +5064,14 @@ function orderReportText(r){
   const summary=[`즉시 발주 ${r.now.length}개, 14일 내 발주 ${r.soon.length}개, 데이터 이상치 ${r.issueRows.length}개`,
     `${r.edited?'발주 총액':'권장 발주 총액'} ${wonMan(r.totalAmt)}원(VAT별도) / ${wonMan(r.totalVat)}원(VAT포함)${r.edited?` · 자동 권장 ${wonMan(r.autoAmt)}원에서 수정`:''}`,
     `입고 전 품절 리스크 ${r.stockoutRisk.length}개, 묶음 발주 검토 ${r.bundleNeed.length}개 그룹`];
+  const fams=orderFamilySubtotals(r);
   if(r.excluded.length) summary.push(`이번 발주 제외 ${r.excluded.length}개: ${r.excluded.map(o=>o.s.nm).join(', ')}`);
   return `[터블 재고·발주 보고 요약]\n기준일: ${fmt(NOW)}\n\n`+
     L('0. 종합 판단',summary)+
     '\n'+L('1. 즉시 발주 검토',r.now.map(orderLine))+
     '\n'+L('2. 14일 내 발주 후보',r.soon.map(orderLine))+
     (r.addedLive.length?'\n'+L('2-1. 직접 추가 품목',r.addedLive.map(addedLine)):'')+
+    (fams.length?'\n'+L('2-2. 묶음별 발주 소계',fams.map(g=>`${g.label} ${g.n}개 — ${wonMan(g.amt)}원(VAT별도) / ${wonMan(Math.round(g.amt*1.1))}원(VAT포함)`)):'')+
     '\n'+L('3. 묶음 발주 검토',r.bundleNeed.map(bundleLine))+
     '\n'+L('4. 데이터 이상치 확인',r.issueRows.map(o=>`${o.s.nm} — ${o.issues.map(x=>x.title).join(', ')} (${o.issues[0].msg})`))+
     '\n'+L('5. 실행 액션',r.action);
@@ -5120,18 +5137,30 @@ function orderTableHtml(r){
       <td class="r">${won(x.amt)}</td><td class="r">${won(Math.round(x.amt*1.1))}</td></tr>`;
   });
   // [v97] 자동 행 + 직접 추가 행을 한 목록으로 — 사용자 순서가 있으면 그 순서(직접 추가 품목도 원하는 자리에)
-  let items=rows.map((o,i)=>({key:o.s.nm,html:body[i]})).concat(r.added.map((x,j)=>({key:orderAddKey(x),html:addRows[j]})));
+  let items=rows.map((o,i)=>({key:o.s.nm,nm:o.s.nm,amt:o.ed.excluded?0:o.ed.amt,ex:o.ed.excluded,html:body[i]}))
+    .concat(r.added.map((x,j)=>({key:orderAddKey(x),nm:x.nm,amt:x.amt,html:addRows[j]}))).filter(t=>t.html);
   const rank=orderRankFn(r.edit); if(rank) items.sort((a,b)=>rank(a.key)-rank(b.key));
-  const rowsHtml=items.map(t=>t.html).join('');
+  // [v99] 묶음 소계 — 붙어 있는 같은 종류(묶음 그룹·카테고리)가 2개 이상이면 오른쪽 칸을 합쳐 소계(제외 품목은 0)
+  items.forEach(t=>{ t.fam=t.nm?orderFamilyKey(t.nm):'n:'+t.key; });
+  let rowsHtml='', gi=0;
+  for(let k=0;k<items.length;){
+    let j=k; while(j+1<items.length&&items[j+1].fam===items[k].fam) j++;
+    const run=items.slice(k,j+1), gid='g'+(gi++), n=run.length, nx=run.filter(t=>t.ex).length, sub=run.reduce((a,t)=>a+t.amt,0);
+    run.forEach((t,m)=>{
+      const cell=m>0?'':(n>1?`<td class="r oSub" rowspan="${n}" data-g="${gid}"><div class="oSubL">${pEsc(orderFamilyLabel(t.fam))} · ${n-nx}개${nx?` <span style="font-weight:600;color:#a3a9b6">(${nx}개 제외)</span>`:''}</div><b class="oSubV">${won(sub)}</b><div class="omini oSubT">VAT포함 ${won(Math.round(sub*1.1))}</div></td>`:'<td class="oSub0"></td>');
+      rowsHtml+=t.html.replace('<tr ',`<tr data-g="${gid}" `).replace(/<\/tr>\s*$/,cell+'</tr>');
+    });
+    k=j+1;
+  }
   const cnt=r.now.length+r.soon.length+r.addedLive.length;
-  const addBtn=ed?`<tr class="oedAddRow"><td class="l" colspan="10"><button class="oedPlus" onclick="orderEdAdd(-1,'new')">+ 품목 직접 추가</button></td></tr>`:'';
+  const addBtn=ed?`<tr class="oedAddRow"><td class="l" colspan="11"><button class="oedPlus" onclick="orderEdAdd(-1,'new')">+ 품목 직접 추가</button></td></tr>`:'';
   const list=ed?`<datalist id="orderEdNmList">${(DATA.stock||[]).map(s=>`<option value="${pEsc(s.nm)}">`).join('')}</datalist>`:'';
   const sortBtns=ed?`<span class="oedSort"><button class="tbtn" onclick="orderEdGroup()" title="묶음 발주 그룹 → 카테고리 순으로, 가장 급한 품목이 있는 묶음부터">🗂 같은 종류끼리 모으기</button>${r.edit.order&&r.edit.order.length?' <button class="tbtn" onclick="orderEdOrderReset()">↕ 긴급도순으로</button>':''}</span>`:'';
   return `<div class="rsec"><h4 class="oedH">📦 이번 발주 대상 — 품목별 발주수량·매입가${sortBtns}</h4>
     <div class="otblWrap"><table class="otbl"><thead><tr>
-      <th class="l">품목</th><th class="c">상태</th><th class="r">현재고</th><th class="r">월평균 판매<div class="omini" style="color:#c9d1ea">최근 3개월</div></th><th class="c">예상 소진</th><th class="c">리드타임</th><th class="r">${ed||r.edited?'발주수량':'권장 발주수량'}</th><th class="r">단가</th><th class="r">매입가(별도)</th><th class="r">VAT포함</th>
+      <th class="l">품목</th><th class="c">상태</th><th class="r">현재고</th><th class="r">월평균 판매<div class="omini" style="color:#c9d1ea">최근 3개월</div></th><th class="c">예상 소진</th><th class="c">리드타임</th><th class="r">${ed||r.edited?'발주수량':'권장 발주수량'}</th><th class="r">단가</th><th class="r">매입가(별도)</th><th class="r">VAT포함</th><th class="r">묶음 소계<div class="omini" style="color:#c9d1ea">같은 종류끼리</div></th>
     </tr></thead><tbody${ed?' ondragover="orderDragOver(event)" ondrop="orderDragDrop(event)"':''}>${rowsHtml}${addBtn}
-      <tr class="otot"><td class="l">합계 · ${cnt}개 품목${r.edited?`<div class="omini">자동 권장 ${won(r.autoAmt)}</div>`:''}</td><td colspan="6"></td><td class="r">발주 총액 →</td><td class="r oTot"><b>${won(r.totalAmt)}</b></td><td class="r oTotV"><b>${won(r.totalVat)}</b></td></tr>
+      <tr class="otot"><td class="l">합계 · ${cnt}개 품목${r.edited?`<div class="omini">자동 권장 ${won(r.autoAmt)}</div>`:''}</td><td colspan="6"></td><td class="r">발주 총액 →</td><td class="r oTot"><b>${won(r.totalAmt)}</b></td><td class="r oTotV"><b>${won(r.totalVat)}</b></td><td></td></tr>
     </tbody></table></div>${list}
     <div class="omemo">${ed?'수량·단가 칸을 고치면 매입가·총액·복사 텍스트에 바로 반영됩니다 · 리드타임을 고치면 품목 설정이 바뀌어 권장 수량·입고일이 다시 계산됩니다(재고 탭에도 반영) · ✕ 이번 발주에서 제외 · ↺ 자동값으로 · 수정값은 저장할 때 함께 저장됩니다':'매입가 = 발주수량 × 단가(생산원가) · VAT 별도 기준'}</div></div>`;
 }
@@ -5188,6 +5217,8 @@ window.orderEdLive=function(el){
   let tot=0; tb.querySelectorAll('tr[data-amt]').forEach(r=>{ tot+=+r.dataset.amt||0; });
   const t=tb.querySelector('.oTot'), tv=tb.querySelector('.oTotV');
   if(t) t.innerHTML=`<b>${won(tot)}</b>`; if(tv) tv.innerHTML=`<b>${won(Math.round(tot*1.1))}</b>`;
+  tb.querySelectorAll('.oSub[data-g]').forEach(c=>{ let s=0; tb.querySelectorAll(`tr[data-g="${c.dataset.g}"]`).forEach(x=>{ s+=+x.dataset.amt||0; });
+    const v1=c.querySelector('.oSubV'), v2=c.querySelector('.oSubT'); if(v1) v1.textContent=won(s); if(v2) v2.textContent='VAT포함 '+won(Math.round(s*1.1)); });
 };
 // [v97] 순서 바꾸기 — ⠿를 잡고 끌기(잡았을 때만 행을 draggable로: 입력칸 텍스트 선택 방해 안 함), 놓으면 화면 순서를 저장
 let ORDER_DRAG=null;
