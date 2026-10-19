@@ -526,6 +526,25 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .obadge.now{background:#C0392B;color:#fff}
 .obadge.soon{background:#fdf3e3;color:#B5611A;border:1px solid #f0d9a8}
 .omemo{font-size:10.5px;color:#8a93a8;margin-top:6px}
+/* [v94] 발주 보고 수정 */
+.obadge.add{background:#eef1f8;color:var(--navy);border:1px solid #d5dcec}
+.oedIn{width:78px;text-align:right;font-size:12px;padding:3px 6px;border:1px dashed #c9cfdd;border-radius:4px;background:#fffef6}
+.oedIn:focus,.oedNm:focus,.oedText:focus{outline:2px solid #9fb0d8;border-style:solid}
+.oedNm{width:calc(100% - 34px);min-width:130px;font-size:12px;padding:3px 6px;border:1px dashed #c9cfdd;border-radius:4px;background:#fffef6}
+.oedReset{cursor:pointer;color:#2f5aa8}
+.oedReset:hover{text-decoration:underline}
+.oedX{float:right;margin-left:6px;border:1px solid #d5dae6;background:#fff;border-radius:5px;font-size:11px;padding:1px 7px;cursor:pointer;color:#5a6478}
+.oedX:hover{border-color:#c0392b;color:#c0392b}
+.otbl tr.oedOff td{background:#f5f6f8 !important;color:#a3a9b6}
+.otbl tr.oedOff td b{text-decoration:line-through;color:#a3a9b6}
+.otbl tr.oedAddRow td{padding:5px 9px}
+.oedPlus{border:1px dashed #9fb0d8;background:#f7f9fd;color:var(--navy);border-radius:6px;font-size:11.5px;font-weight:700;padding:4px 10px;cursor:pointer}
+.oedBar{font-size:11.5px;background:#fffbea;border:1px solid #f0d9a8;color:#7a5410;border-radius:8px;padding:7px 10px;margin-bottom:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.oedBar .tbtn{margin-left:auto;font-size:11px;padding:3px 9px}
+.oedSum{cursor:pointer;font-size:12px;font-weight:800;color:var(--navy);padding-bottom:4px;border-bottom:1px solid var(--grid);margin-bottom:7px}
+.oedText{width:100%;box-sizing:border-box;font-family:inherit;font-size:12px;line-height:1.55;padding:8px 10px;border:1px solid #d5dae6;border-radius:6px;resize:vertical}
+.oedWarn{font-size:11px;background:#fdf0ee;border:1px solid #f1c7c0;color:#a93226;border-radius:6px;padding:6px 9px;margin-bottom:6px}
+.oedWarn .tbtn{font-size:11px;padding:2px 8px;margin-left:4px}
 .stockcell.low{color:var(--red);font-weight:700}
 .editable-stock{background:#fffde8;border:1px dashed #d8c860;border-radius:4px;padding:3px 6px;width:80px;text-align:right;font-size:12px}
 .linktag{display:inline-block;font-size:8px;background:#eef0f7;color:var(--navy);padding:1px 5px;border-radius:6px;margin-left:3px;vertical-align:1px}
@@ -4938,13 +4957,37 @@ function bundleDecisionHtml(all){
   }).join('');
   return `<div class="bundlePanel"><h4 class="collapsibleH" onclick="toggleBundle()"><span class="collArrow">${bundleCollapsed?'▸':'▾'}</span>묶음 발주 검토</h4><div class="collBody" style="display:${bundleCollapsed?'none':'block'}"><div class="bundleGrid">${cards}</div></div></div>`;
 }
+// [v94] 발주 보고 수정 — 자동 계산은 그대로 두고, 사용자가 고친 값을 그 위에 덮어쓴다.
+//   DATA.orderReportEdit = {items:{품목명:{qty,cost,excluded}}, added:[{nm,qty,cost}], text, textBase, date}
+//   품목명 기준이라 다음 보고에도 남는다 → 수정값이 있으면 모달 상단에 '수정값 적용 중' 바와 전체 되돌리기를 띄운다.
+function ensureOrderEdit(){ const e=DATA.orderReportEdit||(DATA.orderReportEdit={});
+  if(!e.items||typeof e.items!=='object') e.items={}; if(!Array.isArray(e.added)) e.added=[]; return e; }
+function orderEditable(){ return !(typeof VIEWONLY!=='undefined'&&VIEWONLY)&&!(typeof EXTERNAL!=='undefined'&&EXTERNAL); }
+function orderEditCount(e){ return Object.keys(e.items).length+e.added.length+(e.text!=null?1:0); }
+function applyOrderEdit(o,e){
+  const s=o.s, c=o.c, ov=e.items[s.nm]||{};
+  const autoQty=+c.orderQty||0, autoCost=getCurrentCost(s.nm,s.cost);
+  const qtyEdited=ov.qty!=null, costEdited=ov.cost!=null;
+  const qty=qtyEdited?+ov.qty:autoQty, cost=costEdited?+ov.cost:autoCost;
+  const amt=(qtyEdited||costEdited)?Math.round(qty*cost):(+c.amt||0);
+  o.ed={qty,cost,amt,autoQty,autoCost,qtyEdited,costEdited,excluded:!!ov.excluded};
+  return o;
+}
 function orderLine(o){
-  const c=o.c, s=o.s; const u=s.stockUnit||'EA';
-  if(!c.unitReady) return `${s.nm} — 현재고 ${won(invTotal(s))}${u}, 단위 설정 필요(발주수량 계산 보류)`;
-  const qty=`권장 ${won(c.orderQty)}${u}${u!==s.orderUnit?` (제조 ${won(c.orderQtyOrderUnit)}${s.orderUnit}, 1${u}=${s.unitConversion}${s.orderUnit})`:''}`;
+  const c=o.c, s=o.s, ed=o.ed; const u=s.stockUnit||'EA';
+  const qEdited=!!(ed&&ed.qtyEdited);
+  if(!c.unitReady&&!qEdited) return `${s.nm} — 현재고 ${won(invTotal(s))}${u}, 단위 설정 필요(발주수량 계산 보류)`;
+  const q=ed?ed.qty:c.orderQty;
+  const conv=(c.unitReady&&u!==s.orderUnit)?` (제조 ${won(toOrderUnit(s,q))}${s.orderUnit}, 1${u}=${s.unitConversion}${s.orderUnit})`:'';
+  const qty=qEdited?`발주 ${won(q)}${u}${conv} [권장 ${won(ed.autoQty)}${u}에서 수정]`:`권장 ${won(q)}${u}${conv}`;
   const moqTxt=(s.moqOrderUnit>0)?`, 제조 MOQ ${won(s.moqOrderUnit)}${s.orderUnit}`:'';
+  const costTxt=(ed&&ed.costEdited)?`, 단가 ${won(ed.cost)}원[수정]`:'';
   const risk=c.stockoutBeforeArrive?', ⚠입고 전 품절 위험':'';
-  return `${s.nm} — 현재고 ${won(invTotal(s))}${u}, 예상 소진일 ${c.runout?fmtMDfull(c.runout):'-'}, ${qty}${moqTxt}, 리드타임 ${s.lead||0}일, 입고예상 ${c.arriveByRec?fmtMDfull(c.arriveByRec):'-'}, 예상 매입액 ${wonMan(c.amt||0)}원${risk} (${c.sourceLabel||'기준 없음'})`;
+  return `${s.nm} — 현재고 ${won(invTotal(s))}${u}, 예상 소진일 ${c.runout?fmtMDfull(c.runout):'-'}, ${qty}${moqTxt}, 리드타임 ${s.lead||0}일, 입고예상 ${c.arriveByRec?fmtMDfull(c.arriveByRec):'-'}${costTxt}, 예상 매입액 ${wonMan(ed?ed.amt:(c.amt||0))}원${risk} (${c.sourceLabel||'기준 없음'})`;
+}
+function addedLine(x){
+  const u=(x.s&&x.s.stockUnit)||'EA';
+  return `${x.nm} — 발주 ${won(x.qty)}${u}, 단가 ${won(x.cost)}원, 예상 매입액 ${wonMan(x.amt)}원${x.s?`, 현재고 ${won(invTotal(x.s))}${u}`:''} (직접 추가)`;
 }
 function bundleLine(b){
   const u=(b.members[0]&&b.members[0].s.stockUnit)||'EA';
@@ -4953,60 +4996,121 @@ function bundleLine(b){
 }
 function buildOrderReport(){
   const all=stockAnalysisRows();
-  const now=all.filter(o=>o.c.status==='now').sort((a,b)=>(a.c.recDD??9999)-(b.c.recDD??9999));
-  const soon=all.filter(o=>o.c.status==='soon').sort((a,b)=>(a.c.recDD??9999)-(b.c.recDD??9999));
-  const review=now.concat(soon);
+  const e=ensureOrderEdit();
+  const byDD=(a,b)=>(a.c.recDD??9999)-(b.c.recDD??9999);
+  const review=all.filter(o=>o.c.status==='now').sort(byDD).concat(all.filter(o=>o.c.status==='soon').sort(byDD));   // 즉시 + 14일내, 긴급도순
+  review.forEach(o=>applyOrderEdit(o,e));
+  const excluded=review.filter(o=>o.ed.excluded);
+  const now=review.filter(o=>o.c.status==='now'&&!o.ed.excluded);
+  const soon=review.filter(o=>o.c.status==='soon'&&!o.ed.excluded);
+  const added=e.added.map((a,i)=>{ const nm=String(a.nm||'').trim(), qty=+a.qty||0, cost=+a.cost||0;
+    return {i,nm,qty,cost,amt:Math.round(qty*cost),s:(DATA.stock||[]).find(x=>x.nm===nm)||null}; });
+  const addedLive=added.filter(x=>x.nm);
   const issueRows=all.filter(o=>o.issues.length).sort((a,b)=>b.issues.length-a.issues.length);
   const bundles=bundleSummaries(all);
   const bundleNeed=bundles.filter(b=>b.cls!=='ok');
-  const totalAmt=review.reduce((a,o)=>a+(+o.c.amt||0),0);
+  const autoAmt=review.reduce((a,o)=>a+(+o.c.amt||0),0);
+  const totalAmt=now.concat(soon).reduce((a,o)=>a+o.ed.amt,0)+addedLive.reduce((a,x)=>a+x.amt,0);
   const totalVat=Math.round(totalAmt*1.1);
-  const stockoutRisk=review.filter(o=>{ const m=simulationMetrics(o.s,o.c,o.c.orderQty,o.s.lead||0); return m.stockoutBefore; });
+  const edited=review.some(o=>o.ed.qtyEdited||o.ed.costEdited||o.ed.excluded)||addedLive.length>0;
+  const stockoutRisk=now.concat(soon).filter(o=>{ const m=simulationMetrics(o.s,o.c,o.ed.qty,o.s.lead||0); return m.stockoutBefore; });
   const action=[];
   if(now.length) action.push(`즉시 발주 검토 ${now.length}개 품목: ${now.slice(0,3).map(o=>o.s.nm).join(', ')}${now.length>3?' 외':''}`);
   if(stockoutRisk.length) action.push(`입고 전 품절 리스크 ${stockoutRisk.length}개 품목: 리드타임 단축·선입고 가능 여부 확인`);
   if(bundleNeed.length) action.push(`묶음 발주 검토 ${bundleNeed.length}개 그룹: ${bundleNeed.map(b=>b.g.name).join(', ')}`);
   if(issueRows.length) action.push(`데이터 이상치 ${issueRows.length}개 품목: 재고 파일/창고 합산 기준 확인`);
   if(!action.length) action.push('즉시 발주 또는 데이터 이상치 없음. 데일리 현재고 업데이트 후 모니터링 유지');
-  return {all,now,soon,review,issueRows,bundles,bundleNeed,totalAmt,totalVat,stockoutRisk,action};
+  return {all,now,soon,review,excluded,added,addedLive,issueRows,bundles,bundleNeed,totalAmt,totalVat,autoAmt,edited,stockoutRisk,action,edit:e};
 }
 function orderReportText(r){
   const L=(t,arr)=>`■ ${t}\n`+(arr.length?arr.map(x=>'  - '+x).join('\n'):'  - 해당 없음')+'\n';
-  const summary=[`즉시 발주 ${r.now.length}개, 14일 내 발주 ${r.soon.length}개, 데이터 이상치 ${r.issueRows.length}개`, `권장 발주 총액 ${wonMan(r.totalAmt)}원(VAT별도) / ${wonMan(r.totalVat)}원(VAT포함)`, `입고 전 품절 리스크 ${r.stockoutRisk.length}개, 묶음 발주 검토 ${r.bundleNeed.length}개 그룹`];
+  const summary=[`즉시 발주 ${r.now.length}개, 14일 내 발주 ${r.soon.length}개, 데이터 이상치 ${r.issueRows.length}개`,
+    `${r.edited?'발주 총액':'권장 발주 총액'} ${wonMan(r.totalAmt)}원(VAT별도) / ${wonMan(r.totalVat)}원(VAT포함)${r.edited?` · 자동 권장 ${wonMan(r.autoAmt)}원에서 수정`:''}`,
+    `입고 전 품절 리스크 ${r.stockoutRisk.length}개, 묶음 발주 검토 ${r.bundleNeed.length}개 그룹`];
+  if(r.excluded.length) summary.push(`이번 발주 제외 ${r.excluded.length}개: ${r.excluded.map(o=>o.s.nm).join(', ')}`);
   return `[터블 재고·발주 보고 요약]\n기준일: ${fmt(NOW)}\n\n`+
     L('0. 종합 판단',summary)+
     '\n'+L('1. 즉시 발주 검토',r.now.map(orderLine))+
     '\n'+L('2. 14일 내 발주 후보',r.soon.map(orderLine))+
+    (r.addedLive.length?'\n'+L('2-1. 직접 추가 품목',r.addedLive.map(addedLine)):'')+
     '\n'+L('3. 묶음 발주 검토',r.bundleNeed.map(bundleLine))+
     '\n'+L('4. 데이터 이상치 확인',r.issueRows.map(o=>`${o.s.nm} — ${o.issues.map(x=>x.title).join(', ')} (${o.issues[0].msg})`))+
     '\n'+L('5. 실행 액션',r.action);
 }
+// 복사되는 최종 텍스트 — 직접 고친 텍스트가 있으면 그것, 없으면 자동 텍스트
+function orderReportFinalText(r){ return r.edit.text!=null?r.edit.text:orderReportText(r); }
 // [v83] 이번 발주 대상 — 품목별 발주수량·매입가 한눈에 표
+// [v94] 편집 가능하면 수량·단가 입력칸, ✕(제외), 직접 추가 행
+let ORDER_ED_NAMES=[], ORDER_AUTO_TEXT='';
 function orderTableHtml(r){
-  const rows=r.review;   // 즉시(now) + 14일내(soon), 긴급도순 정렬됨
-  if(!rows.length) return `<div class="rsec"><h4>📦 이번 발주 대상</h4><div class="rnone">지금 발주할 품목이 없습니다 · 재고 여유</div></div>`;
-  const body=rows.map(o=>{
-    const s=o.s, c=o.c, u=s.stockUnit||'EA';
+  const rows=r.review, ed=orderEditable();
+  ORDER_ED_NAMES=rows.map(o=>o.s.nm);
+  if(!rows.length&&!r.addedLive.length&&!ed) return `<div class="rsec"><h4>📦 이번 발주 대상</h4><div class="rnone">지금 발주할 품목이 없습니다 · 재고 여유</div></div>`;
+  const num=(k,v,on)=>`<input class="oedIn" data-k="${k}" type="text" inputmode="numeric" value="${won(+v||0)}" onchange="${on}">`;
+  const body=rows.map((o,i)=>{
+    const s=o.s, c=o.c, d=o.ed, u=s.stockUnit||'EA', U=u!=='EA'?u:'';
     const stat=c.status==='now'?'<span class="obadge now">즉시</span>':`<span class="obadge soon">${c.recDD}일 내</span>`;
-    const qty=c.unitReady?`${won(c.orderQty)}${u!=='EA'?u:''}${u!==s.orderUnit?`<div class="omini">제조 ${won(c.orderQtyOrderUnit)}${s.orderUnit}</div>`:''}`:'<span style="color:#c0392b;font-size:11px">단위 설정 필요</span>';
-    const amt=+c.amt||0, uc=getCurrentCost(s.nm,s.cost);
-    return `<tr class="or-${c.status}">
-      <td class="l"><b>${s.nm}</b>${c.stockoutBeforeArrive?'<div class="omini" style="color:#c0392b">⚠ 입고 전 품절 위험</div>':''}${(s.oem&&s.oem!=='-')?`<div class="omini">${s.oem}${s.round?' · '+s.round:''}</div>`:''}</td>
+    const reset=(f,auto)=>`<div class="omini oedReset" onclick="orderEdSet(${i},'${f}',null)" title="자동값으로 되돌리기">자동 ${won(auto)} ↺</div>`;
+    let qty, cost;
+    if(ed){
+      qty=num('q'+i,d.qty,`orderEdSet(${i},'qty',this.value)`)+(d.qtyEdited?reset('qty',d.autoQty):(c.unitReady?'':'<div class="omini" style="color:#c0392b">단위 설정 필요</div>'));
+      cost=num('c'+i,d.cost,`orderEdSet(${i},'cost',this.value)`)+(d.costEdited?reset('cost',d.autoCost):'');
+    } else {
+      qty=(c.unitReady||d.qtyEdited)?`${won(d.qty)}${U}${d.qtyEdited?`<div class="omini">수정 · 권장 ${won(d.autoQty)}</div>`:''}`:'<span style="color:#c0392b;font-size:11px">단위 설정 필요</span>';
+      cost=`${won(d.cost)}${d.costEdited?`<div class="omini">수정 · 원가 ${won(d.autoCost)}</div>`:''}`;
+    }
+    if(c.unitReady&&u!==s.orderUnit) qty+=`<div class="omini">제조 ${won(toOrderUnit(s,d.qty))}${s.orderUnit}</div>`;
+    const x=ed?`<button class="oedX" onclick="orderEdSet(${i},'excluded',${d.excluded?'null':'true'})" title="${d.excluded?'다시 넣기':'이번 발주에서 빼기'}">${d.excluded?'↩ 다시 넣기':'✕'}</button>`:'';
+    return `<tr class="or-${c.status}${d.excluded?' oedOff':''}">
+      <td class="l">${x}<b>${s.nm}</b>${d.excluded?'<div class="omini">이번 발주 제외</div>':''}${c.stockoutBeforeArrive?'<div class="omini" style="color:#c0392b">⚠ 입고 전 품절 위험</div>':''}${(s.oem&&s.oem!=='-')?`<div class="omini">${s.oem}${s.round?' · '+s.round:''}</div>`:''}</td>
       <td class="c">${stat}</td>
-      <td class="r">${won(invTotal(s))}${u!=='EA'?u:''}</td>
+      <td class="r">${won(invTotal(s))}${U}</td>
       <td class="c">${c.runout?fmtMDfull(c.runout):'-'}</td>
       <td class="r"><b>${qty}</b></td>
-      <td class="r">${won(amt)}<div class="omini">@${won(uc)}</div></td>
-      <td class="r">${won(Math.round(amt*1.1))}</td>
+      <td class="r">${cost}</td>
+      <td class="r">${d.excluded?'-':won(d.amt)}</td>
+      <td class="r">${d.excluded?'-':won(Math.round(d.amt*1.1))}</td>
     </tr>`;
   }).join('');
+  const addRows=r.added.map(x=>{
+    const inv=x.s?won(invTotal(x.s)):'-';
+    if(ed) return `<tr class="oedAdd">
+      <td class="l"><button class="oedX" onclick="orderEdAdd(${x.i},'del')" title="추가 품목 삭제">✕</button><input class="oedNm" data-k="an${x.i}" list="orderEdNmList" value="${pEsc(x.nm)}" placeholder="품목명 입력·선택" onchange="orderEdAdd(${x.i},'nm',this.value)"></td>
+      <td class="c"><span class="obadge add">추가</span></td>
+      <td class="r">${inv}</td><td class="c">-</td>
+      <td class="r">${num('aq'+x.i,x.qty,`orderEdAdd(${x.i},'qty',this.value)`)}</td>
+      <td class="r">${num('ac'+x.i,x.cost,`orderEdAdd(${x.i},'cost',this.value)`)}</td>
+      <td class="r">${won(x.amt)}</td><td class="r">${won(Math.round(x.amt*1.1))}</td>
+      </tr>`;
+    if(!x.nm) return '';
+    return `<tr class="oedAdd"><td class="l"><b>${pEsc(x.nm)}</b><div class="omini">직접 추가</div></td><td class="c"><span class="obadge add">추가</span></td>
+      <td class="r">${inv}</td><td class="c">-</td><td class="r"><b>${won(x.qty)}</b></td><td class="r">${won(x.cost)}</td>
+      <td class="r">${won(x.amt)}</td><td class="r">${won(Math.round(x.amt*1.1))}</td></tr>`;
+  }).join('');
+  const cnt=r.now.length+r.soon.length+r.addedLive.length;
+  const addBtn=ed?`<tr class="oedAddRow"><td class="l" colspan="8"><button class="oedPlus" onclick="orderEdAdd(-1,'new')">+ 품목 직접 추가</button></td></tr>`:'';
+  const list=ed?`<datalist id="orderEdNmList">${(DATA.stock||[]).map(s=>`<option value="${pEsc(s.nm)}">`).join('')}</datalist>`:'';
   return `<div class="rsec"><h4>📦 이번 발주 대상 — 품목별 발주수량·매입가</h4>
     <div class="otblWrap"><table class="otbl"><thead><tr>
-      <th class="l">품목</th><th class="c">상태</th><th class="r">현재고</th><th class="c">예상 소진</th><th class="r">권장 발주수량</th><th class="r">매입가(별도)</th><th class="r">VAT포함</th>
-    </tr></thead><tbody>${body}
-      <tr class="otot"><td class="l">합계 · ${rows.length}개 품목</td><td colspan="3"></td><td class="r">발주 총액 →</td><td class="r"><b>${won(r.totalAmt)}</b></td><td class="r"><b>${won(r.totalVat)}</b></td></tr>
-    </tbody></table></div>
-    <div class="omemo">매입가 = 권장 발주수량 × 생산원가(@단가) · VAT 별도 기준</div></div>`;
+      <th class="l">품목</th><th class="c">상태</th><th class="r">현재고</th><th class="c">예상 소진</th><th class="r">${ed||r.edited?'발주수량':'권장 발주수량'}</th><th class="r">단가</th><th class="r">매입가(별도)</th><th class="r">VAT포함</th>
+    </tr></thead><tbody>${body}${addRows}${addBtn}
+      <tr class="otot"><td class="l">합계 · ${cnt}개 품목${r.edited?`<div class="omini">자동 권장 ${won(r.autoAmt)}</div>`:''}</td><td colspan="4"></td><td class="r">발주 총액 →</td><td class="r"><b>${won(r.totalAmt)}</b></td><td class="r"><b>${won(r.totalVat)}</b></td></tr>
+    </tbody></table></div>${list}
+    <div class="omemo">${ed?'수량·단가 칸을 고치면 매입가·총액·복사 텍스트에 바로 반영됩니다 · ✕ 이번 발주에서 제외 · ↺ 자동값으로 · 수정값은 저장할 때 함께 저장됩니다':'매입가 = 발주수량 × 단가(생산원가) · VAT 별도 기준'}</div></div>`;
+}
+function orderEditBarHtml(r){
+  const e=r.edit, n=orderEditCount(e); if(!n) return '';
+  return `<div class="oedBar">✏️ <b>수정값 적용 중</b> · ${n}건${e.date?` (${e.date} 수정)`:''} — 자동 계산과 다를 수 있습니다${orderEditable()?` <button class="tbtn" onclick="orderEdResetAll()">전체 자동값으로</button>`:''}</div>`;
+}
+function orderTextHtml(r){
+  const e=r.edit, auto=orderReportText(r); ORDER_AUTO_TEXT=auto;
+  const own=e.text!=null, ed=orderEditable();
+  const stale=own&&e.textBase!=null&&e.textBase!==auto;
+  return `<details class="rsec oedTextWrap"${own?' open':''}><summary class="oedSum">📝 보고 텍스트 ${own?'— 직접 고친 텍스트가 복사됩니다':'— 복사되는 내용을 직접 고칠 수 있습니다'}</summary>
+    ${stale?`<div class="oedWarn">텍스트를 고친 뒤 수량·재고 같은 자동 내용이 바뀌었습니다. 아래 텍스트에는 반영되지 않았습니다.${ed?' <button class="tbtn" onclick="orderTextReset()">자동 텍스트로 다시 만들기</button>':''}</div>`:''}
+    <textarea id="orderReportTextEd" class="oedText" data-k="txt" rows="14" ${ed?'oninput="orderTextInput(this.value)"':'readonly'}>${pEsc(own?e.text:auto)}</textarea>
+    ${own&&ed&&!stale?'<div class="omini" style="margin-top:4px"><a href="javascript:void 0" onclick="orderTextReset()">자동 텍스트로 되돌리기</a></div>':''}
+  </details>`;
 }
 function orderReportHtml(r){
   const sec=(t,arr,cls='')=>`<div class="rsec ${cls}"><h4>${t}</h4>`+(arr.length?arr.map(x=>`<div class="ri">${x}</div>`).join(''):'<div class="rnone">해당 없음</div>')+'</div>';
@@ -5014,18 +5118,53 @@ function orderReportHtml(r){
     <div class="orderReportBox ${r.now.length?'alert':''}"><div class="rv">${r.now.length}</div><div class="rl">즉시 발주</div></div>
     <div class="orderReportBox ${r.soon.length?'warn':''}"><div class="rv">${r.soon.length}</div><div class="rl">14일 내 발주</div></div>
     <div class="orderReportBox ${r.issueRows.length?'alert':'good'}"><div class="rv">${r.issueRows.length}</div><div class="rl">데이터 이상치</div></div>
-    <div class="orderReportBox"><div class="rv">${wonMan(r.totalAmt)}</div><div class="rl">권장 발주 총액</div></div>
+    <div class="orderReportBox"><div class="rv">${wonMan(r.totalAmt)}</div><div class="rl">${r.edited?'발주 총액(수정 반영)':'권장 발주 총액'}</div></div>
   </div>`;
   const note=`<div class="reportNote"><b>보고 기준:</b> 월별 채널 3개월 추이는 월초 업데이트 기준의 판매 방향성, 데일리 현재고 감소 추이는 예상 소진일·권장 발주량의 우선 기준입니다. 총액은 권장 발주수량×생산원가 기준이며 VAT 별도입니다.</div>`;
   const bundles=r.bundleNeed.map(bundleLine);
   const issues=r.issueRows.map(o=>`${o.s.nm} — ${o.issues.map(x=>`<b>${x.title}</b>`).join(', ')} · ${o.issues[0].msg}`);
-  return summary+
+  return orderEditBarHtml(r)+
+    summary+
     orderTableHtml(r)+
     note+
     sec('묶음 발주 검토',bundles,'late')+
     sec('데이터 이상치 확인',issues,'late')+
-    sec('실행 액션',r.action,'late');
+    sec('실행 액션',r.action,'late')+
+    orderTextHtml(r);
 }
+// 다시 그릴 때 스크롤·입력 포커스 유지 (onchange 직후 포커스가 다음 칸으로 넘어간 뒤에 그린다)
+function rerenderOrderReport(){
+  const body=document.getElementById('orderReportBody'); if(!body) return;
+  const st=body.scrollTop, a=document.activeElement, k=a&&body.contains(a)?a.getAttribute('data-k'):null;
+  body.innerHTML=orderReportHtml(buildOrderReport()); body.scrollTop=st;
+  if(k){ const n=body.querySelector(`[data-k="${k}"]`); if(n){ n.focus(); if(n.select&&n.classList.contains('oedIn')) n.select(); } }
+}
+function orderEdTouch(e){ e.date=fmt(NOW); if(typeof markDirty==='function') markDirty(); setTimeout(rerenderOrderReport,0); }
+function orderEdNum(v){ const n=Math.round(+String(v==null?'':v).replace(/,/g,'')); return isFinite(n)&&n>=0?n:null; }
+window.orderEdSet=function(i,f,v){
+  const nm=ORDER_ED_NAMES[i]; if(nm==null) return;
+  const e=ensureOrderEdit(), ov=e.items[nm]||{};
+  if(v==null||v==='') delete ov[f];
+  else if(f==='excluded') ov.excluded=true;
+  else { const n=orderEdNum(v); if(n==null){ toast('0 이상 숫자를 입력하세요'); setTimeout(rerenderOrderReport,0); return; } ov[f]=n; }
+  if(Object.keys(ov).length) e.items[nm]=ov; else delete e.items[nm];
+  orderEdTouch(e);
+};
+window.orderEdAdd=function(i,f,v){
+  const e=ensureOrderEdit();
+  if(f==='new') e.added.push({nm:'',qty:0,cost:0});
+  else if(f==='del') e.added.splice(i,1);
+  else { const a=e.added[i]; if(!a) return;
+    if(f==='nm'){ a.nm=String(v||'').trim(); const st=(DATA.stock||[]).find(x=>x.nm===a.nm); if(st&&!(+a.cost)) a.cost=Math.round(getCurrentCost(st.nm,st.cost)||0); }
+    else a[f]=orderEdNum(v)||0; }
+  orderEdTouch(e);
+};
+window.orderEdResetAll=function(){
+  if(!confirm('발주 보고에서 고친 수량·단가·제외·추가 품목·텍스트를 모두 지우고 자동값으로 돌릴까요?')) return;
+  DATA.orderReportEdit={items:{},added:[]}; orderEdTouch(DATA.orderReportEdit);
+};
+window.orderTextInput=function(v){ const e=ensureOrderEdit(); if(e.text==null) e.textBase=ORDER_AUTO_TEXT; e.text=v; e.date=fmt(NOW); if(typeof markDirty==='function') markDirty(); };
+window.orderTextReset=function(){ const e=ensureOrderEdit(); delete e.text; delete e.textBase; orderEdTouch(e); };
 function openOrderReport(){
   const r=buildOrderReport();
   const range=document.getElementById('orderReportRange'); if(range) range.textContent=`(${fmt(NOW)} 기준)`;
@@ -8457,7 +8596,7 @@ document.getElementById('btnStockDensity').onclick=function(){
 };
 document.getElementById('btnOrderReportClose').onclick=()=>document.getElementById('orderReportModal').classList.remove('open');
 document.getElementById('btnOrderReportCopy').onclick=()=>{
-  const txt=orderReportText(buildOrderReport());
+  const txt=orderReportFinalText(buildOrderReport());   // [v94] 직접 고친 텍스트가 있으면 그것을 복사
   navigator.clipboard.writeText(txt).then(()=>toast('발주 보고 텍스트 복사됨'),()=>{
     const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();
     try{document.execCommand('copy');toast('발주 보고 텍스트 복사됨');}catch(e){toast('복사 실패');}
