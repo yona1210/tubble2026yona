@@ -529,6 +529,7 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 /* [v94] 발주 보고 수정 */
 .obadge.add{background:#eef1f8;color:var(--navy);border:1px solid #d5dcec}
 .oedIn{width:78px;text-align:right;font-size:12px;padding:3px 6px;border:1px dashed #c9cfdd;border-radius:4px;background:#fffef6}
+.oedIn.oedLead{width:42px}
 .oedIn:focus,.oedNm:focus,.oedText:focus{outline:2px solid #9fb0d8;border-style:solid}
 .oedNm{width:calc(100% - 34px);min-width:130px;font-size:12px;padding:3px 6px;border:1px dashed #c9cfdd;border-radius:4px;background:#fffef6}
 .oedReset{cursor:pointer;color:#2f5aa8}
@@ -5050,7 +5051,8 @@ function orderTableHtml(r){
   const num=(k,f,v,on)=>`<input class="oedIn" data-k="${k}" data-f="${f}" type="text" inputmode="numeric" value="${won(+v||0)}" oninput="orderEdLive(this)" onchange="${on}">`;
   const monthly=(s,c)=>{ const m=+s.msale||0, ad=(c&&c.daily)?Math.round(c.daily*30):0;
     return `${m?won(Math.round(m)):'-'}${ad&&m&&Math.abs(ad-m)/m>=0.1?`<div class="omini" title="재고 탭 발주 판단에 쓰는 속도(일판매×30)">발주 기준 ${won(ad)}</div>`:''}`; };
-  const leadCell=(s,c)=>`${s.lead||0}일${c&&c.arriveByRec?`<div class="omini">입고 ${fmtMDfull(c.arriveByRec)}</div>`:''}`;
+  // [v96] 리드타임은 품목 설정(DATA.stock[].lead)을 직접 바꾼다 — 권장 수량·입고일·상태가 재고 탭과 같이 다시 계산됨
+  const leadCell=(s,c,k,on)=>`${ed&&on?`<input class="oedIn oedLead" data-k="${k}" type="text" inputmode="numeric" value="${+s.lead||0}" onchange="${on}"><span class="omini"> 일</span>`:`${+s.lead||0}일`}${c&&c.arriveByRec?`<div class="omini">입고 ${fmtMDfull(c.arriveByRec)}</div>`:''}`;
   const moTxt=(q,c)=>(c&&c.daily>0&&q>0)?`약 ${(q/(c.daily*30)).toFixed(1)}개월분`:'';
   const body=rows.map((o,i)=>{
     const s=o.s, c=o.c, d=o.ed, u=s.stockUnit||'EA', U=u!=='EA'?u:'';
@@ -5073,7 +5075,7 @@ function orderTableHtml(r){
       <td class="r">${won(invTotal(s))}${U}</td>
       <td class="r">${monthly(s,c)}</td>
       <td class="c">${c.runout?fmtMDfull(c.runout):'-'}</td>
-      <td class="c">${leadCell(s,c)}</td>
+      <td class="c">${leadCell(s,c,'l'+i,`orderEdLead('r',${i},this.value)`)}</td>
       <td class="r"><b>${qty}</b></td>
       <td class="r">${cost}</td>
       <td class="r oAmt">${d.excluded?'-':won(d.amt)}</td>
@@ -5081,7 +5083,7 @@ function orderTableHtml(r){
     </tr>`;
   }).join('');
   const addRows=r.added.map(x=>{
-    const c=x.c, inv=x.s?won(invTotal(x.s)):'-', mid=`<td class="r">${inv}</td><td class="r">${x.s?monthly(x.s,c):'-'}</td><td class="c">${c&&c.runout?fmtMDfull(c.runout):'-'}</td><td class="c">${x.s?leadCell(x.s,c):'-'}</td>`;
+    const c=x.c, inv=x.s?won(invTotal(x.s)):'-', mid=`<td class="r">${inv}</td><td class="r">${x.s?monthly(x.s,c):'-'}</td><td class="c">${c&&c.runout?fmtMDfull(c.runout):'-'}</td><td class="c">${x.s?leadCell(x.s,c,'al'+x.i,`orderEdLead('a',${x.i},this.value)`):'-'}</td>`;
     const mo=`<div class="omini oMo">${moTxt(x.qty,c)}</div>`;
     if(ed) return `<tr class="oedAdd" data-amt="${x.amt}" data-daily="${(c&&c.daily)||0}">
       <td class="l"><button class="oedX" onclick="orderEdAdd(${x.i},'del')" title="추가 품목 삭제">✕</button><input class="oedNm" data-k="an${x.i}" list="orderEdNmList" value="${pEsc(x.nm)}" placeholder="품목명 입력·선택" onchange="orderEdAdd(${x.i},'nm',this.value)"></td>
@@ -5104,7 +5106,7 @@ function orderTableHtml(r){
     </tr></thead><tbody>${body}${addRows}${addBtn}
       <tr class="otot"><td class="l">합계 · ${cnt}개 품목${r.edited?`<div class="omini">자동 권장 ${won(r.autoAmt)}</div>`:''}</td><td colspan="6"></td><td class="r">발주 총액 →</td><td class="r oTot"><b>${won(r.totalAmt)}</b></td><td class="r oTotV"><b>${won(r.totalVat)}</b></td></tr>
     </tbody></table></div>${list}
-    <div class="omemo">${ed?'수량·단가 칸을 고치면 매입가·총액·복사 텍스트에 바로 반영됩니다 · ✕ 이번 발주에서 제외 · ↺ 자동값으로 · 수정값은 저장할 때 함께 저장됩니다':'매입가 = 발주수량 × 단가(생산원가) · VAT 별도 기준'}</div></div>`;
+    <div class="omemo">${ed?'수량·단가 칸을 고치면 매입가·총액·복사 텍스트에 바로 반영됩니다 · 리드타임을 고치면 품목 설정이 바뀌어 권장 수량·입고일이 다시 계산됩니다(재고 탭에도 반영) · ✕ 이번 발주에서 제외 · ↺ 자동값으로 · 수정값은 저장할 때 함께 저장됩니다':'매입가 = 발주수량 × 단가(생산원가) · VAT 별도 기준'}</div></div>`;
 }
 function orderEditBarHtml(r){
   const e=r.edit, n=orderEditCount(e); if(!n) return '';
@@ -5159,6 +5161,19 @@ window.orderEdLive=function(el){
   let tot=0; tb.querySelectorAll('tr[data-amt]').forEach(r=>{ tot+=+r.dataset.amt||0; });
   const t=tb.querySelector('.oTot'), tv=tb.querySelector('.oTotV');
   if(t) t.innerHTML=`<b>${won(tot)}</b>`; if(tv) tv.innerHTML=`<b>${won(Math.round(tot*1.1))}</b>`;
+};
+// [v96] 리드타임 수정 = 품목 설정 변경. 상태가 바뀌어 발주 대상에서 빠지면 알려준다
+window.orderEdLead=function(kind,i,v){
+  const nm=kind==='a'?((ensureOrderEdit().added[i]||{}).nm):ORDER_ED_NAMES[i];
+  const s=(DATA.stock||[]).find(x=>x.nm===nm); if(!s) return;
+  const n=orderEdNum(v);
+  if(n==null||n<1){ toast('리드타임은 1일 이상으로 입력하세요'); setTimeout(rerenderOrderReport,0); return; }
+  const old=+s.lead||0; if(old===n) return;
+  s.lead=n; if(typeof markDirty==='function') markDirty();
+  if(typeof renderStock==='function') renderStock();
+  const st=calcStock(s).status;
+  toast(`${nm} 리드타임 ${old}일 → ${n}일 · 권장 수량·입고일 다시 계산${kind!=='a'&&st!=='now'&&st!=='soon'?' (이제 14일 내 발주 대상 아님 → 목록에서 빠짐)':''}`);
+  setTimeout(rerenderOrderReport,0);
 };
 function orderEdTouch(e){ e.date=fmt(NOW); if(typeof markDirty==='function') markDirty(); setTimeout(rerenderOrderReport,0); }
 function orderEdNum(v){ const n=Math.round(+String(v==null?'':v).replace(/,/g,'')); return isFinite(n)&&n>=0?n:null; }
