@@ -2510,8 +2510,10 @@ body{padding-bottom:48px}
     <h3>발주 보고 요약 <span style="font-size:11px;font-weight:400;color:#888" id="orderReportRange"></span></h3>
     <div id="orderReportBody" style="max-height:64vh;overflow-y:auto"></div>
     <div class="efactions">
+      <button class="tbtn primary" id="btnOrderReportSave" title="고친 수량·단가·리드타임·순서·텍스트를 포함해 전체 데이터를 .json 파일로 저장">💾 저장</button>
       <button class="tbtn accent" id="btnOrderReportCopy">텍스트 복사</button>
       <button class="tbtn" id="btnOrderReportClose">닫기</button>
+      <div class="savestatus" style="margin-left:auto;align-self:center"></div>
     </div>
   </div>
 </div>
@@ -5261,6 +5263,7 @@ function openOrderReport(){
   const range=document.getElementById('orderReportRange'); if(range) range.textContent=`(${fmt(NOW)} 기준)`;
   const body=document.getElementById('orderReportBody'); if(body) body.innerHTML=orderReportHtml(r);
   document.getElementById('orderReportModal').classList.add('open');
+  if(typeof updateSaveStatus==='function') updateSaveStatus();
 }
 
 const fmtMDfull=d=>d?`${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`:'-';
@@ -8686,6 +8689,8 @@ document.getElementById('btnStockDensity').onclick=function(){
   this.classList.toggle('primary', stockSimpleView);
 };
 document.getElementById('btnOrderReportClose').onclick=()=>document.getElementById('orderReportModal').classList.remove('open');
+// [v98] 발주 보고 창에서 바로 저장 — 앱 상단 [저장]과 같은 동작(전체 데이터 .json 백업)
+document.getElementById('btnOrderReportSave').onclick=()=>document.getElementById('btnSave').click();
 document.getElementById('btnOrderReportCopy').onclick=()=>{
   const txt=orderReportFinalText(buildOrderReport());   // [v94] 직접 고친 텍스트가 있으면 그것을 복사
   navigator.clipboard.writeText(txt).then(()=>toast('발주 보고 텍스트 복사됨'),()=>{
@@ -8698,7 +8703,7 @@ document.getElementById('btnOrderReportCopy').onclick=()=>{
 // 3. 편집잠금: 공유 데이터로 열렸으면 편집 기능 숨김(보기 전용)
 // 공유 모드 플래그 (상단에서 이미 선언됨)
 if(VIEWONLY){
-  ['btnEdit','btnEditSave','btnEditCancel','btnAdd','btnLead','btnStockEdit','btnStockEditSave','btnStockEditCancel',
+  ['btnEdit','btnEditSave','btnEditCancel','btnAdd','btnLead','btnOrderReportSave','btnStockEdit','btnStockEditSave','btnStockEditCancel',
    'btnStockAdd','btnStockSetting','btnCostEdit','btnCostEditSave','btnCostEditCancel','btnCostItemAdd',
    'btnSave','btnLoad','btnStockSave','btnStockLoad','btnStockUpload','btnDailyStockUpload',
    'btnCostSave','btnCostLoad','btnCostShare','commonbar'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});
