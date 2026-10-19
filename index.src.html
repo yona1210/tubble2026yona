@@ -4989,6 +4989,14 @@ function orderFamilyKey(nm){
     cat=cats.find(c=>nm.replace(/\s/g,'').includes(c.replace(/\s/g,'')))||''; }
   return cat?'c:'+cat:'n:'+nm;
 }
+// [v100] 발주량이 몇 개월분인지 — 월평균 판매(표의 '월평균' 칸)와 발주 기준 속도(일판매×30)가 10% 이상 다르면 둘 다 보여준다.
+//   (예: 얼룩제거제 월평균 743인데 발주 기준 7,079 → 한 가지만 쓰면 "7,079개 = 1.0개월분"이 월평균과 안 맞아 보임)
+function orderMonthsHtml(q,daily,msale){
+  if(!(q>0)) return '';
+  const a=daily>0?q/(daily*30):null, b=msale>0?q/msale:null;
+  if(a!=null&&b!=null&&Math.abs(a-b)/Math.max(a,b)>=0.1) return `월평균 기준 ${b.toFixed(1)}개월분<br><span style="color:#b5611a">발주 기준 ${a.toFixed(1)}개월분</span>`;
+  const v=a!=null?a:b; return v!=null?`약 ${v.toFixed(1)}개월분`:'';
+}
 function orderFamilyLabel(fk){
   if(fk.startsWith('g:')){ const g=(DATA.costGroups||[]).find(x=>x.id===fk.slice(2)); return g?g.name.replace(/\s*묶음 발주$/,''):fk.slice(2); }
   return fk.slice(2);
@@ -5091,7 +5099,7 @@ function orderTableHtml(r){
     return `${m?won(Math.round(m)):'-'}${ad&&m&&Math.abs(ad-m)/m>=0.1?`<div class="omini" title="재고 탭 발주 판단에 쓰는 속도(일판매×30)">발주 기준 ${won(ad)}</div>`:''}`; };
   // [v96] 리드타임은 품목 설정(DATA.stock[].lead)을 직접 바꾼다 — 권장 수량·입고일·상태가 재고 탭과 같이 다시 계산됨
   const leadCell=(s,c,k,on)=>`${ed&&on?`<input class="oedIn oedLead" data-k="${k}" type="text" inputmode="numeric" value="${+s.lead||0}" onchange="${on}"><span class="omini"> 일</span>`:`${+s.lead||0}일`}${c&&c.arriveByRec?`<div class="omini">입고 ${fmtMDfull(c.arriveByRec)}</div>`:''}`;
-  const moTxt=(q,c)=>(c&&c.daily>0&&q>0)?`약 ${(q/(c.daily*30)).toFixed(1)}개월분`:'';
+  const moTxt=(q,c,s)=>orderMonthsHtml(q,c&&c.daily,s?+s.msale:0);
   const grip=ed?'<span class="oedGrip" onmousedown="orderDragArm(this)" title="끌어서 순서 바꾸기">⠿</span>':'';
   const body=rows.map((o,i)=>{
     const s=o.s, c=o.c, d=o.ed, u=s.stockUnit||'EA', U=u!=='EA'?u:'';
@@ -5105,10 +5113,10 @@ function orderTableHtml(r){
       qty=(c.unitReady||d.qtyEdited)?`${won(d.qty)}${U}${d.qtyEdited?`<div class="omini">수정 · 권장 ${won(d.autoQty)}</div>`:''}`:'<span style="color:#c0392b;font-size:11px">단위 설정 필요</span>';
       cost=`${won(d.cost)}${d.costEdited?`<div class="omini">수정 · 원가 ${won(d.autoCost)}</div>`:''}`;
     }
-    qty+=`<div class="omini oMo">${moTxt(d.qty,c)}</div>`;
+    qty+=`<div class="omini oMo">${moTxt(d.qty,c,s)}</div>`;
     if(c.unitReady&&u!==s.orderUnit) qty+=`<div class="omini">제조 ${won(toOrderUnit(s,d.qty))}${s.orderUnit}</div>`;
     const x=ed?`<button class="oedX" onclick="orderEdSet(${i},'excluded',${d.excluded?'null':'true'})" title="${d.excluded?'다시 넣기':'이번 발주에서 빼기'}">${d.excluded?'↩ 다시 넣기':'✕'}</button>`:'';
-    return `<tr class="or-${c.status}${d.excluded?' oedOff':''}" data-key="${pEsc(s.nm)}" data-amt="${d.excluded?0:d.amt}" data-daily="${c.daily||0}">
+    return `<tr class="or-${c.status}${d.excluded?' oedOff':''}" data-key="${pEsc(s.nm)}" data-amt="${d.excluded?0:d.amt}" data-daily="${c.daily||0}" data-msale="${+s.msale||0}">
       <td class="l">${x}${grip}<b>${s.nm}</b>${d.excluded?'<div class="omini">이번 발주 제외</div>':''}${c.stockoutBeforeArrive?'<div class="omini" style="color:#c0392b">⚠ 입고 전 품절 위험</div>':''}${(s.oem&&s.oem!=='-')?`<div class="omini">${s.oem}${s.round?' · '+s.round:''}</div>`:''}</td>
       <td class="c">${stat}</td>
       <td class="r">${won(invTotal(s))}${U}</td>
@@ -5123,8 +5131,8 @@ function orderTableHtml(r){
   });
   const addRows=r.added.map(x=>{
     const c=x.c, inv=x.s?won(invTotal(x.s)):'-', mid=`<td class="r">${inv}</td><td class="r">${x.s?monthly(x.s,c):'-'}</td><td class="c">${c&&c.runout?fmtMDfull(c.runout):'-'}</td><td class="c">${x.s?leadCell(x.s,c,'al'+x.i,`orderEdLead('a',${x.i},this.value)`):'-'}</td>`;
-    const mo=`<div class="omini oMo">${moTxt(x.qty,c)}</div>`;
-    if(ed) return `<tr class="oedAdd" data-key="${pEsc(orderAddKey(x))}" data-amt="${x.amt}" data-daily="${(c&&c.daily)||0}">
+    const mo=`<div class="omini oMo">${moTxt(x.qty,c,x.s)}</div>`;
+    if(ed) return `<tr class="oedAdd" data-key="${pEsc(orderAddKey(x))}" data-amt="${x.amt}" data-daily="${(c&&c.daily)||0}" data-msale="${(x.s&&+x.s.msale)||0}">
       <td class="l"><button class="oedX" onclick="orderEdAdd(${x.i},'del')" title="추가 품목 삭제">✕</button>${grip}<input class="oedNm" data-k="an${x.i}" list="orderEdNmList" value="${pEsc(x.nm)}" placeholder="품목명 입력·선택" onchange="orderEdAdd(${x.i},'nm',this.value)"></td>
       <td class="c"><span class="obadge add">추가</span></td>${mid}
       <td class="r">${num('aq'+x.i,'q',x.qty,`orderEdAdd(${x.i},'qty',this.value)`)}${mo}</td>
@@ -5213,7 +5221,7 @@ window.orderEdLive=function(el){
   tr.dataset.amt=tr.classList.contains('oedOff')?0:amt;
   const a=tr.querySelector('.oAmt'), v=tr.querySelector('.oVat'), mo=tr.querySelector('.oMo');
   if(!tr.classList.contains('oedOff')){ if(a) a.textContent=won(amt); if(v) v.textContent=won(Math.round(amt*1.1)); }
-  if(mo) mo.textContent=(daily>0&&q>0)?`약 ${(q/(daily*30)).toFixed(1)}개월분`:'';
+  if(mo) mo.innerHTML=orderMonthsHtml(q,daily,+tr.dataset.msale||0);
   let tot=0; tb.querySelectorAll('tr[data-amt]').forEach(r=>{ tot+=+r.dataset.amt||0; });
   const t=tb.querySelector('.oTot'), tv=tb.querySelector('.oTotV');
   if(t) t.innerHTML=`<b>${won(tot)}</b>`; if(tv) tv.innerHTML=`<b>${won(Math.round(tot*1.1))}</b>`;
