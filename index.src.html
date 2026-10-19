@@ -4245,12 +4245,22 @@ function dailyStockVelocity(s,simStock){
     prevNormalIdx=i;
   }
   const recentRestock=restocks.some(r=>((NOW-r.to)/86400000)<=28);   // 최근 28일 내 재입고 여부
+  // [v101] 행사·공동구매처럼 한 번에 크게 나간 출고는 평소 판매 속도가 아니다.
+  //   평소 속도(최근 N개월 월평균÷30)의 PROMO_X배 이상 빠르면서 PROMO_MIN개 이상 빠진 구간 → 속도 계산에서 제외.
+  //   (예: 얼룩제거제 10/7~10/19 −3,143개 = 하루 262개, 월평균 743 → 하루 25개의 10배 → 공동구매 출고)
+  const PROMO_X=3, PROMO_MIN=500;
+  const baseD=(typeof monthlySalesBasis==='function')?(Math.max(0,monthlySalesBasis(s).monthlyAvg||0)/30):0;
+  const isLump=e=>baseD>0&&e.diff>=PROMO_MIN&&e.daily>=baseD*PROMO_X;
+  const lumps=events.filter(isLump);
+  if(lumps.length){ for(let k=events.length-1;k>=0;k--) if(isLump(events[k])) events.splice(k,1); }
+  const recentLumps=lumps.filter(e=>((NOW-e.to)/86400000)<=28);
+  const lumpQty=recentLumps.reduce((a,e)=>a+e.diff,0);
   // 유효 분석 기간 = 제외 안 된 이벤트들의 최소~최대
   const usedFrom = events.length?events.reduce((m,e)=>e.from<m?e.from:m, events[0].from):null;
   const usedTo   = events.length?events.reduce((m,e)=>e.to>m?e.to:m, events[0].to):null;
   const spanDays = (usedFrom&&usedTo)?dayGap(usedFrom,usedTo):0;
   if(!events.length) return {daily:null,sampleDays:0,sampleCnt:0,validCnt,totalCnt,latestDaily:null,
-    tier:validCnt>=3?'flat':'insufficient',periodFrom:usedFrom,periodTo:usedTo,spanDays,netDrop:0,excluded,recentRestock,label:'순감소 없음(또는 전 구간 제외)'};
+    tier:validCnt>=3?'flat':'insufficient',periodFrom:usedFrom,periodTo:usedTo,spanDays,netDrop:0,excluded,recentRestock,lumps,recentLumps:recentLumps.length,lumpQty,label:'순감소 없음(또는 전 구간 제외)'};
   const recent=events.filter(e=>((NOW-e.to)/86400000)<=28);
   const use=recent.length?recent:events;
   const totalDiff=use.reduce((a,e)=>a+e.diff,0);
@@ -4261,7 +4271,7 @@ function dailyStockVelocity(s,simStock){
   if(validCnt>=3 && spanDays>=7) tier='apply';
   else if(validCnt>=3) tier='reference';
   return {daily,sampleDays:totalDays,sampleCnt:use.length,validCnt,totalCnt,latestDaily:latest.daily,
-    tier,periodFrom:usedFrom,periodTo:usedTo,spanDays,netDrop:totalDiff,excluded,recentRestock,
+    tier,periodFrom:usedFrom,periodTo:usedTo,spanDays,netDrop:totalDiff,excluded,recentRestock,lumps,recentLumps:recentLumps.length,lumpQty,
     label:`최근 ${totalDays}일 정상마감 순재고 감소 추이`};
 }
 // 추세배수: 최근3개월 ÷ 직전3개월 채널합. 상승만 반영(하락은 1=평균유지), 최대 1.5배 상한
@@ -9018,7 +9028,11 @@ demandAnalysis=function(s,simStock){
   const inv=dailyStockVelocity(s,simStock);
   let daily,source,sourceLabel,tagCls;
   const monthlyLabel=`최근 ${sales.count||sales.requested}개월 평균 기준${sales.count?` (${sales.periodText})`:''}`;
-  if(inv.daily!=null && inv.tier==='apply'){
+  if(inv.recentLumps && baseDaily>0){
+    // [v101] 최근 행사·공동구매 같은 대량 출고 → 데일리 감소가 판매 속도를 과대평가 → 그 구간 빼고 월평균 우선
+    daily=baseDaily; source='monthly'; tagCls='month';
+    sourceLabel=`${monthlyLabel} · 최근 행사·대량 출고 ${inv.recentLumps}건(−${won(inv.lumpQty)}) 제외 → 월평균 우선`;
+  } else if(inv.daily!=null && inv.tier==='apply'){
     if(inv.recentRestock && inv.daily < baseDaily){
       // [v83] 최근 재입고로 순재고 감소가 실제 판매를 과소평가 → 월평균이 더 신뢰 → 월평균 우선
       daily=baseDaily; source='monthly'; tagCls='month';
@@ -9171,7 +9185,11 @@ demandAnalysis=function(s,simStock){
   const momentumLabel=momentum.eligible
     ? `최근 2개월 상승 보정 +${Math.round(momentum.uplift*100)}% 적용 (${momentum.periodText})`
     : '';
-  if(inv.daily!=null && inv.tier==='apply'){
+  if(inv.recentLumps && baseDaily>0){
+    // [v101] 최근 행사·공동구매 같은 대량 출고 → 데일리 감소가 판매 속도를 과대평가 → 그 구간 빼고 월평균 우선
+    daily=baseDaily; source='monthly'; tagCls='month';
+    sourceLabel=`${monthlyLabel} · 최근 행사·대량 출고 ${inv.recentLumps}건(−${won(inv.lumpQty)}) 제외 → 월평균 우선`;
+  } else if(inv.daily!=null && inv.tier==='apply'){
     if(inv.recentRestock && inv.daily < baseDaily){
       // [v83] 최근 재입고로 순재고 감소가 실제 판매를 과소평가 → 월평균이 더 신뢰 → 월평균 우선
       daily=baseDaily; source='monthly'; tagCls='month';
