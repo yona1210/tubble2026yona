@@ -8318,7 +8318,10 @@ function buildWeeklyFormRows(){
   // 재발주 트래킹(발주 키워드 + 입고/출시 이력)은 보관 품목도 포함
   const isReorderTrack=(s)=>{
     const txt=((s.nextAction||'')+' '+(s.memo||''));
-    return /발주|재입고/.test(txt) && s.st9.some((st,k)=>k>=9 && st==='done');
+    if(!/발주|재입고/.test(txt)) return false;
+    // 보관 품목은 입고·출시 완료 후 1주일만 보고 (끝난 건이 계속 남지 않게)
+    if(s.archived) return s.st9.some((st,k)=>k>=9 && st==='done' && inRange((s.d9[k]||[])[1],weekAgo,NOW));
+    return s.st9.some((st,k)=>k>=9 && st==='done');
   };
   const list=DATA.sku.filter(s=>{
     if(isReorderTrack(s)) return true;                       // 재발주 트래킹 (보관 여부 무관)
