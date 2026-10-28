@@ -3416,6 +3416,7 @@ if(!DATA.manufacturers){ DATA.manufacturers=[
    trend:[{y:'23',s:614,o:8.4},{y:'24',s:847,o:4.5},{y:'25',s:764,o:-11.3}],
    status:'신규 검토 중. 25년 적자전환이나 다이소 대량 CAPA·후불 합의', pay:'후불 협의 (계약 전)', payState:'new', notes:[], creditHistory:[]}
 ]; }
+if(!(window.__TUBBLE_DATA__ && window.__TUBBLE_DATA__.viewonly) && typeof loadWeeklySnapsLocal==='function') loadWeeklySnapsLocal();   // VIEWONLY 선언 전이라 직접 확인
 if(typeof loadMfrLocal==='function' && loadMfrLocal()){ setTimeout(()=>{ try{toast('저장된 제조사 데이터를 불러왔습니다');}catch(e){} },800); }
 // 시장 데이터 접근자: 기본 MARKET_DATA + 업로드 override 병합
 function MKT(){
@@ -8345,7 +8346,7 @@ function buildWeeklyFormRows(){
     let nextStepIdx=-1;
     for(let k=0;k<STEPS.length;k++){ if(s.st9[k]==='doing'){nextStepIdx=k;break;} }
     if(nextStepIdx<0) for(let k=0;k<STEPS.length;k++){ if(s.st9[k]==='plan'){nextStepIdx=k;break;} }
-    const nextStep = nextStepIdx>=0? STEPS[nextStepIdx] : '전 공정 완료';
+    const nextStep = nextStepIdx>=0? STEPS[nextStepIdx] : '전 단계 완료';
     const nextStepDue = nextStepIdx>=0? ((s.d9[nextStepIdx]||[])[1]||'') : '';
     // [v87] 결과(H) 전용: "현재 진행 공정" 다음의 실제 다음 미완 공정 (현재 공정 중복·역행 방지)
     const _curIdx = (s.st9.indexOf('doing')>=0) ? s.st9.indexOf('doing') : s.st9.lastIndexOf('done');
@@ -8413,10 +8414,11 @@ function buildWeeklyFormRows(){
         G = tagThis;
       } else {
         // [v93] 팀장 보고 형태: 1행 = 핵심 사실(메모 첫 조각), 이후 행 = 보조 사실 "- …", 마지막 행 = 공정 상태(이번주 완료·진행 중)
+        // [v104] '공정:' 머리말은 보고서 말투가 아니라 뺀다. 진행 중 상태는 메모와 겹치므로 메모가 없을 때만 싣는다
         const doingNames = STEPS_SHORT.filter((_,k)=>s.st9[k]==='doing');
-        const stepBit = [doneNow.length?`${doneNow.join(', ')} 완료`:'', doingNames.length?`${doingNames.join('·')} 진행 중${(!memoCleanAll&&dueOk(nextStepDue))?` (~${nextStepDue})`:''}`:''].filter(Boolean).join(' → ');
         const lines = memoCleanParts.slice();
-        if(stepBit) lines.push(`공정: ${stepBit}`);
+        if(doneNow.length) lines.push(`${doneNow.join(', ')} 완료`);
+        if(!lines.length && doingNames.length) lines.push(`${doingNames.join('·')} 진행 중${dueOk(nextStepDue)?` (~${nextStepDue})`:''}`);
         if(!lines.length) lines.push(`${w.cur} 준비 중`);
         G = lines.map((p,i)=> i===0 ? p : '- '+p).join('\n');
       }
@@ -8424,7 +8426,7 @@ function buildWeeklyFormRows(){
       if(tagResult){
         H = tagResult;
       } else if(w.state==='done'){
-        H = '전 공정 완료';
+        H = '전 단계 완료';
       } else {
         // [v93] 결과 = 직전 보고 대비 사실(달성·미달·예정일 변동) + ⚠리스크 + 다음 공정 예정. 현재 공정명은 G에 있으므로 반복하지 않는다
         const bits=[];
@@ -8438,7 +8440,7 @@ function buildWeeklyFormRows(){
         if(riskLine) bits.unshift(`⚠ ${riskLine}`);
         else if(s.risk==='높음') bits.unshift(`⚠ 리스크 높음${s.waiting==='내부검토'?' (내부검토 대기)':''}`);
         const afterLate = afterStep && dueOk(afterDue) && PD(afterDue) && PD(afterDue) < todayStart();
-        if(afterStep && dueOk(afterDue)) bits.push(`다음 ${afterStep} ${afterDue}${afterLate?' 지연':''}`);
+        if(afterStep && dueOk(afterDue) && afterIdx!==fin.k) bits.push(`다음 ${afterStep} ${afterDue}${afterLate?' 지연':''}`);   // [v104] 완성일(입고·출시)은 L 목표에 있으므로 반복 안 함
         if(!bits.length) bits.push(w.state==='doing' ? '전주 계획대로 진행' : w.cur);
         H = bits.join(' · ');
       }
@@ -8447,8 +8449,8 @@ function buildWeeklyFormRows(){
       const overdue = dueOk(nextStepDue) && PD(nextStepDue) && PD(nextStepDue) < todayStart();
       const dueJ = dueNext.filter(x=>x.k!==fin.k);   // 완성 공정(출시·입고)은 L 목표에 있으므로 J에서는 뺀다
       const dueJList = dueJ.length ? dueJ : dueNext;
-      J = dueJList.length ? dueJList.slice(0,3).map(x=>`${x.nm} 완료(${x.due})`).join(' → ') + (dueJList.length>3?` 외 ${dueJList.length-3}건`:'')
-        : (nextStep!=='전 공정 완료'
+      J = dueJList.length ? dueJList.slice(0,3).map(x=>`${x.nm} ${x.due} 완료 예정`).join(' → ') + (dueJList.length>3?` 외 ${dueJList.length-3}건`:'')
+        : (nextStep!=='전 단계 완료'
             ? (overdue ? `${nextStep} 완료 지연 (예정 ${nextStepDue} 경과)` : `${nextStep} 진행${dueOk(nextStepDue)?' (완료 '+nextStepDue+')':''}`)
             : '출시·판매 모니터링');
       // [v88] K 액션(차주): 다음 액션 + 누구를 기다리는지(대기처)
@@ -8469,7 +8471,7 @@ function buildWeeklyFormRows(){
       const miles = dueNext.filter(x=>x.k!==fin.k);   // 완성 공정 자체는 앞의 완성일과 중복이라 제외
       const goalBit = (s.weekGoal||'').trim()
         || (miles.length ? miles.map(x=>`${STEPS_SHORT[x.k]} ${x.due} 완료`).join(', ')
-        : (nextStep!=='전 공정 완료' && nextStepIdx!==fin.k && dueOk(nextStepDue) ? `${nextStep} ${nextStepDue} 완료` : ''));
+        : (nextStep!=='전 단계 완료' && nextStepIdx!==fin.k && dueOk(nextStepDue) ? `${nextStep} ${nextStepDue} 완료` : ''));
       L = [finBit, goalBit].filter(Boolean).join(' · ');
     }
     const Fest = !snapL;  // 추정 여부 (스냅샷 없으면 추정)
@@ -8502,8 +8504,26 @@ function finishInfo(s){
 function getPrevSnapshot(){
   const snaps=DATA.weeklySnapshots||[];
   const cur=reportWeekLabel(NOW).label;
-  for(let i=snaps.length-1;i>=0;i--){ if(snaps[i].weekLabel!==cur) return snaps[i]; }
+  for(let i=snaps.length-1;i>=0;i--){
+    if(snaps[i].weekLabel===cur) continue;
+    // [v104] 3주 넘게 지난 보고는 '직전 보고'가 아니다 — 9월 보고와 비교해 한 달 전 일정이 '미달'로 뜨던 문제
+    const d=new Date(snaps[i].savedAt||'');
+    if(isNaN(d) || (NOW-d)>21*86400000) return null;
+    return snaps[i];
+  }
   return null;
+}
+// [v104] 주간 스냅샷은 브라우저에도 보관 — 보고 창만 열고 파일 저장을 안 하면 다음 주 비교가 끊기던 문제
+function saveWeeklySnapsLocal(){ try{ localStorage.setItem('tubbleWeeklySnaps', JSON.stringify(DATA.weeklySnapshots||[])); }catch(e){} }
+function loadWeeklySnapsLocal(){
+  try{
+    const loc=JSON.parse(localStorage.getItem('tubbleWeeklySnaps')||'[]'); if(!Array.isArray(loc)||!loc.length) return;
+    const all=(DATA.weeklySnapshots||[]).slice();
+    loc.forEach(sn=>{ const i=all.findIndex(x=>x.weekLabel===sn.weekLabel);
+      if(i<0) all.push(sn); else if(String(sn.savedAt||'')>String(all[i].savedAt||'')) all[i]=sn; });
+    all.sort((a,b)=>String(a.savedAt||'').localeCompare(String(b.savedAt||'')));
+    DATA.weeklySnapshots=all.slice(-8);
+  }catch(e){}
 }
 function getPrevSnapRow(s){
   const snap=getPrevSnapshot(); if(!snap) return null;
@@ -8552,19 +8572,29 @@ function buildOpsRows(){
   // [v93] 발주 진행 건(발주 완료·입고 미완) + 재고 탭 발주 판단(즉시/14일 내/입고 전 품절)
   const ordLines=DATA.sku.filter(s=>!s.archived && (s.st9[3]==='done'||s.st9[3]==='doing') && s.st9[9]!=='done')
     .map(s=>`${shortNm(s.nm)}${s.round?' '+s.round:''}${(+s.qty>0)?` ${won(s.qty)}${s.qtyu||'EA'}`:''} — 입고 ${isMD((s.d9[9]||[])[1])?(s.d9[9]||[])[1]:(s.launch||'미정')}`);
-  const stockCalc=(DATA.stock||[]).map(s=>({s, c:calcStock(s)})).filter(x=>x.c && x.c.status!=='na' && x.c.status!=='unverified');
-  const ordNow=stockCalc.filter(x=>x.c.status==='now').sort((a,b)=>(a.c.recDD??0)-(b.c.recDD??0)).map(x=>shortNm(x.s.nm));
-  const ordSoon=stockCalc.filter(x=>x.c.status==='soon').sort((a,b)=>(a.c.recDD??0)-(b.c.recDD??0)).map(x=>shortNm(x.s.nm));
+  // [v104] 이미 발주가 나가 입고 대기 중인 품목은 '즉시 발주'가 아니다 — 출시일정의 발주 진행 건과 재고 품목을 이름으로 잇는다
+  //   (붙여 쓴 이름 포함, 또는 뒤쪽 단어 4자 이상 포함: '포밍 주방세제' → 주방세제 500ml·1L 리필)
+  const compact=v=>shortNm(v).replace(/\s+/g,'');
+  const ordSkus=DATA.sku.filter(s=>!s.archived && (s.st9[3]==='done'||s.st9[3]==='doing') && s.st9[9]!=='done');
+  const skuKeys=ordSkus.map(s=>{ const w=shortNm(s.nm).split(/\s+/).filter(Boolean); const keys=[w.join('')];
+    for(let i=1;i<w.length;i++){ const k=w.slice(i).join(''); if(k.length>=4) keys.push(k); }
+    const due=(s.d9[9]||[])[1]; return {keys, arrive: isMD(due)?PD(due):(isMD(s.launch)?PD(s.launch):null)}; });
+  const pendingOrder=nm=>{ const c=compact(nm); return skuKeys.find(x=>x.keys.some(k=>c.indexOf(k)>=0))||null; };
+  const capList=(arr,n=6)=>arr.length>n? arr.slice(0,n).join(', ')+` 외 ${arr.length-n}건` : arr.join(', ');
+  const stockCalc=(DATA.stock||[]).map(s=>({s, c:calcStock(s), po:pendingOrder(s.nm)})).filter(x=>x.c && x.c.status!=='na' && x.c.status!=='unverified');
+  const ordNow=stockCalc.filter(x=>!x.po && x.c.status==='now').sort((a,b)=>(a.c.recDD??0)-(b.c.recDD??0)).map(x=>shortNm(x.s.nm));
+  const ordSoon=stockCalc.filter(x=>!x.po && x.c.status==='soon').sort((a,b)=>(a.c.recDD??0)-(b.c.recDD??0)).map(x=>shortNm(x.s.nm));
   const lowLines=stockCalc.filter(x=>x.c.runout && x.c.runoutMonths!=null && x.c.runoutMonths<1.5).sort((a,b)=>a.c.runout-b.c.runout).slice(0,4)
     .map(x=>`${shortNm(x.s.nm)} 현재고 ${won(invTotal(x.s))}${x.s.stockUnit||'EA'} · 소진 ${fmtMDfull(x.c.runout)}`);
-  const stockoutRisk=stockCalc.filter(x=>x.c.stockoutBeforeArrive).map(x=>shortNm(x.s.nm));
+  // [v104] 발주 진행 품목은 실제 입고 예정일보다 먼저 소진되는지로 판정 (지금 발주한다고 가정한 계산은 맞지 않음)
+  const stockoutRisk=stockCalc.filter(x=>x.po ? !!(x.po.arrive && x.c.runout && x.c.runout<x.po.arrive) : x.c.stockoutBeforeArrive).map(x=>shortNm(x.s.nm));
   const ordRow={
     item:'개발', owner:'이현아', gubun:'발주', naeyong:'제품명', prev:'발주 현황', cur:'발주 현황',
     F: ordSnapL || '주요 SKU 발주·입고 트래킹',
     Fest: !ordSnapL,
     // [v93] 발주 진행 건을 품목·차수·수량·입고예정으로 나열 (팀장 보고에 그대로 옮길 수 있게)
     G: ordLines.length? [`발주·입고 진행 ${ordLines.length}건`].concat(ordLines.map(x=>'- '+x)).join('\n') : '발주 진행 품목 없음',
-    H: ordNow.length? `⚠ 즉시 발주 ${ordNow.length}건: ${ordNow.join(', ')}${ordSoon.length?` · 14일 내 ${ordSoon.length}건: ${ordSoon.join(', ')}`:''}` : (ordSoon.length? `14일 내 발주 ${ordSoon.length}건: ${ordSoon.join(', ')}` : '발주 라인 정상 · 즉시 발주 품목 없음'),
+    H: ordNow.length? `⚠ 즉시 발주 ${ordNow.length}건: ${capList(ordNow)}${ordSoon.length?`\n- 14일 내 ${ordSoon.length}건: ${capList(ordSoon)}`:''}` : (ordSoon.length? `14일 내 발주 ${ordSoon.length}건: ${capList(ordSoon)}` : '발주 라인 정상 · 즉시 발주 품목 없음'),
     J:'입고 트래킹', K:'쇼트 방지 선입고 운영, 제품생산 데일리 체크',
     L:'주요 SKU 입고 확정 및 재고 안정화'
   };
@@ -8574,7 +8604,7 @@ function buildOpsRows(){
     Fest: !invSnapL,
     // [v93] 데일리 재고 기준일 + 소진 임박 품목(현재고·소진 예상일)
     G: [`데일리 재고 ${(DATA.stockMeta&&DATA.stockMeta.dailyDate)||'-'} 기준`].concat(lowLines.map(x=>'- '+x)).join('\n'),
-    H: stockoutRisk.length? `⚠ 입고 전 품절 위험 ${stockoutRisk.length}건: ${stockoutRisk.join(', ')}` : (lowLines.length? '입고 정상 · 소진 임박 품목 재발주 검토' : '입고 정상 · 재고 안정'),
+    H: stockoutRisk.length? `⚠ 입고 전 품절 위험 ${stockoutRisk.length}건: ${capList(stockoutRisk)}` : (lowLines.length? '입고 정상 · 소진 임박 품목 재발주 검토' : '입고 정상 · 재고 안정'),
     J:'입고 후 판매추이 검토 및 재발주', K:'채널별 판매 모니터링, 재발주 시점 산정',
     L:'판매추이 확인·재발주 판단'
   };
@@ -8593,6 +8623,7 @@ function putWeeklySnapshot(rows){
   const snap={weekLabel:wk.label, range:wk.range, savedAt:fmt(NOW), rows};
   if(idx>=0) DATA.weeklySnapshots[idx]=snap; else DATA.weeklySnapshots.push(snap);
   if(DATA.weeklySnapshots.length>8) DATA.weeklySnapshots=DATA.weeklySnapshots.slice(-8);   // 최근 8주만 보관
+  saveWeeklySnapsLocal();
   if(typeof markDirty==='function') markDirty();
   return true;
 }
@@ -8611,7 +8642,15 @@ function autoSaveWeeklySnapshot(){
 // 셀 내 탭/줄바꿈 정리 (TSV 안전)
 // [v93] 셀 안 줄바꿈은 따옴표로 감싸 유지 — 엑셀에 붙여넣으면 한 셀 안에서 줄바꿈된다 (팀장 보고의 '핵심 사실 + 보조 줄' 구조 그대로)
 function tsvCell(v){ v=String(v==null?'':v).replace(/\t/g,' ').replace(/\r\n/g,'\n'); return /[\n"]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+// [v104] 엑셀용 HTML 표 — 윈도우 클립보드가 텍스트 줄바꿈을 CRLF로 바꿔 셀 안에 ♪(CR)가 찍히던 문제.
+// 엑셀은 HTML을 우선 쓰고, same-cell <br>은 셀 안 줄바꿈으로 들어간다. 서식은 지정하지 않아 양식 서식을 덮지 않게
+function weeklyFormClipHTML(rows){
+  const esc=v=>String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\r?\n/g,'<br style="mso-data-placement:same-cell">');
+  return '<table>'+rows.map(r=>'<tr>'+[r.gubun,r.naeyong,r.prev,r.F,r.G,r.H,r.cur,r.J,r.K,r.L].map(c=>`<td>${esc(c)}</td>`).join('')+'</tr>').join('')+'</table>';
+}
+let WF_CLIP_HTML='';
 function weeklyFormTSV(rows){
+  WF_CLIP_HTML=weeklyFormClipHTML(rows);
   // [v70] C~L 10열만 (A항목·B담당 제외 — 양식 병합셀 보존). C구분 D내용 E전주 F G H I금주 J K L
   return rows.map(r=>[r.gubun,r.naeyong,r.prev,r.F,r.G,r.H,r.cur,r.J,r.K,r.L].map(tsvCell).join('\t')).join('\n');
 }
@@ -8698,6 +8737,9 @@ document.getElementById('btnReportFormCopy').onclick=()=>{
   const txt=ta.value;
   // file:// 환경 대비: execCommand 먼저 시도 (가시 영역으로 잠시 이동)
   let ok=false;
+  // [v104] 복사 이벤트에서 텍스트와 HTML 표를 함께 실어 엑셀이 HTML(줄바꿈 정상)을 쓰게 한다
+  const onCopy=e=>{ try{ if(!WF_CLIP_HTML) return; e.clipboardData.setData('text/plain', txt); e.clipboardData.setData('text/html', WF_CLIP_HTML); e.preventDefault(); }catch(_){} };
+  document.addEventListener('copy', onCopy, true);
   try{
     ta.style.position='fixed'; ta.style.left='0'; ta.style.top='0'; ta.style.opacity='0';
     ta.removeAttribute('readonly');
@@ -8706,6 +8748,7 @@ document.getElementById('btnReportFormCopy').onclick=()=>{
     ta.setAttribute('readonly','');
     ta.style.position='absolute'; ta.style.left='-9999px'; ta.style.top='-9999px'; ta.style.opacity='1';
   }catch(e){ ok=false; }
+  document.removeEventListener('copy', onCopy, true);
   if(ok){ toast('양식 표 복사됨 — 엑셀 개발 섹션(C열)에 붙여넣기'); return; }
   // 그래도 실패 → clipboard API 재시도
   if(navigator.clipboard){
