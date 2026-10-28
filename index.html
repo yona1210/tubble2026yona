@@ -3729,6 +3729,7 @@ function editForm(s,idx){
         ${['낮음','보통','높음'].map(o=>`<option ${o===s.risk?'selected':''}>${o}</option>`).join('')}</select></div>
       <div class="efield"><label>대기처</label><select data-ei="${idx}" data-ek="waiting">
         ${['제조사','디자인','촬영','행정','내부검토','기타'].map(o=>`<option ${o===s.waiting?'selected':''}>${o}</option>`).join('')}</select></div>
+      <div class="efield"><label>금주 결과 <span class="hint">주간보고 결과(H) — 예: 선정 대기 중 · 비우면 진행 단계·대기처로 자동</span></label><input style="width:260px" data-ei="${idx}" data-ek="weekResult" value="${(s.weekResult||'').replace(/"/g,'&quot;')}"></div>
       <div class="efield"><label>차주 목표 <span class="hint">주간보고 목표(L) — 비우면 차주 완료예정 공정으로 자동</span></label><input style="width:260px" data-ei="${idx}" data-ek="weekGoal" value="${(s.weekGoal||'').replace(/"/g,'&quot;')}"></div>
     </div>
     <div class="efield" style="width:100%"><label>진행상황 메모</label><input style="width:100%" data-ei="${idx}" data-ek="memo" value="${(s.memo||'').replace(/"/g,'&quot;')}"></div>
@@ -3908,6 +3909,7 @@ function render(){
           <div><span class="ml">진척률</span><b>${w.pct}%</b></div>
           <div><span class="ml">다음 액션</span><b>${s.nextAction||'-'}</b></div>
           <div><span class="ml">대기처</span><b>${s.waiting||'-'}</b></div>
+          <div><span class="ml">금주 결과</span><b>${s.weekResult||'-'}</b></div>
           <div><span class="ml">차주 목표</span><b>${s.weekGoal||'-'}</b></div>
           <div><span class="ml">리스크</span>${riskBadge||'<b>-</b>'}</div>
         </div>
@@ -8311,6 +8313,8 @@ function reportWeekLabel(base){
 const RISK_RE=/원가|인상|지연|불량|패널티|클레임|반품|리스크|쇼트|품절|보류|홀딩|결품/;
 const shortNm=v=>String(v||'').replace(/^터블\s*/,'').replace(/^(트루클린|파워클린|이지클린|케어클린)\s*/,'');
 const todayStart=()=>new Date(NOW.getFullYear(),NOW.getMonth(),NOW.getDate());   // 오늘 예정(당일)은 미달이 아니라 이번 주 계획으로 본다
+// [v105] 재발주이면서 발주가 끝나 생산·입고만 남은 건 — 품목 행 대신 발주 현황 행에 모은다 (발주 검토·품의 중이면 품목 행 유지)
+function isReorderInProduction(s){ return /재발주/.test(s.type||'') && s.st9[3]==='done' && s.st9[9]!=='done'; }
 function buildWeeklyFormRows(){
   const weekAgo=new Date(NOW.getTime()-7*86400000);
   const weekAhead=new Date(NOW.getTime()+7*86400000);
@@ -8336,7 +8340,7 @@ function buildWeeklyFormRows(){
     const dueNextWk=s.st9.some((st,k)=>(st==='plan'||st==='doing') && inRange((s.d9[k]||[])[1],todayStart(),weekAhead));
     if(dueNextWk) return true;                               // 차주 완료예정 있음
     return false;
-  });
+  }).filter(s=>!isReorderInProduction(s));                     // [v105] 발주 끝난 재발주 건은 '발주 현황' 행에만 (사용자 약식 양식)
   return list.map(s=>{
     const w=work(s);
     // 이번 주 완료된 공정
@@ -8423,8 +8427,8 @@ function buildWeeklyFormRows(){
         G = lines.map((p,i)=> i===0 ? p : '- '+p).join('\n');
       }
       // [v88] H 결과: 메모[결과] 우선 → 현재 공정 + 직전 보고 대비(달성/미달·예정일 변동). 메모는 G에 있으므로 반복 안 함
-      if(tagResult){
-        H = tagResult;
+      if(tagResult || (s.weekResult||'').trim()){
+        H = tagResult || s.weekResult.trim();   // [v105] 금주 결과 입력칸 우선 — 판단·상태는 담당자가 쓴다
       } else if(w.state==='done'){
         H = '전 단계 완료';
       } else {
@@ -8441,7 +8445,12 @@ function buildWeeklyFormRows(){
         else if(s.risk==='높음') bits.unshift(`⚠ 리스크 높음${s.waiting==='내부검토'?' (내부검토 대기)':''}`);
         const afterLate = afterStep && dueOk(afterDue) && PD(afterDue) && PD(afterDue) < todayStart();
         if(afterStep && dueOk(afterDue) && afterIdx!==fin.k) bits.push(`다음 ${afterStep} ${afterDue}${afterLate?' 지연':''}`);   // [v104] 완성일(입고·출시)은 L 목표에 있으므로 반복 안 함
-        if(!bits.length) bits.push(w.state==='doing' ? '전주 계획대로 진행' : w.cur);
+        // [v105] '전주 계획대로 진행'은 정보가 없어 뺐다 — 지금 무엇을 하고/기다리는지로 채운다
+        if(!bits.length){
+          const doingNm = STEPS_SHORT.filter((_,k)=>s.st9[k]==='doing').slice(-1)[0];
+          const WAIT_NM = {'내부검토':'내부검토','디자인':'디자인','촬영':'촬영','행정':'행정 처리'};
+          bits.push(WAIT_NM[s.waiting] ? `${WAIT_NM[s.waiting]} 대기 중` : (doingNm ? `${doingNm} 진행 중` : w.cur));
+        }
         H = bits.join(' · ');
       }
       // [v88] J 계획(차주): 차주 완료예정 공정을 날짜순으로 → 없으면 다음 미완 공정
@@ -8457,7 +8466,10 @@ function buildWeeklyFormRows(){
       const actBit = s.nextAction? s.nextAction.trim() : (memoParts.slice(0,2).join(' / ')||nextStep);
       // [v93] 대기처는 의사결정이 걸린 '내부검토'만 표기 — '제조사 대기'는 팀장 보고에서 항상 지워지던 문구
       const waitBit = (s.waiting==='내부검토') ? '내부검토 대기' : '';
-      K = [actBit, waitBit].filter(Boolean).join(' · ');
+      // [v105] 다음 액션이 이미 끝난 일(완료)이고 이번 주 진행(G)과 같은 말이면 차주 액션이 아니다 → '-'
+      const norm=v=>String(v||'').replace(/[\s()\/.,·~-]/g,'');
+      const actDup = actBit && /완료/.test(actBit) && norm(G).indexOf(norm(actBit).slice(0,12))>=0;
+      K = actDup ? (waitBit||'-') : [actBit, waitBit].filter(Boolean).join(' · ');
       // [v88] L 목표(차주): "완성이 언제냐"를 맨 앞에 — 직전 보고 대비 유지/변동(±일) → 차주 목표(입력) 또는 차주 마일스톤
       let finBit;
       if(fin.ok){
@@ -8570,12 +8582,12 @@ function buildOpsRows(){
     .sort((a,b)=>(a.stock/a.msale)-(b.stock/b.msale)).slice(0,3).map(s=>s.nm);
   const invSnapL=getLastSnapshotGoal('__입고재고__');
   // [v93] 발주 진행 건(발주 완료·입고 미완) + 재고 탭 발주 판단(즉시/14일 내/입고 전 품절)
-  const ordLines=DATA.sku.filter(s=>!s.archived && (s.st9[3]==='done'||s.st9[3]==='doing') && s.st9[9]!=='done')
+  const ordLines=DATA.sku.filter(s=>!s.archived && s.st9[3]==='done' && s.st9[9]!=='done')   // [v105] 발주 완료 건만 (검토·품의 중은 품목 행)
     .map(s=>`${shortNm(s.nm)}${s.round?' '+s.round:''}${(+s.qty>0)?` ${won(s.qty)}${s.qtyu||'EA'}`:''} — 입고 ${isMD((s.d9[9]||[])[1])?(s.d9[9]||[])[1]:(s.launch||'미정')}`);
   // [v104] 이미 발주가 나가 입고 대기 중인 품목은 '즉시 발주'가 아니다 — 출시일정의 발주 진행 건과 재고 품목을 이름으로 잇는다
   //   (붙여 쓴 이름 포함, 또는 뒤쪽 단어 4자 이상 포함: '포밍 주방세제' → 주방세제 500ml·1L 리필)
   const compact=v=>shortNm(v).replace(/\s+/g,'');
-  const ordSkus=DATA.sku.filter(s=>!s.archived && (s.st9[3]==='done'||s.st9[3]==='doing') && s.st9[9]!=='done');
+  const ordSkus=DATA.sku.filter(s=>!s.archived && s.st9[3]==='done' && s.st9[9]!=='done');
   const skuKeys=ordSkus.map(s=>{ const w=shortNm(s.nm).split(/\s+/).filter(Boolean); const keys=[w.join('')];
     for(let i=1;i<w.length;i++){ const k=w.slice(i).join(''); if(k.length>=4) keys.push(k); }
     const due=(s.d9[9]||[])[1]; return {keys, arrive: isMD(due)?PD(due):(isMD(s.launch)?PD(s.launch):null)}; });
@@ -8594,7 +8606,14 @@ function buildOpsRows(){
     Fest: !ordSnapL,
     // [v93] 발주 진행 건을 품목·차수·수량·입고예정으로 나열 (팀장 보고에 그대로 옮길 수 있게)
     G: ordLines.length? [`발주·입고 진행 ${ordLines.length}건`].concat(ordLines.map(x=>'- '+x)).join('\n') : '발주 진행 품목 없음',
-    H: ordNow.length? `⚠ 즉시 발주 ${ordNow.length}건: ${capList(ordNow)}${ordSoon.length?`\n- 14일 내 ${ordSoon.length}건: ${capList(ordSoon)}`:''}` : (ordSoon.length? `14일 내 발주 ${ordSoon.length}건: ${capList(ordSoon)}` : '발주 라인 정상 · 즉시 발주 품목 없음'),
+    // [v105] 결과 = 생산·입고 관리 + 팀장 보고에 쓰이는 재고 경고만 짧게 (긴 즉시 발주 목록은 재고 탭에서)
+    H: (()=>{ const out=['생산 입고 관리'];
+      // 팀장 보고 [입고·재고·물류]에 올라가는 줄: 발주 안 넣은 품목 중 1개월 안에 소진되는 것 (가까운 순 3개)
+      const low=stockCalc.filter(x=>!x.po && x.c.runout && x.c.runoutMonths!=null && x.c.runoutMonths<1).sort((a,b)=>a.c.runout-b.c.runout).map(x=>shortNm(x.s.nm));
+      if(low.length) out.push(`⚠ ${capList(low,3)} 재고 소진 임박, 재발주 검토 필요`);
+      const late=stockCalc.filter(x=>x.po && x.po.arrive && x.c.runout && x.c.runout<x.po.arrive).map(x=>shortNm(x.s.nm));
+      if(late.length) out.push(`⚠ ${capList(late,3)} 입고 전 소진 예상`);
+      return out.join('\n'); })(),
     J:'입고 트래킹', K:'쇼트 방지 선입고 운영, 제품생산 데일리 체크',
     L:'주요 SKU 입고 확정 및 재고 안정화'
   };
@@ -8608,7 +8627,7 @@ function buildOpsRows(){
     J:'입고 후 판매추이 검토 및 재발주', K:'채널별 판매 모니터링, 재발주 시점 산정',
     L:'판매추이 확인·재발주 판단'
   };
-  return [ordRow, invRow];
+  return [ordRow];   // [v105] 입고 현황 행은 발주 현황과 겹쳐 뺐다 (사용자 약식 양식)
 }
 // [v70] 이번주 보고를 스냅샷으로 저장 — [v88] 목표뿐 아니라 완성일·공정 예정일·상태까지 (다음 주 비교 기준)
 function snapshotRows(){
@@ -8707,7 +8726,7 @@ document.getElementById('btnReport').onclick=()=>{
   const hintEl=document.getElementById('reportFormMeta');
   const prevSnap=getPrevSnapshot();
   if(hintEl) hintEl.innerHTML=`<b>${wk.label}</b> · 범위 ${wk.range} · 작성일 ${fmt(NOW)} `+
-    `<span style="color:#9aa1b2">· 개발 ${formRows.length-2}건 + 발주·입고 2건</span><br>`+
+    `<span style="color:#9aa1b2">· 개발 ${formRows.length-1}건 + 발주 현황 1건</span><br>`+
     (prevSnap? `<span style="color:#2563c9">직전 보고(${prevSnap.weekLabel}, ${prevSnap.savedAt})와 자동 비교 — 계획(F)은 그때의 목표, 결과(H)는 달성/미달·예정일 변동, 목표(L)는 완성일 유지/변동</span>`
              : `<span style="color:#c0392b">직전 보고 없음 — 이번 보고가 자동 저장되어 다음 주부터 완성일 변동·달성/미달이 비교됩니다 (파일 저장 필요)</span>`)+
     (autoSaved? `<span style="color:#9aa1b2"> · 이번 주 보고 자동 저장됨</span>` : '');
