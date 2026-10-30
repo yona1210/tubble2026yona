@@ -3110,7 +3110,7 @@ if(!DATA.costGroups){ DATA.costGroups=[
 function applyMultiCleanerOrderBasis(){
   const g=(DATA.costGroups||[]).find(x=>x.id==='multi_cleaner'); if(!g||!g.items) return;
   g.items.forEach(function(nm){ const s=(DATA.stock||[]).find(function(x){return x.nm===nm;});
-    if(s){ if(s.targetMonths==null) s.targetMonths=1; if(s.skipItemMoq==null) s.skipItemMoq=true; } });
+    if(s){ if(s.skipItemMoq==null) s.skipItemMoq=true; } });
 }
 applyMultiCleanerOrderBasis();
 // [v83] 얼룩제거제 5종 묶음 발주 기본 그룹 보장 (costDetail에 '얼룩제거' 품목이 있고 그룹이 없을 때만 추가)
@@ -6212,7 +6212,7 @@ function groupOrderMoneyHtml(g,M){
   if(!g.orderMfrs) g.orderMfrs={};
   if(g.moqTabs==null) g.moqTabs=0;
   // 확보 기간(개월)은 품목(s.targetMonths)에 저장 — 재고·발주 탭과 동일 기준으로 연동
-  const tm=(function(){ const it=M.items.find(x=>x.exists&&x.tgt!=null); return it&&it.tgt!=null?it.tgt:1; })();
+  const tm=(function(){ const it=M.items.find(x=>x.exists&&x.tgt!=null); return it&&it.tgt!=null?it.tgt:(+(DATA.stockset||{}).target||3); })();
   // 다음 발주 차수 자동 제안 (품목 최신 차수 +1)
   const sugRound=(function(){ let mx=0; (g.items||[]).forEach(function(nm){ var st=(DATA.stock||[]).find(function(x){return x.nm===nm;}); if(st&&st.round){ var mm=String(st.round).match(/(\d+)/); if(mm) mx=Math.max(mx,Number(mm[1])); } }); return mx>0?(mx+1)+'차':''; })();
   const editable=!(typeof VIEWONLY!=='undefined'&&VIEWONLY)&&!(typeof EXTERNAL!=='undefined'&&EXTERNAL);
@@ -6302,7 +6302,7 @@ window.recalcGroupMoney=function(gid){
   if(typeof markDirty==='function') markDirty();
 };
 window.updateGroupMoq=function(gid,v){ const g=DATA.costGroups.find(x=>x.id===gid); if(g){ g.moqTabs=(v===''||v==null)?0:Number(v); recalcGroupMoney(gid); } };
-window.updateGroupTargetMonths=function(gid,v){ const g=DATA.costGroups.find(x=>x.id===gid); if(!g) return; const tm=(v===''||v==null)?1:Math.max(0,Number(v)); (g.items||[]).forEach(function(nm){ const s=(DATA.stock||[]).find(function(x){return x.nm===nm;}); if(s) s.targetMonths=tm; }); if(typeof markDirty==='function') markDirty(); if(typeof renderCost==='function') renderCost(); if(typeof renderStock==='function') renderStock(); if(typeof renderActiveTab==='function') renderActiveTab(); };
+window.updateGroupTargetMonths=function(gid,v){ const g=DATA.costGroups.find(x=>x.id===gid); if(!g) return; const tm=(v===''||v==null)?null:Math.max(0,Number(v)); (g.items||[]).forEach(function(nm){ const s=(DATA.stock||[]).find(function(x){return x.nm===nm;}); if(s){ if(tm==null) delete s.targetMonths; else s.targetMonths=tm; } }); if(typeof markDirty==='function') markDirty(); if(typeof renderCost==='function') renderCost(); if(typeof renderStock==='function') renderStock(); if(typeof renderActiveTab==='function') renderActiveTab(); };
 window.updateGroupMemo=function(id,v){ const g=DATA.costGroups.find(x=>x.id===id); if(g){ g.memo=v; markDirty(); } };
 window.selectGroup=function(v){ costGroupSel=v; renderCost(); };
 // [묶음 발주 확정] 현재 입력(수량·매입단가·제조사)을 각 품목 원가·매입에 새 차수로 기록 + 재고 최신 차수·원가 갱신
@@ -8183,7 +8183,7 @@ document.getElementById('btnDailyAddSelected').onclick=async()=>{
     const ns={ nm, cat:(typeof salesCategory==='function'?salesCategory(nm):'기타'), ch:'전채널', msale:0, msaleLegacy:0,
       lead:30, cost:0, price:0, moq:1000, oem:'-', round:'',
       stockUnit:'EA', orderUnit:'EA', unitConversion:1, orderMultiple:1, moqOrderUnit:1000,
-      targetMonths:1, skipItemMoq:true, rop:0, rec:0,
+      skipItemMoq:true, rop:0, rec:0,
       inventory:{ total:m.stockVal, warehouses:wh, updatedAt:fmtDate(NOW), source:pendingDailyStock.file, updateType:'daily', verified:true, warehouseStatus:(m.whStatus||'unknown') } };
     if(typeof syncInventory==='function') syncInventory(ns);
     DATA.stock.push(ns);
@@ -9115,7 +9115,7 @@ mergeMonthlySalesUpload=function(parsed,fileName,month){
 };
 // 구버전 불러오기 후 월별 이력을 정규화하고 평균 판매량을 재산출한다.
 const _normalizeAfterLoadV44=normalizeAfterLoad;
-normalizeAfterLoad=function(){ _normalizeAfterLoadV44(); normalizeMonthlySalesHistory(); refreshMonthlySalesAverages(); if(!DATA.stockset) DATA.stockset={}; DATA.stockset.salesWindow=getSalesWindow(); };
+normalizeAfterLoad=function(){ _normalizeAfterLoadV44(); normalizeMonthlySalesHistory(); refreshMonthlySalesAverages(); if(!DATA.stockset) DATA.stockset={}; DATA.stockset.salesWindow=getSalesWindow(); if(typeof unifyTargetMonthsV108==='function') unifyTargetMonthsV108(); };
 // 최근 N개월 평균을 baseline으로 쓰므로 동일 최근3개월 데이터의 추세배수는 중복 가산하지 않는다.
 demandAnalysis=function(s,simStock){
   const sales=monthlySalesBasis(s);
@@ -9233,6 +9233,17 @@ document.getElementById('stockFileInput').onchange=e=>{
 normalizeMonthlySalesHistory();
 refreshMonthlySalesAverages();
 if(!DATA.stockset) DATA.stockset={}; DATA.stockset.salesWindow=getSalesWindow();
+// [v108] 목표 보유개월 3개월 통일 — 전역 기준 3개월, 품목별 개별값(1·1.5개월 등) 1회 제거
+function unifyTargetMonthsV108(){
+  if(!DATA.meta) DATA.meta={};
+  if(DATA.meta.targetUnifiedV108) return false;
+  if(!DATA.stockset) DATA.stockset={};
+  DATA.stockset.target=3;
+  (DATA.stock||[]).forEach(s=>{ delete s.targetMonths; });
+  DATA.meta.targetUnifiedV108=true;
+  return true;
+}
+if(unifyTargetMonthsV108() && !window.__TUBBLE_DATA__.viewonly){ try{ markDirty(); }catch(e){} }
 
 render();
 takeSnapshot();
