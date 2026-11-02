@@ -437,8 +437,34 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .timing{font-size:12px;font-weight:800;white-space:nowrap;text-align:center}
 .timing.now{color:var(--red)} .timing.soon{color:var(--amber)} .timing.ok{color:var(--green)} .timing.na{color:var(--mut)} .timing.unverified{color:#c0392b;font-weight:700}
 .timing small{display:block;font-weight:400;font-size:9px;color:var(--mut);margin-top:1px}
-.arrproj{white-space:normal;min-width:150px;max-width:190px;margin:3px auto 0;font-size:9.5px;font-weight:500;line-height:1.35;color:#3d4a6b;text-align:left}
-.arrproj.bad{color:#c0392b}
+.arrtd{min-width:190px}
+.arrc{white-space:normal;text-align:left;background:#f6f8fc;border:1px solid #e3e8f3;border-left:3px solid #8a96b8;border-radius:6px;padding:5px 8px;margin:2px 0 4px;font-size:11px;line-height:1.45}
+.arrc.inc{border-left-color:#27ae60;background:#f2faf5;border-color:#d5ecdf}
+.arrc.rec{border-left-color:#3b5bdb}
+.arrc.bad{border-left-color:#c0392b;background:#fdf2f1;border-color:#f1d4d1}
+.arrh{display:flex;align-items:baseline;gap:5px;margin-bottom:2px}
+.arrh b{font-size:12.5px;font-weight:800;color:var(--navy)}
+.arrh i{font-style:normal;font-weight:700;color:#27ae60;margin-left:auto}
+.arrc.rec .arrh i{color:#3b5bdb}
+.arrtag{white-space:nowrap;flex:none;font-size:9.5px;font-weight:700;color:#5b6684;background:#fff;border:1px solid #dde3ef;border-radius:9px;padding:0 6px}
+.arrr{display:flex;align-items:baseline;gap:6px;color:#6b7590;font-size:10.5px}
+.arrr b{margin-left:auto;font-weight:700;color:#222;font-variant-numeric:tabular-nums}
+.arrr em{font-style:normal;font-weight:800;color:var(--navy);min-width:40px;text-align:right}
+.arrr.warn,.arrr.warn b{color:#c0392b}
+.mcwide{grid-column:1/-1}
+.incBox{background:#fff;border:1px solid #dfe5f2;border-left:3px solid #27ae60;border-radius:8px;padding:10px 12px;margin:10px 0 12px}
+.incTitle{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11.5px;font-weight:800;color:var(--navy);margin-bottom:7px}
+.incTitle small{font-weight:500;color:var(--mut);font-size:10px;margin-left:4px}
+.incrow{display:flex;align-items:center;gap:6px;margin:4px 0;font-size:11.5px}
+.incrow input[type=date]{width:140px}.incrow input[type=number]{width:100px;text-align:right}
+.incrow input{padding:4px 6px;border:1px solid #d4dbe8;border-radius:5px;font-size:11.5px}
+.incrow.done{opacity:.55}
+.incu{color:var(--mut);font-size:10.5px}
+.incdone{font-size:9.5px;color:#27ae60;font-weight:700;background:#eaf7ef;border-radius:8px;padding:1px 6px}
+.incdel{border:none;background:none;color:#b0b7c9;cursor:pointer;font-size:12px}.incdel:hover{color:#c0392b}
+.incempty{font-size:11px;color:#aaa;padding:4px 0}
+.incSent{margin-top:8px;padding:7px 9px;background:#f6f8fc;border-radius:6px;font-size:11px;line-height:1.6;color:#2c3550}
+.incNote{margin-top:6px;font-size:9.5px;color:var(--mut)}
 .qtybig{font-weight:800;color:var(--navy);font-size:13px}
 .qtybig small{display:block;font-weight:400;color:var(--mut);font-size:9px}
 .amtbig{font-weight:800;color:var(--navy);font-size:12.5px}
@@ -4886,7 +4912,7 @@ function simulationMetrics(s,c,qty,leadDays){
   // [v32] 공통 산식: calcStock과 동일 정의. 입력 발주수량은 stockUnit 기준.
   qty=Math.max(0,+qty||0); leadDays=Math.max(0,+leadDays||0)+orderPrepDays();   // [v109] 발주 처리기간 포함
   const daily=Math.max(0,+c.daily||0);
-  const stock=invTotal(s);                                  // 단일 원본
+  const stock=invTotal(s)+incomingTotal(s);                 // 단일 원본 + 입고 대기 발주(v111)
   const arrival=new Date(NOW.getTime()+leadDays*86400000);
   const stockAtArrival=stock-(daily*leadDays);              // 입고 시점 예상재고
   const stockoutBefore=daily>0 && stockAtArrival<0;
@@ -5448,7 +5474,7 @@ function renderStock(){
         <td class="timing ${c.status}">${timingTxt}<small>${c.recDate&&c.status!=='na'?'권장 '+fmtMDfull(c.recDate):''}</small></td>
         <td class="num">${cellQty}</td>
         <td class="timing">${EXTERNAL?MASK:`${s.lead||0}일<small>품목별 설정</small>`}</td>
-        <td class="timing">${arriveTxt}<small>${arriveSub}</small>${(!EXTERNAL&&c.status!=='na'&&c.status!=='unverified'&&arrivalProjText(c,su))?`<div class="arrproj${c.arrProj.stockout?' bad':''}">${arrivalProjText(c,su)}</div>`:''}</td>
+        <td class="timing arrtd" title="${EXTERNAL?'':arrivalTitleText(c,su).replace(/"/g,'&quot;')}">${(!EXTERNAL&&arrivalCellHtml(s,c,su))||`${arriveTxt}<small>${arriveSub}</small>`}</td>
         <td class="num">${cellAmt}</td>
       </tr>
       <tr class="trendrow" data-trend="${i}"><td colspan="11"><div class="trendwrap" data-chkey="${chKey||''}">
@@ -5466,6 +5492,7 @@ function renderStock(){
           ${clientBasisHtml(s.nm)}
           <div class="basisNote"><b>해석:</b> 월평균 기준은 기본 전망, 월별 채널 3개월 추이는 월초에 갱신되는 판매 방향성, 데일리 현재고 감소 추이는 매일 확인 가능한 실제 소진 속도입니다. 데일리 기준 소진일이 월평균보다 빠르면 발주 시점을 앞당겨 보는 구조입니다.</div>
           ${stockIssueHtml(s,c)}
+          ${incomingBoxHtml(s,i,c)}
           ${orderSimHtml(s,i,c)}
         </div>`}
         ${chKey?`<div class="trendhead"><b>${s.nm} · 월별 채널 출고 추이</b>
@@ -5486,7 +5513,7 @@ function renderStock(){
           <div><span class="ml">소진예상</span><b>${EXTERNAL?MASK:(c.status==='unverified'?unverifiedMobileRunoutText(c):(c.runout?fmtMDfull(c.runout)+(c.runoutMonths!=null?' · '+fmtSupplyDur(c.runoutMonths):''):'-'))}</b></div>
           <div><span class="ml">권장 발주수량</span><b>${EXTERNAL?MASK:(c.status==='unverified'?unverifiedMobileOrderText(s,c):(c.orderQty?won(c.orderQty):'-'))}</b></div>
           <div><span class="ml">예상 매입액</span><b>${EXTERNAL?MASK:(c.amt?wonMan(c.amt):'-')}</b></div>
-          <div><span class="ml">입고예상</span><b>${arriveTxt}</b>${(!EXTERNAL&&c.status!=='na'&&c.status!=='unverified'&&arrivalProjText(c,su))?`<div class="arrproj${c.arrProj.stockout?' bad':''}">${arrivalProjText(c,su)}</div>`:''}</div>
+          <div class="mcwide"><span class="ml">입고예상</span>${(!EXTERNAL&&arrivalCellHtml(s,c,su))||`<b>${arriveTxt}</b>`}</div>
           <div><span class="ml">품목 리드타임</span><b>${EXTERNAL?MASK:(s.lead||0)+'일'}</b></div>
         </div>
       </div>`);
@@ -9347,6 +9374,16 @@ demandAnalysis=function(s,simStock){
 };
 
 function orderPrepDays(){ const v=Number((DATA.stockset||{}).prep); return Number.isFinite(v)&&v>=0?v:7; }
+// [v111] 입고 대기 발주(이미 발주한 건) — s.incoming=[{date:'YYYY-MM-DD',qty}]
+//  재고 업데이트일 이후에 들어오는 건만 미입고로 본다(그 이전 입고일은 이미 현재고에 반영된 것으로 간주).
+function pendingIncoming(s){
+  const inv=s&&s.inventory||{};
+  const base=/^\d{4}-\d{2}-\d{2}/.test(inv.updatedAt||'')?String(inv.updatedAt).slice(0,10):fmtDate(NOW);
+  return (s&&s.incoming||[])
+    .filter(e=>e&&/^\d{4}-\d{2}-\d{2}$/.test(e.date||'')&&+e.qty>0&&e.date>base)
+    .sort((a,b)=>a.date.localeCompare(b.date));
+}
+function incomingTotal(s){ return pendingIncoming(s).reduce((t,e)=>t+(+e.qty||0),0); }
 function calcStockCoreV47(s,stock,da){
   const daily=Math.max(0,Number(da.daily)||0);
   const weekly=(da.baseDaily||0)*7;
@@ -9369,12 +9406,25 @@ function calcStockCoreV47(s,stock,da){
   const runoutTrend=da.chDaily>0?new Date(NOW.getTime()+(stock/da.chDaily)*86400000):null;
   const runoutInv=da.invDaily>0?new Date(NOW.getTime()+(stock/da.invDaily)*86400000):null;
   const rop=Math.round(daily*(lead+buffer));
-  const recDays=(stock-rop)/daily;
+  // [v111] 발주 타이밍·권장 수량은 현재고 + 입고 대기 발주 기준
+  const incList=pendingIncoming(s), incTotal=incList.reduce((t,e)=>t+(+e.qty||0),0);
+  const pos=stock+incTotal;
+  const recDays=(pos-rop)/daily;
   const recDate=new Date(NOW.getTime()+recDays*86400000);
   const recDD=Math.ceil(recDays);
   const bufferStock=daily*buffer;
   const targetStock=daily*target*30;
-  const invStockAtArrive=stock-daily*lead;
+  const invStockAtArrive=pos-daily*lead;
+  // 입고 대기 건별 예상 — 입고 시점 잔여 재고 → 입고 후 확보량(순서대로 이어서 계산)
+  const incProj=[]; let cur=stock, prevDays=0;
+  incList.forEach(e=>{
+    const d=new Date(e.date+'T00:00:00'), days=Math.max(0,(d-NOW)/86400000);
+    const remainRaw=cur-daily*(days-prevDays), remain=Math.max(0,remainRaw);
+    const stockoutDate=remainRaw<0?new Date(NOW.getTime()+(prevDays+cur/daily)*86400000):null;
+    const after=remain+(+e.qty);
+    incProj.push({date:d,qty:+e.qty,remain,stockout:remainRaw<0,stockoutDate,after,months:after/daily/30,incoming:true});
+    cur=after; prevDays=days;
+  });
   // [v89] 권장 발주량은 '지금 발주했을 때 입고 시점에 남을 실제 재고'를 기준으로 뺀다.
   //  - 이전에는 발주점 전(ROP 미도달) 품목에 안전버퍼(일판매×7일)라는 가정값을 써서,
   //    재고가 1년치 남은 품목에도 발주 수량이 표시됐다(예: 이염방지 세탁시트 507일치에 1,000개).
@@ -9398,10 +9448,10 @@ function calcStockCoreV47(s,stock,da){
   // [v89] 발주 물량 자체가 몇 개월분인지 — 현재고를 합산하지 않은 순수 발주분 기준.
   // coverMonths(현재고+발주분)는 시뮬레이터·시나리오표에서 계속 쓰고, 재고표에는 이 값을 보여준다.
   const orderMonths=(daily>0&&orderQty>0)?orderQty/daily/30:null;
-  const stockoutBeforeArrive=recDD<=0&&invStockAtArrive<0;
+  const stockoutBeforeArrive=(recDD<=0&&invStockAtArrive<0)||incProj.some(p=>p.stockout);
   // [v110] 입고예상 칸 — 권장일에 발주했을 때(지금 발주 품목은 오늘) 입고 시점 잔여 재고와 입고 후 확보량
   //  지금 발주: 위 orderQty와 동일. 권장일이 남은 품목: 그날 발주 기준 수량을 다시 산정(입고 시점엔 안전재고만 남음).
-  const arrRemainRaw=stock-daily*((recDays>0?recDays:0)+lead);
+  const arrRemainRaw=pos-daily*((recDays>0?recDays:0)+lead);
   const arrRemain=Math.max(0,arrRemainRaw);
   const arrQty=recDays>0?roundOrder(Math.max(0,targetStock-arrRemain)):orderQty;
   const arrAfter=arrRemain+arrQty;
@@ -9410,15 +9460,59 @@ function calcStockCoreV47(s,stock,da){
   if(recDD<=0) status='now'; else if(recDD<=Math.max(0,+set.warn||0)) status='soon';
   return {daily,weekly,runout,runoutBase,runoutTrend,runoutInv,runoutMonths:runoutDays/30,recDate,recDD,
     orderQty,orderQtyOrderUnit,arrive,arriveByRec,months:coverMonths,coverMonths,orderMonths,stockAfterArrive,amt:orderQty*unitCost,status,rop,costRate,
-    invStockAtArrive,stockoutBeforeArrive,unitReady,needRaw,unit,stock,arrivalBaseStock,targetStock,bufferStock,arrProj};
+    invStockAtArrive,stockoutBeforeArrive,unitReady,needRaw,unit,stock,arrivalBaseStock,targetStock,bufferStock,arrProj,incProj,incTotal};
 }
+function arrMD(d){ return `${d.getFullYear()!==NOW.getFullYear()?String(d.getFullYear()).slice(2)+'/':''}${d.getMonth()+1}/${d.getDate()}`; }
 // 예: 입고 시점(10/30) 예상 잔여 재고 약 4,440EA, 입고 후 약 10,440EA(약 2.0개월분) 확보
-function arrivalProjText(c,su){
-  const p=c&&c.arrProj; if(!p||!p.date) return '';
-  const md=`${p.date.getFullYear()!==NOW.getFullYear()?String(p.date.getFullYear()).slice(2)+'/':''}${p.date.getMonth()+1}/${p.date.getDate()}`;
-  const remain=p.stockout?`입고 전 품절 예상(잔여 0${su})`:`예상 잔여 재고 약 ${won(Math.round(p.remain))}${su}`;
-  return `입고 시점(${md}) ${remain}, 입고 후 약 ${won(Math.round(p.after))}${su}(약 ${p.months.toFixed(1)}개월분) 확보`;
+function arrivalProjText(c,su,p){
+  p=p||(c&&c.arrProj); if(!p||!p.date) return '';
+  const remain=p.stockout?`입고 전 품절 예상(${p.stockoutDate?fmtMDfull(p.stockoutDate)+' 소진':'잔여 0'+su})`:`예상 잔여 재고 약 ${won(Math.round(p.remain))}${su}`;
+  return `입고 시점(${arrMD(p.date)}) ${remain}, 입고 후 약 ${won(Math.round(p.after))}${su}(약 ${p.months.toFixed(1)}개월분) 확보`;
 }
+// 입고예상 칸 — 발주 완료 건(입고 대기) + 권장 발주 시 예상을 카드형으로
+function arrivalCellHtml(s,c,su){
+  if(!c||c.status==='na'||c.status==='unverified') return '';
+  const blk=(p,tag,cls,sub)=>`<div class="arrc ${cls}${p.stockout?' bad':''}">
+    <div class="arrh"><span class="arrtag">${tag}</span><b>${fmtMDfull(p.date)}</b>${sub||''}</div>
+    ${p.stockout?`<div class="arrr warn"><span>입고 전 품절</span><b>${p.stockoutDate?fmtMDfull(p.stockoutDate)+' 소진':'잔여 0'}</b></div>`:`<div class="arrr"><span>입고 시 잔여</span><b>${won(Math.round(p.remain))}</b></div>`}
+    <div class="arrr"><span>입고 후</span><b>${won(Math.round(p.after))}</b><em>${p.months.toFixed(1)}개월</em></div></div>`;
+  const parts=(c.incProj||[]).map(p=>blk(p,'발주 완료','inc',`<i>+${won(p.qty)}</i>`));
+  if(c.arrProj&&c.arrProj.date&&(c.status!=='ok'||!parts.length)&&c.arrProj.qty>0)
+    parts.push(blk(c.arrProj,c.status==='now'?'오늘 발주':'권장일 발주','rec',`<i>+${won(c.arrProj.qty)}</i>`));
+  return parts.join('');
+}
+function arrivalTitleText(c,su){
+  if(!c) return '';
+  return (c.incProj||[]).map(p=>'[발주 완료 +'+won(p.qty)+su+'] '+arrivalProjText(c,su,p)).concat(c.arrProj&&c.arrProj.qty>0?['[권장 발주 시] '+arrivalProjText(c,su)]:[]).join('\n');
+}
+// 상세 패널 — 입고 대기 발주 입력
+function incomingBoxHtml(s,i,c){
+  const su=s.stockUnit||'EA';
+  const ed=!(typeof VIEWONLY!=='undefined'&&VIEWONLY)&&!(typeof EXTERNAL!=='undefined'&&EXTERNAL);
+  const list=s.incoming||[];
+  const pend=new Set(pendingIncoming(s));
+  const base=(s.inventory&&s.inventory.updatedAt)?String(s.inventory.updatedAt).slice(0,10):'';
+  const rows=list.map((e,k)=>{
+    const done=!pend.has(e)&&e.date&&+e.qty>0;
+    return ed?`<div class="incrow${done?' done':''}"><input type="date" value="${e.date||''}" onchange="setIncoming(${i},${k},'date',this.value)">
+      <input type="number" min="0" placeholder="수량" value="${e.qty||''}" onchange="setIncoming(${i},${k},'qty',this.value)"><span class="incu">${su}</span>
+      ${done?'<span class="incdone">재고 반영됨</span>':''}<button type="button" class="incdel" onclick="delIncoming(${i},${k})" title="삭제">✕</button></div>`
+      :`<div class="incrow${done?' done':''}"><b>${e.date||'-'}</b> · ${won(+e.qty||0)}${su}${done?' <span class="incdone">재고 반영됨</span>':''}</div>`;
+  }).join('');
+  const sents=arrivalTitleText(c,su);
+  return `<div class="incBox"><div class="incTitle"><span>입고 대기 발주 <small>이미 발주해서 입고를 기다리는 건</small></span>
+      ${ed?`<button type="button" class="tbtn" onclick="addIncoming(${i})">+ 입고 건 추가</button>`:''}</div>
+    ${rows||'<div class="incempty">등록된 입고 대기 건 없음</div>'}
+    ${sents?`<div class="incSent">${sents.split('\n').map(x=>`<div>${x}</div>`).join('')}</div>`:''}
+    <div class="incNote">입고일이 재고 업데이트일${base?`(${base})`:''} 이전이면 이미 현재고에 들어간 것으로 보고 계산에서 뺍니다. 입고 대기 수량은 발주 타이밍·권장 발주수량에 반영됩니다.</div></div>`;
+}
+function rerenderStockKeepOpen(i){
+  renderStock();
+  const tr=document.querySelector(`tr.strow[data-srow="${i}"]`); if(tr) tr.click();
+}
+window.addIncoming=function(i){ const s=DATA.stock[i]; if(!s) return; (s.incoming=s.incoming||[]).push({date:fmtDate(new Date(NOW.getTime()+7*86400000)),qty:0}); markDirty(); rerenderStockKeepOpen(i); };
+window.setIncoming=function(i,k,f,v){ const s=DATA.stock[i]; if(!s||!s.incoming||!s.incoming[k]) return; s.incoming[k][f]=f==='qty'?Math.max(0,Math.round(+v||0)):v; markDirty(); rerenderStockKeepOpen(i); };
+window.delIncoming=function(i,k){ const s=DATA.stock[i]; if(!s||!s.incoming) return; s.incoming.splice(k,1); if(!s.incoming.length) delete s.incoming; markDirty(); rerenderStockKeepOpen(i); };
 function unverifiedStockCandidates(s){
   const inv=s.inventory||{};
   const raw=[];
