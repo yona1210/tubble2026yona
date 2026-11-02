@@ -9729,6 +9729,51 @@ function flowStockDetail(st){
   return {kpis,table,thisAvg,lastAvg,wDir};
 }
 window.flowStockView=function(v){ FLOW_STOCK_VIEW=v; renderFlowBoard(); };
+// [v114] 3개월 흐름 엑셀 — 요약 / 판매처별 월 출고 / 주별 재고 / 일별 재고 (전체 합계 + 품목별)
+window.flowExportExcel=function(){
+  if(typeof XLSX==='undefined'){ toast('엑셀 라이브러리를 불러오지 못했습니다'); return; }
+  const r0=v=>v==null?'':Math.round(v);
+  const pct=p=>p==null?'':Math.round(p*100);   // % 단위 숫자
+  const items=flowItems().map(flowItemSummary).sort((a,b)=>b.sum3-a.sum3).filter(x=>x.sum3>0||x.st);
+  const groups=[{nm:'전체 품목 합계',names:items.map(x=>x.s.nm)}].concat(items.map(x=>({nm:x.s.nm,names:[x.s.nm]})));
+  const chs=FLOW_CH;
+  let months=[];
+  const sum=[], mon=[], wk=[], dy=[];
+  groups.forEach((g,gi)=>{
+    const sm=flowSalesMonthly(g.names), st=flowStockWeekly(g.names);
+    if(sm&&!months.length) months=sm.months;
+    const sc=sm?flowSalesCompare(sm.total):null, kc=st?flowStockCompare(st):null, sd=st?flowStockDetail(st):null;
+    const chTot=chs.map(c=>sm?sm.byCh[c.key].reduce((a,b)=>a+b,0):0);
+    sum.push([g.nm, sm?r0(sm.total.reduce((a,b)=>a+b,0)):'', ...chTot.map(r0),
+      sc?r0(sc.avg):'', sc?r0(sc.last):'', sc?sc.dir.t:'', sc?pct(sc.dir.p):'',
+      kc?r0(kc.prev):'', kc?r0(kc.recent):'', kc?kc.dir.t:'', kc?pct(kc.dir.p):'',
+      sd?r0(sd.lastAvg):'', sd?r0(sd.thisAvg):'', sd?sd.wDir.t:'', sd?pct(sd.wDir.p):'']);
+    if(sm){
+      chs.forEach(c=>{ const a=sm.byCh[c.key], t=a.reduce((x,y)=>x+y,0); if(!t) return; const cm=flowSalesCompare(a);
+        mon.push([g.nm,c.label,...a.map(r0),r0(t),r0(cm.avg),r0(cm.avg/FLOW_WPM),cm.dir.t,pct(cm.dir.p)]); });
+      mon.push([g.nm,'전체',...sm.total.map(r0),r0(sm.total.reduce((a,b)=>a+b,0)),r0(sc.avg),r0(sc.avg/FLOW_WPM),sc.dir.t,pct(sc.dir.p)]);
+    }
+    if(st){
+      st.weeks.forEach((w,i)=>{ const d=st.wDays[i]||7, avg=st.drop[i]/d, pv=i>0?st.drop[i-1]/(st.wDays[i-1]||7):null;
+        wk.push([g.nm,fmtDate(w),fmtDate(flowAddDays(w,d-1)),d,r0(st.drop[i]),r0(avg),pv>0?pct(avg/pv-1):'',r0(st.restock[i]),r0(st.level[i])]); });
+      st.days.forEach((d,i)=>{ dy.push([g.nm,fmtDate(d),r0(st.dDrop[i]),r0(st.dRestock[i]),r0(st.dLevel[i]),st.dEst[i]?'기록 사이 평균':'']); });
+    }
+  });
+  const ml=months.map(flowMonLabel), last=ml[ml.length-1]||'최근월';
+  const H1=['품목','3개월 출고',...chs.map(c=>c.label+' 3개월'),'매출 월평균',`매출 ${last}`,'매출 흐름',`매출 증감률 %(${last} vs 평균)`,
+    '재고 감소 직전4주 주평균','재고 감소 최근4주 주평균','재고 흐름','재고 증감률 %(4주)','지난주 하루 평균 감소','이번 주 하루 평균 감소','전주 대비','전주 대비 증감률 %'];
+  const H2=['품목','판매처',...ml,'3개월 합계','월평균','주 환산(월평균÷4.35)','흐름',`증감률 %(${last} vs 평균)`];
+  const H3=['품목','주 시작(월)','주 끝','일수','재고 감소','하루 평균','전주 대비 증감률 %(하루 평균)','입고(재고 증가)','주말 재고'];
+  const H4=['품목','날짜','재고 감소','입고(재고 증가)','재고(기록일)','비고'];
+  const sheet=(head,rows,widths)=>{ const ws=XLSX.utils.aoa_to_sheet([head,...rows]); ws['!cols']=widths.map(w=>({wch:w})); ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rows.length,c:head.length-1}})}; return ws; };
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,sheet(H1,sum,[34,11,...chs.map(()=>11),11,11,8,12,14,14,8,12,14,14,8,12]),'요약');
+  XLSX.utils.book_append_sheet(wb,sheet(H2,mon,[34,12,...ml.map(()=>10),11,10,14,8,14]),'판매처별 월 출고');
+  XLSX.utils.book_append_sheet(wb,sheet(H3,wk,[34,12,12,6,11,10,16,13,11]),'주별 재고 감소');
+  XLSX.utils.book_append_sheet(wb,sheet(H4,dy,[34,12,11,13,11,14]),'일별 재고 감소(28일)');
+  XLSX.writeFile(wb,`터블_3개월판매흐름_${fmtDate(NOW)}.xlsx`);
+  toast('3개월 판매 흐름 엑셀을 내려받았습니다');
+};
 function flowBoardHtml(){
   const items=flowItems().map(flowItemSummary).sort((a,b)=>b.sum3-a.sum3);
   const names=FLOW_SEL==='__ALL__'?items.map(x=>x.s.nm):[FLOW_SEL];
@@ -9772,7 +9817,7 @@ function flowBoardHtml(){
       <td>${kc?`${won(Math.round(kc.prev))} → <b>${won(Math.round(kc.recent))}</b>`:'-'}</td><td class="${kc?kc.dir.c:''}">${kc?kc.dir.t+flowPct(kc.dir.p):'-'}</td></tr>`;
   }).join('');
   const lastMon=sm?flowMonLabel(sm.months[sm.months.length-1]):'최근월';
-  return `<div class="flowTop"><select id="flowSel" onchange="flowSelect(this.value)">${opts}</select>${period}</div>
+  return `<div class="flowTop"><select id="flowSel" onchange="flowSelect(this.value)">${opts}</select>${period}<button type="button" class="tbtn" style="margin-left:auto" onclick="flowExportExcel()">⬇ 엑셀 다운로드</button></div>
     ${sumBits.length?`<div class="flowSum"><b>${pEsc(selName)}</b> · ${sumBits.join(' / ')}</div>`:''}
     <div class="flowGrid">
       <div class="flowCard"><div class="flowH">판매처별 월 출고 <span>매출 데이터 · 최근 3개월 (월말 일괄 기록이라 주 단위는 재고 추세로 봅니다)</span></div>
