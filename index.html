@@ -487,9 +487,17 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .flowKpis.k4 span{font-size:10.5px;font-weight:700;color:#5b6684}
 .flowKpis.k4 b{display:block;font-size:19px;font-weight:800;color:var(--navy);margin:2px 0 1px;font-variant-numeric:tabular-nums}
 .flowKpis.k4 em{display:block;font-style:normal;font-size:10.5px;color:var(--mut)}
-.flowKpis.k4 i.fc{position:absolute;top:8px;right:10px;font-style:normal}
+
 .fc{font-weight:800;font-size:11.5px}
 .fc.up{color:#c0392b}.fc.down{color:#3355FF}.fc.flat{color:#7a849c}
+.fc.low{opacity:.45}
+.flowKpis.k4 .kv,.flowKpis.k4 .fcs{background:none;border:none;padding:0;border-radius:0}
+.flowKpis.k4 .kv{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.flowKpis.k4 .fcs{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.flowKpis.k4 .fcs small{font-size:9.5px;font-weight:600;color:var(--mut);margin-right:2px}
+.flowWk td,.flowWk th{white-space:nowrap;padding:5px 4px;font-size:11px}
+.flowKpis.k4 .fcs i.fc{position:static;font-style:normal;font-size:11px}
+.flowWk tr.weak td{color:#aab0bf}.flowWk tr.weak td b{color:#aab0bf}
 .flowSeg{display:inline-flex;border:1px solid #d4dbe8;border-radius:7px;overflow:hidden;margin-bottom:6px}
 .flowSeg button{border:none;background:#fff;padding:5px 12px;font-size:11px;font-weight:700;color:#5b6684;cursor:pointer}
 .flowSeg button.on{background:var(--navy);color:#fff}
@@ -9602,69 +9610,66 @@ function flowSalesMonthly(names){
   return {months,byCh,total};
 }
 // 데일리 재고 — 최근 13주 주간 재고 감소(출고 추정)와 주말 재고
+// [v115] 재고 감소 흐름 — 입고가 낀 구간은 판매가 재고 증가에 가려 0으로 보이므로(예: 9/28주 ▼100%)
+//  앞뒤 ±21일 정상 감소 구간의 하루 평균으로 판매를 추정해 채우고(추정분 따로 표시), 입고량 = 재고 증가 + 추정 판매.
+//  추정 기준에서는 공구·특판처럼 평소의 3배 넘게 빠진 구간을 뺀다(추정이 부풀지 않게).
+const FLOW_LOWBASE=50;   // 하루 평균이 이보다 작으면 % 변동은 참고용으로 흐리게
+function flowItemIntervals(h){
+  const isNormal=x=>(x.status==='정상 마감 재고'||x.source==='미리보기');
+  const iv=[]; let prev=null;
+  h.forEach(x=>{
+    if(!isNormal(x)){ prev=null; return; }   // 비정상 기록이 끼면 그 구간은 버린다
+    if(prev){ const gap=Math.round((x.dateObj-prev.dateObj)/86400000); if(gap>0) iv.push({from:prev.dateObj,to:x.dateObj,gap,diff:prev.stock-x.stock}); }
+    prev=x;
+  });
+  const dec=iv.filter(v=>v.diff>0).map(v=>v.diff/v.gap).sort((a,b)=>a-b);
+  const med=dec.length?dec[Math.floor(dec.length/2)]:0;
+  const usable=iv.filter(v=>v.diff>0&&(!med||v.diff/v.gap<=med*3));
+  const rateAt=mid=>{
+    const near=usable.filter(v=>Math.abs((v.from.getTime()+v.to.getTime())/2-mid)<=21*86400000);
+    const src=near.length?near:usable;
+    const d=src.reduce((a,v)=>a+v.gap,0);
+    return d?src.reduce((a,v)=>a+v.diff,0)/d:0;
+  };
+  iv.forEach(v=>{ if(v.diff<0){ v.imp=rateAt((v.from.getTime()+v.to.getTime())/2)*v.gap; v.inbound=-v.diff+v.imp; } });
+  return iv;
+}
 function flowStockWeekly(names){
   const recs=[];
   names.forEach(nm=>{ const h=(typeof getDailyHistory==='function'?getDailyHistory(nm):[])||[]; if(h.length) recs.push(h); });
   if(!recs.length) return null;
   let lastD=null; recs.forEach(h=>{ const d=h[h.length-1].dateObj; if(d&&(!lastD||d>lastD)) lastD=d; });
   if(!lastD) return null;
+  const isNormal=x=>(x.status==='정상 마감 재고'||x.source==='미리보기');
   const lastWk=flowWeekStart(lastD);
   const weeks=[]; for(let k=FLOW_WEEKS-1;k>=0;k--) weeks.push(flowAddDays(lastWk,-7*k));
   const wkIdx={}; weeks.forEach((w,i)=>{ wkIdx[flowDayKey(w)]=i; });
-  const drop=weeks.map(()=>0), restock=weeks.map(()=>0), level=weeks.map(()=>null);
-  const isNormal=x=>(x.status==='정상 마감 재고'||x.source==='미리보기');
-  recs.forEach(h=>{
-    let prev=null;
-    h.forEach(x=>{
-      if(!isNormal(x)){ prev=null; return; }   // 비정상 기록이 끼면 그 구간은 버린다
-      if(prev){
-        const days=Math.round((x.dateObj-prev.dateObj)/86400000);
-        const diff=prev.stock-x.stock;
-        for(let k=1;k<=days;k++){
-          const di=wkIdx[flowDayKey(flowWeekStart(flowAddDays(prev.dateObj,k)))]; if(di==null) continue;
-          if(diff>0) drop[di]+=diff/days; else if(diff<0) restock[di]+=(-diff)/days;
-        }
-      }
-      prev=x;
-    });
-  });
-  // 주말 재고: 그 주 안에 기록이 있는 주만 — 품목별 그 주 마지막 정상 기록의 합
-  weeks.forEach((w,i)=>{
-    const end=flowAddDays(w,7);
-    if(!recs.some(h=>h.some(x=>x.dateObj>=w&&x.dateObj<end))) return;
-    let sum=0, any=false;
-    recs.forEach(h=>{ let v=null; h.forEach(x=>{ if(x.dateObj<end&&isNormal(x)) v=x.stock; }); if(v!=null){ sum+=v; any=true; } });
-    if(any) level[i]=sum;
-  });
-  const lastDays=Math.round((lastD-lastWk)/86400000)+1;
-  // [v113] 일별 — 최근 28일. 기록 사이가 하루 넘게 비면 그 구간 감소를 일수로 나눠 채우고 '추정'으로 표시
   const days=[]; for(let k=FLOW_DAYS-1;k>=0;k--) days.push(flowAddDays(lastD,-k));
   const dIdx={}; days.forEach((d,i)=>{ dIdx[flowDayKey(d)]=i; });
-  const dDrop=days.map(()=>0), dRestock=days.map(()=>0), dEst=days.map(()=>false), dLevel=days.map(()=>null);
+  const W=()=>weeks.map(()=>0), D=()=>days.map(()=>0);
+  const drop=W(), imp=W(), restock=W(), level=weeks.map(()=>null);
+  const dDrop=D(), dImp=D(), dRestock=D(), dEst=days.map(()=>false), dLevel=days.map(()=>null);
   recs.forEach(h=>{
-    let prev=null;
-    h.forEach(x=>{
-      if(!isNormal(x)){ prev=null; return; }
-      if(prev){
-        const gap=Math.round((x.dateObj-prev.dateObj)/86400000), diff=prev.stock-x.stock;
-        for(let k=1;k<=gap;k++){
-          const di=dIdx[flowDayKey(flowAddDays(prev.dateObj,k))]; if(di==null) continue;
-          if(diff>0) dDrop[di]+=diff/gap; else if(diff<0) dRestock[di]+=(-diff)/gap;
-          if(gap>1) dEst[di]=true;
-        }
+    flowItemIntervals(h).forEach(v=>{
+      for(let k=1;k<=v.gap;k++){
+        const day=flowAddDays(v.from,k), wi=wkIdx[flowDayKey(flowWeekStart(day))], di=dIdx[flowDayKey(day)];
+        const sold=v.diff>0?v.diff/v.gap:0, im=v.diff<0?v.imp/v.gap:0, inb=v.diff<0?v.inbound/v.gap:0;
+        if(wi!=null){ drop[wi]+=sold; imp[wi]+=im; restock[wi]+=inb; }
+        if(di!=null){ dDrop[di]+=sold; dImp[di]+=im; dRestock[di]+=inb; if(v.gap>1&&v.diff>0) dEst[di]=true; }
       }
-      prev=x;
     });
   });
-  days.forEach((d,i)=>{
-    const end=flowAddDays(d,1);
-    if(!recs.some(h=>h.some(x=>flowDayKey(x.dateObj)===flowDayKey(d)))) return;
-    let sum=0; recs.forEach(h=>{ let v=null; h.forEach(x=>{ if(x.dateObj<end&&isNormal(x)) v=x.stock; }); if(v!=null) sum+=v; });
-    dLevel[i]=sum;
-  });
-  // 주별 경과 일수(마지막 주는 기록일까지) — 일평균 계산용
+  // 기록 일수(품목 상관없이 재고가 기록된 날짜 수) — 기록이 적은 주는 흐리게
+  const recDays=new Set(); recs.forEach(h=>h.forEach(x=>{ if(isNormal(x)) recDays.add(flowDayKey(x.dateObj)); }));
+  const wRec=weeks.map(w=>{ let n=0; for(let k=0;k<7;k++) if(recDays.has(flowDayKey(flowAddDays(w,k)))) n++; return n; });
+  const lastStockBefore=end=>{ let sum=0, any=false; recs.forEach(h=>{ let v=null; h.forEach(x=>{ if(x.dateObj<end&&isNormal(x)) v=x.stock; }); if(v!=null){ sum+=v; any=true; } }); return any?sum:null; };
+  weeks.forEach((w,i)=>{ if(wRec[i]) level[i]=lastStockBefore(flowAddDays(w,7)); });   // 기록 없는 주는 비워 둔다(선 끊김)
+  days.forEach((d,i)=>{ if(recDays.has(flowDayKey(d))) dLevel[i]=lastStockBefore(flowAddDays(d,1)); });
+  const lastDays=Math.round((lastD-lastWk)/86400000)+1;
   const wDays=weeks.map((w,i)=>i===weeks.length-1?lastDays:7);
-  return {weeks,drop,restock,level,wDays,partialLast:lastDays<7?lastDays:0,to:lastD,days,dDrop,dRestock,dEst,dLevel};
+  const tot=weeks.map((w,i)=>drop[i]+imp[i]), dTot=days.map((d,i)=>dDrop[i]+dImp[i]);
+  return {weeks,drop,imp,tot,restock,level,wRec,wDays,partialLast:lastDays<7?lastDays:0,to:lastD,
+    days,dDrop,dImp,dTot,dRestock,dEst,dLevel,dRec:days.map(d=>recDays.has(flowDayKey(d)))};
 }
 function flowAvg(arr,from,to){ const s=arr.slice(Math.max(0,from),to); return s.length?s.reduce((a,b)=>a+b,0)/s.length:0; }
 function flowDir(prev,recent,th){
@@ -9678,8 +9683,8 @@ function flowDir(prev,recent,th){
 function flowPct(p){ return p==null?'':` (${p>0?'+':''}${Math.round(p*100)}%)`; }
 // 재고: 최근 4주 vs 직전 4주 주평균 — 7일을 다 못 채운 마지막 주는 비교에서 뺀다
 function flowStockCompare(st){
-  const end=st.partialLast?st.drop.length-1:st.drop.length;
-  const recent=flowAvg(st.drop,end-4,end), prev=flowAvg(st.drop,end-8,end-4);
+  const end=st.partialLast?st.tot.length-1:st.tot.length;
+  const recent=flowAvg(st.tot,end-4,end), prev=flowAvg(st.tot,end-8,end-4);
   return {recent,prev,dir:flowDir(prev,recent)};
 }
 // 매출: 최근 1개월 vs 3개월 평균 (채널 추이 표와 같은 기준 ±10%)
@@ -9699,33 +9704,41 @@ function flowMixBar(chSum,total){
 }
 const flowMonLabel=m=>`${+String(m).slice(5)}월`;
 // [v113] 재고 감소 — 오늘/이번 주/지난주/4주를 한눈에 + 최근 6주 표
-function flowChg(cur,prev){
+// 기준(prev) 하루 평균이 FLOW_LOWBASE 미만이면 % 는 흐리게(참고) — 작은 수의 큰 % 변동에 눈이 끌리지 않게
+function flowChg(cur,prev,baseDaily){
   if(!(prev>0)) return {txt:cur>0?'비교 기준 없음':'-',cls:'flat'};
   const p=cur/prev-1, cls=p>=0.15?'up':p<=-0.15?'down':'flat';
-  return {txt:`${p>=0?'▲':'▼'} ${Math.abs(Math.round(p*100))}%`,cls,p};
+  const low=(baseDaily!=null?baseDaily:prev)<FLOW_LOWBASE;
+  return {txt:`${p>=0?'▲':'▼'} ${Math.abs(Math.round(p*100))}%`,cls:cls+(low?' low':''),p,low};
 }
 function flowStockDetail(st){
   const n=st.weeks.length, L=n-1;
-  const wAvg=i=>i>=0?st.drop[i]/(st.wDays[i]||7):0;
+  const wAvg=i=>i>=0?st.tot[i]/(st.wDays[i]||7):0;
   const thisAvg=wAvg(L), lastAvg=wAvg(L-1), prev2Avg=wAvg(L-2);
   const wDir=flowDir(lastAvg,thisAvg);
-  const di=st.days.length-1, lastDay=st.dDrop[di];
-  const prev7=st.dDrop.slice(Math.max(0,di-7),di), prev7Avg=prev7.length?prev7.reduce((a,b)=>a+b,0)/prev7.length:0;
+  // 4주 평균(이번 주 제외, 완결된 직전 4주의 하루 평균)
+  const avg4=i=>{ const a=[]; for(let k=i-4;k<i;k++) if(k>=0) a.push(wAvg(k)); return a.length?a.reduce((x,y)=>x+y,0)/a.length:0; };
+  const di=st.days.length-1, lastDay=st.dTot[di];
+  const prev7=st.dTot.slice(Math.max(0,di-7),di), prev7Avg=prev7.length?prev7.reduce((a,b)=>a+b,0)/prev7.length:0;
   const cmp=flowStockCompare(st);
   const range=(w,d)=>`${fmtMDfull(w)}~${fmtMDfull(flowAddDays(w,(d||7)-1))}`;
-  const card=(lab,big,sub,chg)=>`<div><span>${lab}</span><b>${big}</b><em>${sub}</em>${chg?`<i class="fc ${chg.cls}">${chg.txt}</i>`:''}</div>`;
-  const c1=flowChg(lastDay,prev7Avg), c2=flowChg(thisAvg,lastAvg), c3=flowChg(lastAvg,prev2Avg), c4=flowChg(cmp.recent,cmp.prev);
+  const card=(lab,big,sub,chgs)=>`<div><span>${lab}</span><div class="kv"><b>${big}</b><div class="fcs">${(chgs||[]).map(([t,c])=>`<i class="fc ${c.cls}"><small>${t}</small> ${c.txt}</i>`).join('')}</div></div><em>${sub}</em></div>`;
+  const impNote=i=>st.imp[i]>0.5?` · 추정 ${won(Math.round(st.imp[i]))} 포함`:'';
+  const dayLab=st.dImp[di]>0.5?' (입고일 · 판매 추정)':st.dEst[di]?' (기록 사이 평균)':'';
   const kpis=`<div class="flowKpis k4">
-    ${card(`${fmtMDfull(st.to)} 하루 감소${st.dEst[di]?' (추정)':''}`,won(Math.round(lastDay)),`직전 7일 하루 평균 ${won(Math.round(prev7Avg))}`,c1)}
-    ${card(`이번 주 ${range(st.weeks[L],st.wDays[L])}${st.partialLast?` · ${st.wDays[L]}일`:''}`,`${won(Math.round(st.drop[L]))}`,`하루 평균 ${won(Math.round(thisAvg))} · 지난주 하루 ${won(Math.round(lastAvg))}`,c2)}
-    ${card(`지난주 ${range(st.weeks[L-1])}`,won(Math.round(st.drop[L-1]||0)),`하루 평균 ${won(Math.round(lastAvg))} · 전주 하루 ${won(Math.round(prev2Avg))}`,c3)}
-    ${card('최근 4주 주평균',won(Math.round(cmp.recent)),`직전 4주 ${won(Math.round(cmp.prev))}`,c4)}
+    ${card(`${fmtMDfull(st.to)} 하루 감소${dayLab}`,won(Math.round(lastDay)),`직전 7일 하루 평균 ${won(Math.round(prev7Avg))}`,[['7일 평균 대비',flowChg(lastDay,prev7Avg)]])}
+    ${card(`이번 주 ${range(st.weeks[L],st.wDays[L])}${st.partialLast?` · ${st.wDays[L]}일`:''}`,`${won(Math.round(st.tot[L]))}`,`하루 평균 ${won(Math.round(thisAvg))}${impNote(L)}`,[['전주',flowChg(thisAvg,lastAvg)],['4주 평균',flowChg(thisAvg,avg4(L))]])}
+    ${card(`지난주 ${range(st.weeks[L-1])}`,won(Math.round(st.tot[L-1]||0)),`하루 평균 ${won(Math.round(lastAvg))}${impNote(L-1)}`,[['전주',flowChg(lastAvg,prev2Avg)],['4주 평균',flowChg(lastAvg,avg4(L-1))]])}
+    ${card('최근 4주 주평균',won(Math.round(cmp.recent)),`직전 4주 주평균 ${won(Math.round(cmp.prev))}`,[['직전 4주',flowChg(cmp.recent,cmp.prev,cmp.prev/7)]])}
   </div>`;
   const rows=[]; for(let i=L;i>=Math.max(0,L-5);i--){
-    const ch=flowChg(wAvg(i),wAvg(i-1));
-    rows.push(`<tr${i===L?' class="cur"':''}><td>${range(st.weeks[i],st.wDays[i])}${i===L&&st.partialLast?` <span class="flowMut">(${st.wDays[i]}일)</span>`:''}</td><td><b>${won(Math.round(st.drop[i]))}</b></td><td>${won(Math.round(wAvg(i)))}</td><td class="fc ${i>0?ch.cls:''}">${i>0?ch.txt:'-'}</td><td>${st.restock[i]>0?won(Math.round(st.restock[i])):'-'}</td><td>${st.level[i]!=null?won(Math.round(st.level[i])):'-'}</td></tr>`);
+    const ch=flowChg(wAvg(i),wAvg(i-1)), c4=flowChg(wAvg(i),avg4(i));
+    const weak=st.wRec[i]===0;
+    rows.push(`<tr class="${i===L?'cur':''}${weak?' weak':''}"><td>${range(st.weeks[i],st.wDays[i])}${i===L&&st.partialLast?` <span class="flowMut">(${st.wDays[i]}일)</span>`:''}</td>
+      <td class="${weak?'fc low':''}">${st.wRec[i]}일</td><td><b>${won(Math.round(st.tot[i]))}</b></td><td class="flowMut">${st.imp[i]>0.5?won(Math.round(st.imp[i])):'-'}</td><td>${won(Math.round(wAvg(i)))}</td>
+      <td class="fc ${i>0?ch.cls:''}">${i>0?ch.txt:'-'}</td><td class="fc ${c4.cls}">${i>0?c4.txt:'-'}</td><td>${st.restock[i]>0.5?'📦 '+won(Math.round(st.restock[i])):'-'}</td><td>${st.level[i]!=null?won(Math.round(st.level[i])):'-'}</td></tr>`);
   }
-  const table=`<table class="flowTbl flowWk"><thead><tr><th>주(월~일)</th><th>재고 감소</th><th>하루 평균</th><th>전주 대비<br><span>하루 평균 기준</span></th><th>입고</th><th>주말 재고</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+  const table=`<table class="flowTbl flowWk"><thead><tr><th>주(월~일)</th><th>재고<br><span>기록</span></th><th>재고 감소<br><span>추정 포함</span></th><th>그중<br><span>추정</span></th><th>하루 평균</th><th>전주 대비</th><th>4주 평균<br><span>대비</span></th><th>입고</th><th>주말 재고</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
   return {kpis,table,thisAvg,lastAvg,wDir};
 }
 window.flowStockView=function(v){ FLOW_STOCK_VIEW=v; renderFlowBoard(); };
@@ -9754,23 +9767,23 @@ window.flowExportExcel=function(){
       mon.push([g.nm,'전체',...sm.total.map(r0),r0(sm.total.reduce((a,b)=>a+b,0)),r0(sc.avg),r0(sc.avg/FLOW_WPM),sc.dir.t,pct(sc.dir.p)]);
     }
     if(st){
-      st.weeks.forEach((w,i)=>{ const d=st.wDays[i]||7, avg=st.drop[i]/d, pv=i>0?st.drop[i-1]/(st.wDays[i-1]||7):null;
-        wk.push([g.nm,fmtDate(w),fmtDate(flowAddDays(w,d-1)),d,r0(st.drop[i]),r0(avg),pv>0?pct(avg/pv-1):'',r0(st.restock[i]),r0(st.level[i])]); });
-      st.days.forEach((d,i)=>{ dy.push([g.nm,fmtDate(d),r0(st.dDrop[i]),r0(st.dRestock[i]),r0(st.dLevel[i]),st.dEst[i]?'기록 사이 평균':'']); });
+      st.weeks.forEach((w,i)=>{ const d=st.wDays[i]||7, avg=st.tot[i]/d, pv=i>0?st.tot[i-1]/(st.wDays[i-1]||7):null;
+        wk.push([g.nm,fmtDate(w),fmtDate(flowAddDays(w,d-1)),d,st.wRec[i],r0(st.tot[i]),r0(st.drop[i]),r0(st.imp[i]),r0(avg),pv>0?pct(avg/pv-1):'',r0(st.restock[i]),r0(st.level[i])]); });
+      st.days.forEach((d,i)=>{ dy.push([g.nm,fmtDate(d),r0(st.dTot[i]),r0(st.dDrop[i]),r0(st.dImp[i]),r0(st.dRestock[i]),r0(st.dLevel[i]),[st.dEst[i]?'기록 사이 평균':'',st.dImp[i]>0.5?'입고일 판매 추정':''].filter(Boolean).join(' · ')]); });
     }
   });
   const ml=months.map(flowMonLabel), last=ml[ml.length-1]||'최근월';
   const H1=['품목','3개월 출고',...chs.map(c=>c.label+' 3개월'),'매출 월평균',`매출 ${last}`,'매출 흐름',`매출 증감률 %(${last} vs 평균)`,
     '재고 감소 직전4주 주평균','재고 감소 최근4주 주평균','재고 흐름','재고 증감률 %(4주)','지난주 하루 평균 감소','이번 주 하루 평균 감소','전주 대비','전주 대비 증감률 %'];
   const H2=['품목','판매처',...ml,'3개월 합계','월평균','주 환산(월평균÷4.35)','흐름',`증감률 %(${last} vs 평균)`];
-  const H3=['품목','주 시작(월)','주 끝','일수','재고 감소','하루 평균','전주 대비 증감률 %(하루 평균)','입고(재고 증가)','주말 재고'];
-  const H4=['품목','날짜','재고 감소','입고(재고 증가)','재고(기록일)','비고'];
+  const H3=['품목','주 시작(월)','주 끝','일수','재고 기록 일수','재고 감소(추정 포함)','실측 감소','입고 구간 판매 추정','하루 평균','전주 대비 증감률 %(하루 평균)','입고','주말 재고'];
+  const H4=['품목','날짜','재고 감소(추정 포함)','실측 감소','입고일 판매 추정','입고','재고(기록일)','비고'];
   const sheet=(head,rows,widths)=>{ const ws=XLSX.utils.aoa_to_sheet([head,...rows]); ws['!cols']=widths.map(w=>({wch:w})); ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rows.length,c:head.length-1}})}; return ws; };
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,sheet(H1,sum,[34,11,...chs.map(()=>11),11,11,8,12,14,14,8,12,14,14,8,12]),'요약');
   XLSX.utils.book_append_sheet(wb,sheet(H2,mon,[34,12,...ml.map(()=>10),11,10,14,8,14]),'판매처별 월 출고');
-  XLSX.utils.book_append_sheet(wb,sheet(H3,wk,[34,12,12,6,11,10,16,13,11]),'주별 재고 감소');
-  XLSX.utils.book_append_sheet(wb,sheet(H4,dy,[34,12,11,13,11,14]),'일별 재고 감소(28일)');
+  XLSX.utils.book_append_sheet(wb,sheet(H3,wk,[34,12,12,6,10,14,11,14,10,16,11,11]),'주별 재고 감소');
+  XLSX.utils.book_append_sheet(wb,sheet(H4,dy,[34,12,14,11,13,11,11,22]),'일별 재고 감소(28일)');
   XLSX.writeFile(wb,`터블_3개월판매흐름_${fmtDate(NOW)}.xlsx`);
   toast('3개월 판매 흐름 엑셀을 내려받았습니다');
 };
@@ -9826,7 +9839,9 @@ function flowBoardHtml(){
         ${st?`${stockNote}
         <div class="flowSeg"><button type="button" class="${FLOW_STOCK_VIEW==='day'?'on':''}" onclick="flowStockView('day')">일별 · 최근 ${FLOW_DAYS}일</button><button type="button" class="${FLOW_STOCK_VIEW==='week'?'on':''}" onclick="flowStockView('week')">주별 · 최근 ${FLOW_WEEKS}주</button></div>
         <div class="flowChart"><canvas id="flowStockChart"></canvas></div>${sd.table}
-        <div class="flowNote">감소량 = 앞 기록 대비 재고가 줄어든 양(출고 추정). 기록이 며칠 비면 그 사이 감소를 일수로 나눠 채우고 일별 막대를 옅게 표시합니다. 재고가 늘어난 구간(입고)·비정상 기록 구간은 출고를 알 수 없어 뺐고, 공구·특판 대량 출고는 그대로 들어갑니다. 주는 월~일 기준입니다.</div>`:'<div class="flowEmpty">데일리 재고 이력 없음</div>'}</div>
+        <div class="flowNote"><b>재고 감소</b> = 앞 기록 대비 재고가 줄어든 양(출고 추정). 기록이 며칠 비면 그 사이 감소를 일수로 나눠 채웁니다(조금 옅은 막대).
+          <b>입고가 낀 구간</b>은 판매가 재고 증가에 가려지므로 앞뒤 3주 정상 구간의 하루 평균으로 판매를 추정해 <b>가장 옅은 막대</b>로 쌓았고, 입고량 = 재고 증가 + 추정 판매입니다(📦). 공구·특판 대량 출고는 실측에 그대로 들어가지만 추정 기준에서는 뺍니다.
+          재고 기록이 없는 주는 흐리게, 기준 하루 평균이 ${FLOW_LOWBASE}개 미만인 % 는 참고용으로 흐리게 표시합니다. 주는 월~일 기준입니다.</div>`:'<div class="flowEmpty">데일리 재고 이력 없음</div>'}</div>
     </div>
     <div class="flowCard"><div class="flowH">전체 품목 흐름 <span>행을 누르면 위 차트가 그 품목으로 바뀝니다</span></div>
       <div class="flowOvWrap"><table class="flowTbl flowOv"><thead><tr><th>품목</th><th>3개월 출고</th><th>판매처 구성<br><span>${FLOW_CH.filter(c=>c.key!=='etc').map(c=>`<i class="flowDot" style="background:${c.color}"></i>${c.label}`).join(' ')}</span></th><th>매출 월평균 → ${lastMon}</th><th>매출 흐름</th><th>재고 감소 주평균<br><span>직전 4주 → 최근 4주</span></th><th>재고 흐름</th></tr></thead><tbody>${ovRows}</tbody></table></div></div>`;
@@ -9839,23 +9854,29 @@ function flowDrawCharts(){
       datasets:FLOW_CH.filter(c=>sm.byCh[c.key].some(v=>v>0)).map(c=>({label:c.label,data:sm.byCh[c.key].map(Math.round),backgroundColor:c.color}))},
     options:{plugins:{legend:{position:'bottom'},tooltip:{mode:'index',intersect:false,callbacks:{footer:items=>'합계 '+won(items.reduce((a,x)=>a+(x.raw||0),0))}}},
       scales:{x:{grid:{display:false}},y:{ticks:{callback:v=>won(v)}}}}});
+  // [v115] 판매(감소)가 주인공 — 실측은 진한 주황, 입고 구간 추정은 옅은 주황(같은 막대에 쌓음). 입고는 막대 대신 📦 표시.
+  const IMP_BG='rgba(224,138,43,.28)', SOLID='#e08a2b', SOLID_GAP='rgba(224,138,43,.62)';
+  const restockTip=(arr,i)=>arr[i]>0.5?`📦 입고 ${won(Math.round(arr[i]))}`:'';
+  const scalesOf=(ylab)=>({x:{stacked:true,grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:14}},
+    y:{stacked:true,position:'left',title:{display:true,text:ylab},ticks:{callback:v=>won(v)}},
+    y2:{position:'right',grid:{display:false},title:{display:true,text:'재고'},ticks:{callback:v=>won(v)}}});
   if(st&&FLOW_STOCK_VIEW==='day') makeChart('flowStockChart',{type:'bar',
-    data:{labels:st.days.map(d=>`${d.getMonth()+1}/${d.getDate()}`),
+    data:{labels:st.days.map((d,i)=>`${d.getMonth()+1}/${d.getDate()}${st.dRestock[i]>0.5?' 📦':''}`),
       datasets:[
-        {type:'line',label:'재고',data:st.dLevel.map(v=>v==null?null:Math.round(v)),borderColor:'#1E2761',backgroundColor:'#1E2761',yAxisID:'y2',spanGaps:true,order:0},
-        {label:'하루 재고 감소',data:st.dDrop.map(Math.round),backgroundColor:st.dEst.map(e=>e?'rgba(224,138,43,.38)':'#e08a2b'),yAxisID:'y',order:1},
-        {label:'입고(재고 증가)',data:st.dRestock.map(Math.round),backgroundColor:'#c8d3ea',yAxisID:'y',order:2},
-        {type:'line',label:'7일 평균 감소',data:st.dDrop.map((v,i,a)=>{ const s=a.slice(Math.max(0,i-6),i+1); return Math.round(s.reduce((x,y)=>x+y,0)/s.length); }),borderColor:'#c0392b',borderDash:[4,3],borderWidth:1.5,pointRadius:0,yAxisID:'y',order:0}]},
-    options:{plugins:{legend:{position:'bottom'},tooltip:{mode:'index',intersect:false,callbacks:{afterTitle:items=>{ const i=items[0]&&items[0].dataIndex; return i!=null&&st.dEst[i]?'기록 사이 평균으로 채운 값':''; }}}},
-      scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:14}},y:{position:'left',title:{display:true,text:'하루 수량'},ticks:{callback:v=>won(v)}},y2:{position:'right',grid:{display:false},title:{display:true,text:'재고'},ticks:{callback:v=>won(v)}}}}});
+        {type:'line',label:'재고(기록일)',data:st.dLevel.map(v=>v==null?null:Math.round(v)),borderColor:'#1E2761',backgroundColor:'#1E2761',tension:0,spanGaps:true,yAxisID:'y2',order:0},
+        {type:'line',label:'7일 평균 감소',data:st.dTot.map((v,i,a)=>{ const s=a.slice(Math.max(0,i-6),i+1); return Math.round(s.reduce((x,y)=>x+y,0)/s.length); }),borderColor:'#c0392b',borderDash:[4,3],borderWidth:1.5,pointRadius:0,tension:0,yAxisID:'y',stack:'avg',order:0},
+        {label:'하루 재고 감소',data:st.dDrop.map(Math.round),backgroundColor:st.dEst.map(e=>e?SOLID_GAP:SOLID),yAxisID:'y',stack:'s',order:1},
+        {label:'입고일 판매 추정',data:st.dImp.map(Math.round),backgroundColor:IMP_BG,borderColor:SOLID,borderWidth:{top:1,left:0,right:0,bottom:0},yAxisID:'y',stack:'s',order:1}]},
+    options:{plugins:{legend:{position:'bottom'},tooltip:{mode:'index',intersect:false,callbacks:{afterTitle:items=>{ const i=items[0]&&items[0].dataIndex; if(i==null) return ''; return [st.dEst[i]?'기록 사이 평균으로 나눈 값':'',restockTip(st.dRestock,i)].filter(Boolean).join('\n'); }}}},
+      scales:scalesOf('하루 수량')}});
   else if(st) makeChart('flowStockChart',{type:'bar',
-    data:{labels:st.weeks.map((w,i)=>flowWeekLabel(w)+(i===st.weeks.length-1&&st.partialLast?'*':'')),
+    data:{labels:st.weeks.map((w,i)=>flowWeekLabel(w)+(i===st.weeks.length-1&&st.partialLast?'*':'')+(st.restock[i]>0.5?' 📦':'')),
       datasets:[
-        {type:'line',label:'주말 재고',data:st.level.map(v=>v==null?null:Math.round(v)),borderColor:'#1E2761',backgroundColor:'#1E2761',yAxisID:'y2',spanGaps:true,order:0},
-        {label:'재고 감소(출고 추정)',data:st.drop.map(Math.round),backgroundColor:'#e08a2b',yAxisID:'y',order:1},
-        {label:'입고(재고 증가)',data:st.restock.map(Math.round),backgroundColor:'#c8d3ea',yAxisID:'y',order:2}]},
-    options:{plugins:{legend:{position:'bottom'},tooltip:{mode:'index',intersect:false}},
-      scales:{x:{grid:{display:false}},y:{position:'left',title:{display:true,text:'주간 수량'},ticks:{callback:v=>won(v)}},y2:{position:'right',grid:{display:false},title:{display:true,text:'재고'},ticks:{callback:v=>won(v)}}}}});
+        {type:'line',label:'주말 재고',data:st.level.map(v=>v==null?null:Math.round(v)),borderColor:'#1E2761',backgroundColor:'#1E2761',tension:0,spanGaps:false,yAxisID:'y2',order:0},
+        {label:'재고 감소(실측)',data:st.drop.map(Math.round),backgroundColor:st.wRec.map(n=>n<=1?SOLID_GAP:SOLID),yAxisID:'y',stack:'s',order:1},
+        {label:'입고 구간 판매 추정',data:st.imp.map(Math.round),backgroundColor:IMP_BG,borderColor:SOLID,borderWidth:{top:1,left:0,right:0,bottom:0},yAxisID:'y',stack:'s',order:1}]},
+    options:{plugins:{legend:{position:'bottom'},tooltip:{mode:'index',intersect:false,callbacks:{afterTitle:items=>{ const i=items[0]&&items[0].dataIndex; if(i==null) return ''; return [`재고 기록 ${st.wRec[i]}일`,restockTip(st.restock,i)].filter(Boolean).join('\n'); },footer:items=>{ const i=items[0]&&items[0].dataIndex; return i==null?'':'합계 '+won(Math.round(st.tot[i])); }}}},
+      scales:scalesOf('주간 수량')}});
 }
 function renderFlowBoard(){
   const body=document.getElementById('flowBody'); if(!body) return;
