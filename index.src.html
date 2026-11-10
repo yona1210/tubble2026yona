@@ -4434,7 +4434,10 @@ function dailyStockVelocity(s,simStock){
   const recent=events.filter(e=>((NOW-e.to)/86400000)<=28);
   const use=recent.length?recent:events;
   const totalDiff=use.reduce((a,e)=>a+e.diff,0);
-  const totalDays=use.reduce((a,e)=>a+e.days,0)||1;
+  // [v121] 재고 변동 없는 정상 구간(출고 0으로 측정됨)도 일수에 넣는다 — 빼면 띄엄띄엄 나가는 품목의 속도가 부풀려진다
+  //   (아쿠아 블루 6개입: 4주 중 한 주 860개 → 감소한 며칠로만 나눠 하루 144개·월 4,368 → 지금 발주 12,915개로 오판). v102 공구 계산과 같은 원칙.
+  const useFlats=recent.length?flats.filter(e=>((NOW-e.to)/86400000)<=28):flats;
+  const totalDays=(use.reduce((a,e)=>a+e.days,0)+useFlats.reduce((a,e)=>a+e.days,0))||1;
   const daily=totalDiff/totalDays;
   const latest=events[events.length-1];
   let tier='insufficient';
