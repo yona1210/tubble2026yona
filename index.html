@@ -525,6 +525,10 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .flowFold>summary::before{content:"▸ ";color:#9aa3bd}
 .flowFold[open]>summary::before{content:"▾ "}
 .flowFold[open]>summary{margin-bottom:8px}
+.flowSub{font-size:11px;font-weight:700;color:#5b6684;margin:2px 0 4px}
+.flowDay th,.flowDay td{white-space:nowrap;text-align:right}
+.flowDay thead th{color:#fff;font-size:10.5px}
+.flowDay sup{color:#b5541a;font-size:9px;margin-left:1px}
 .flowLegend{font-size:11px;color:#4a5470;line-height:1.9;background:#f6f8fc;border-radius:6px;padding:6px 10px;margin:2px 0 6px}
 .flowLegend .lg{display:inline-block;padding:0 6px;border-radius:4px;font-size:10.5px;margin-left:8px}
 .flowLegend .lg:first-child{margin-left:0}
@@ -9841,7 +9845,7 @@ window.flowExportExcel=function(){
 //  ① 주간 출고 차트 + 지난주 핵심 숫자 ② 품목 × 주차 표 ③ 판매처별 월 출고는 접어 둔 참고 자료.
 //  비교는 다 채워진 주끼리만 한다(이번 주가 하루치뿐이어도 ▼69% 같은 오해가 없게). 용어는 '주간 출고'로 통일.
 const FLOW_MX_WEEKS=8;
-let FLOW_CH_OPEN=false;
+
 function flowWeekCmp(st){
   const L=st.tot.length-1, done=st.partialLast?L-1:L;
   const last=st.tot[done]||0, prev=done>0?st.tot[done-1]:0;
@@ -9857,6 +9861,9 @@ function flowSpikes(st){
   const med=v.length?v[Math.floor(v.length/2)]:0;
   return st.tot.map((t,i)=>i<=done&&med>0&&t>=med*2.5&&t-med>=200);
 }
+// 최근 n일 중 평일 인덱스(st.days 기준)
+function flowWeekdayIdx(st,n){ const r=[]; for(let i=st.days.length-1;i>=0&&r.length<n;i--){ const g=st.days[i].getDay(); if(g>=1&&g<=5) r.unshift(i); } return r; }
+const flowDayLabel=d=>`${d.getMonth()+1}/${d.getDate()}(${'일월화수목금토'[d.getDay()]})`;
 function flowSpark(st,from,to){
   const vals=st.tot.slice(from,(to==null?st.tot.length-1:to)+1), mx=Math.max(1,...vals);
   return `<span class="flowSpark">${vals.map(v=>`<i style="height:${Math.max(4,Math.round(v/mx*100))}%"></i>`).join("")}</span>`;
@@ -9882,10 +9889,18 @@ function flowBoardHtml(){
     ${kpi('4주 평균 대비',c.chg4.txt,`직전 4주 평균 ${won(Math.round(c.avg4))}개/주`,c.chg4)}
   </div>`;
   const sumLine=`<div class="flowSum"><b>${pEsc(selName)}</b> · 지난주(${flowRange(st.weeks[c.done])}) <b>${won(Math.round(c.last))}개</b> 출고 — 전주 대비 <b class="fc ${c.chgPrev.cls}">${c.chgPrev.txt}</b>, 최근 4주 평균 대비 <b class="fc ${c.chg4.cls}">${c.chg4.txt}</b></div>`;
+  // [v119] 최근 10영업일 하루 출고 숫자 — 차트만으로는 수량이 안 읽힌다는 요청
+  const di=flowWeekdayIdx(st,10), dsum=di.reduce((a,i)=>a+st.dTot[i],0);
+  const dayTbl=`<div class="flowOvWrap"><table class="flowTbl flowDay"><thead><tr><th>최근 10영업일</th>${di.map(i=>`<th>${flowDayLabel(st.days[i])}</th>`).join('')}<th>평균</th></tr></thead>
+    <tbody><tr><td>하루 출고</td>${di.map(i=>`<td>${st.dTot[i]>=0.5?won(Math.round(st.dTot[i])):'-'}${st.dEst[i]?'<sup title="재고 기록이 비어 그 사이 감소를 평일에 나눈 값">*</sup>':''}</td>`).join('')}<td><b>${won(Math.round(dsum/(di.length||1)))}</b></td></tr></tbody></table></div>
+    <div class="flowNote">* 표시는 재고 기록이 비어 있던 날이라 앞뒤 기록 사이 감소량을 평일 수로 나눈 값입니다.</div>`;
   const chartCard=`<div class="flowCard"><div class="flowH">주간 출고 추이 <span>${pEsc(selName)} · 최근 ${FLOW_WEEKS}주 · 🔶 평소 주의 2.5배 이상(공구·특판 등 대량 출고) · 다 끝난 주만 표시</span></div>
     ${kpis}
-    <div class="flowSeg"><button type="button" class="${FLOW_STOCK_VIEW!=='day'?'on':''}" onclick="flowStockView('week')">주별</button><button type="button" class="${FLOW_STOCK_VIEW==='day'?'on':''}" onclick="flowStockView('day')">일별 · 최근 ${FLOW_DAYS}일</button></div>
-    <div class="flowChart"><canvas id="flowStockChart"></canvas></div></div>`;
+    <div class="flowGrid">
+      <div><div class="flowSub">주별 출고 · 최근 ${FLOW_WEEKS}주</div><div class="flowChart"><canvas id="flowStockChart"></canvas></div></div>
+      <div><div class="flowSub">일별 출고 · 최근 ${FLOW_DAYS}일 중 평일</div><div class="flowChart"><canvas id="flowDayChart"></canvas></div></div>
+    </div>
+    ${dayTbl}</div>`;
   // ② 품목 × 주차 표 (다 끝난 주만, 최근 8주 — 진행 중인 주는 하루치뿐이라 헷갈리므로 뺀다)
   const D=flowWeekCmp(stAll).done, from=Math.max(0,D-FLOW_MX_WEEKS+1);
   const wIdx=[]; for(let i=from;i<=D;i++) wIdx.push(i);
@@ -9916,7 +9931,7 @@ function flowBoardHtml(){
       ${rs.map(r=>`<tr><td><i class="flowDot" style="background:${r.ch.color}"></i>${r.ch.label}</td>${r.arr.map(v=>`<td>${won(Math.round(v))}</td>`).join('')}<td><b>${won(Math.round(r.cmp.avg))}</b></td><td>${(r.sum/grand*100).toFixed(0)}%</td><td class="${r.cmp.dir.c}">${r.cmp.dir.t}${flowPct(r.cmp.dir.p)}</td></tr>`).join('')}
       <tr class="sum"><td>전체</td>${sm.total.map(v=>`<td>${won(Math.round(v))}</td>`).join('')}<td><b>${won(Math.round(salesCmp.avg))}</b></td><td>100%</td><td class="${salesCmp.dir.c}">${salesCmp.dir.t}${flowPct(salesCmp.dir.p)}</td></tr></tbody></table></div></div>`;
   }
-  const chCard=`<details class="flowCard flowFold"${FLOW_CH_OPEN?' open':''} ontoggle="FLOW_CH_OPEN=this.open;if(this.open)flowDrawSales()"><summary class="flowH">판매처별 월 출고 (참고) <span>${pEsc(selName)} · 매출 데이터 ${sm?`${flowMonLabel(sm.months[0])}~${flowMonLabel(sm.months[sm.months.length-1])}`:''} · 월말 일괄 기록이라 주 단위 판매처 구분은 불가</span></summary>${chPart}</details>`;
+  const chCard=`<div class="flowCard"><div class="flowH">판매처별 월 출고 <span>${pEsc(selName)} · 매출 데이터 ${sm?`${flowMonLabel(sm.months[0])}~${flowMonLabel(sm.months[sm.months.length-1])}`:''} · 월말 일괄 기록이라 주 단위 판매처 구분은 불가</span></div>${chPart}</div>`;
   return top+sumLine+chartCard+mx+chCard;
 }
 function flowDrawSales(){
@@ -9929,20 +9944,19 @@ function flowDrawSales(){
       scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,ticks:{callback:v=>won(v)}}}}});
 }
 function flowDrawCharts(){
-  if(FLOW_CH_OPEN) flowDrawSales();
+  flowDrawSales();
   const names=FLOW_SEL==='__ALL__'?flowItems().map(s=>s.nm):[FLOW_SEL];
   let st=flowStockWeekly(names); if(!st) return;
   const SOLID='#e08a2b', PART='rgba(224,138,43,.35)', SPK='#c0392b';
-  if(FLOW_STOCK_VIEW==='day'){
-    makeChart('flowStockChart',{type:'bar',
-      data:{labels:st.days.map(d=>`${d.getMonth()+1}/${d.getDate()}`),
-        datasets:[
-          {type:'line',label:'7일 평균',data:st.dTot.map((v,i,a)=>{ const s=a.slice(Math.max(0,i-6),i+1); return Math.round(s.reduce((x,y)=>x+y,0)/s.length); }),borderColor:'#1E2761',borderWidth:1.5,pointRadius:0,tension:0,order:0},
-          {label:'하루 출고',data:st.dTot.map(Math.round),backgroundColor:SOLID,order:1}]},
-      options:{plugins:{legend:{position:'bottom'},tooltip:{mode:'index',intersect:false}},
-        scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:14}},y:{title:{display:true,text:'하루 출고(개)'},ticks:{callback:v=>won(v)}}}}});
-    return;
-  }
+  // [v119] 일별 — 평일만(주말은 출고가 없어 0으로 비어 보이므로 뺀다), 5영업일 평균선
+  const wd=flowWeekdayIdx(st,FLOW_DAYS), dv=wd.map(i=>st.dTot[i]);
+  makeChart('flowDayChart',{type:'bar',
+    data:{labels:wd.map(i=>flowDayLabel(st.days[i])),
+      datasets:[
+        {type:'line',label:'5영업일 평균',data:dv.map((v,k,a)=>{ const s=a.slice(Math.max(0,k-4),k+1); return Math.round(s.reduce((x,y)=>x+y,0)/s.length); }),borderColor:'#1E2761',borderWidth:1.5,borderDash:[4,3],pointRadius:0,tension:0,order:0},
+        {label:'하루 출고',data:dv.map(Math.round),backgroundColor:SOLID,order:1}]},
+    options:{plugins:{legend:{position:'bottom'},tooltip:{mode:'index',intersect:false}},
+      scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:10,font:{size:10}}},y:{title:{display:true,text:'하루 출고(개)'},ticks:{callback:v=>won(v)}}}}});
   // 다 끝난 주만 그린다(진행 중인 주는 하루치뿐이라 막대가 뚝 떨어져 보여 오해를 산다)
   const D=flowWeekCmp(st).done, sp=flowSpikes(st).slice(0,D+1);
   st=Object.assign({},st,{weeks:st.weeks.slice(0,D+1),tot:st.tot.slice(0,D+1),wDays:st.wDays.slice(0,D+1),partialLast:0});
