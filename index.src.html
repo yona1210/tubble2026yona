@@ -503,7 +503,7 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .flowOv td.nm{font-weight:700;color:#222;white-space:nowrap}
 .flowMix{display:flex;height:10px;width:150px;border-radius:5px;overflow:hidden;background:#eef0f4;margin-left:auto}
 .flowMix i{display:block;height:100%}
-.wkKs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:2px 0 10px}
+.wkKs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:2px 0 10px}
 .wkK{border:1px solid #e3e8f3;background:#fbfcfe;border-radius:8px;padding:8px 12px}
 .wkK span{display:block;font-size:11px;font-weight:700;color:#5b6684}
 .wkK b{display:block;font-size:22px;font-weight:800;color:var(--navy);margin:3px 0 1px;font-variant-numeric:tabular-nums}
@@ -511,6 +511,8 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .wkK em{display:block;font-style:normal;font-size:10.5px;color:var(--mut)}
 .flowMx th,.flowMx td{white-space:nowrap}
 .flowMx th{line-height:1.3}
+.flowMx thead th{color:#fff;font-weight:700;font-size:11px}
+.flowMx thead th span{color:#c9d0ea}
 .flowMx td.nm{position:sticky;left:0;background:#fff;z-index:1;max-width:260px;overflow:hidden;text-overflow:ellipsis}
 .flowMx tr.sum td.nm{background:#f6f8fc}
 .flowMx th.part,.flowMx td.part{color:#a7afc2;background:#fafbfd}
@@ -528,7 +530,7 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .flowLegend .lg:first-child{margin-left:0}
 .flowLegend .lg.spk{background:#fff3e6;color:#b5541a;font-weight:700}
 .flowLegend .lg.part{background:#fafbfd;color:#a7afc2;border:1px solid #e3e8f3}
-@media (max-width:760px){.wkKs{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:760px){.wkKs{grid-template-columns:1fr}}
 .incBox{background:#fff;border:1px solid #dfe5f2;border-left:3px solid #27ae60;border-radius:8px;padding:10px 12px;margin:10px 0 12px}
 .incTitle{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11.5px;font-weight:800;color:var(--navy);margin-bottom:7px}
 .incTitle small{font-weight:500;color:var(--mut);font-size:10px;margin-left:4px}
@@ -9802,12 +9804,12 @@ window.flowExportExcel=function(){
   // [v117] 미팅용 — 품목 × 주차 주간 출고(최근 13주) · 비교는 다 채워진 지난주 기준
   const stA=flowStockWeekly(items.map(x=>x.s.nm));
   if(stA){
-    const LA=stA.tot.length-1;
-    const H0=['품목',...stA.weeks.map((w,i)=>`${fmtMDfull(w)}~${fmtMDfull(flowAddDays(w,6))}${stA.partialLast&&i===LA?` (진행 중 ${stA.wDays[i]}일)`:''}`),'지난주 출고','전주 대비 %','최근 4주 평균','4주 평균 대비 %','대량 출고 주(평소 2.5배 이상)'];
+    const DA=flowWeekCmp(stA).done, wkA=stA.weeks.slice(0,DA+1);   // 다 끝난 주만
+    const H0=['품목',...wkA.map(w=>`${fmtMDfull(w)}~${fmtMDfull(flowAddDays(w,6))}`),'지난주 출고','전주 대비 %','최근 4주 평균','4주 평균 대비 %','대량 출고 주(평소 2.5배 이상)'];
     const mxRow=(nm,s2)=>{ const cc=flowWeekCmp(s2), sp=flowSpikes(s2);
-      return [nm,...s2.tot.map(r0),r0(cc.last),cc.prev>0?pct(cc.last/cc.prev-1):'',r0(cc.avg4),cc.avg4>0?pct(cc.last/cc.avg4-1):'',s2.weeks.filter((w,i)=>sp[i]).map(w=>fmtMDfull(w)+'주').join(', ')]; };
+      return [nm,...s2.tot.slice(0,DA+1).map(r0),r0(cc.last),cc.prev>0?pct(cc.last/cc.prev-1):'',r0(cc.avg4),cc.avg4>0?pct(cc.last/cc.avg4-1):'',s2.weeks.filter((w,i)=>i<=DA&&sp[i]).map(w=>fmtMDfull(w)+'주').join(', ')]; };
     const mxRows=[mxRow('전체 합계',stA)].concat(items.filter(x=>x.st).map(x=>({nm:x.s.nm,st:x.st,c:flowWeekCmp(x.st)})).sort((a,b)=>b.c.last-a.c.last).map(x=>mxRow(x.nm,x.st)));
-    XLSX.utils.book_append_sheet(wb,sheet(H0,mxRows,[34,...stA.weeks.map(()=>12),11,11,11,13,22]),'품목별 주간 출고');
+    XLSX.utils.book_append_sheet(wb,sheet(H0,mxRows,[34,...wkA.map(()=>12),11,11,11,13,22]),'품목별 주간 출고');
   }
   XLSX.utils.book_append_sheet(wb,sheet(H1,sum,[34,11,...chs.map(()=>11),11,11,8,12,14,14,8,12,14,14,8,12]),'요약');
   XLSX.utils.book_append_sheet(wb,sheet(H2,mon,[34,12,...ml.map(()=>10),11,10,14,8,14]),'판매처별 월 출고');
@@ -9836,9 +9838,9 @@ function flowSpikes(st){
   const med=v.length?v[Math.floor(v.length/2)]:0;
   return st.tot.map((t,i)=>i<=done&&med>0&&t>=med*2.5&&t-med>=200);
 }
-function flowSpark(st,from){
-  const vals=st.tot.slice(from), mx=Math.max(1,...vals);
-  return `<span class="flowSpark">${vals.map((v,i)=>`<i class="${st.partialLast&&from+i===st.tot.length-1?'part':''}" style="height:${Math.max(4,Math.round(v/mx*100))}%"></i>`).join('')}</span>`;
+function flowSpark(st,from,to){
+  const vals=st.tot.slice(from,(to==null?st.tot.length-1:to)+1), mx=Math.max(1,...vals);
+  return `<span class="flowSpark">${vals.map(v=>`<i style="height:${Math.max(4,Math.round(v/mx*100))}%"></i>`).join("")}</span>`;
 }
 function flowBoardHtml(){
   const items=flowItems().map(flowItemSummary);
@@ -9859,29 +9861,27 @@ function flowBoardHtml(){
     ${kpi(`지난주 출고 · ${flowRange(st.weeks[c.done])}`,`${won(Math.round(c.last))}개`,`하루 평균 ${won(Math.round(c.last/7))}개`)}
     ${kpi('전주 대비',c.chgPrev.txt,`그 전주 ${won(Math.round(c.prev))}개`,c.chgPrev)}
     ${kpi('최근 4주 평균 대비',c.chg4.txt,`4주 평균 ${won(Math.round(c.avg4))}개/주`,c.chg4)}
-    ${st.partialLast?kpi(`이번 주 진행 중 · ${st.wDays[L]}일`,`${won(Math.round(st.tot[L]))}개`,'주가 끝나면 비교에 들어갑니다'):''}
   </div>`;
   const sumLine=`<div class="flowSum"><b>${pEsc(selName)}</b> · 지난주(${flowRange(st.weeks[c.done])}) <b>${won(Math.round(c.last))}개</b> 출고 — 전주 대비 <b class="fc ${c.chgPrev.cls}">${c.chgPrev.txt}</b>, 최근 4주 평균 대비 <b class="fc ${c.chg4.cls}">${c.chg4.txt}</b></div>`;
-  const chartCard=`<div class="flowCard"><div class="flowH">주간 출고 추이 <span>${pEsc(selName)} · 최근 ${FLOW_WEEKS}주 · 🔶 평소 주의 2.5배 이상(공구·특판 등 대량 출고) · 흐린 막대 = 진행 중인 주</span></div>
+  const chartCard=`<div class="flowCard"><div class="flowH">주간 출고 추이 <span>${pEsc(selName)} · 최근 ${FLOW_WEEKS}주 · 🔶 평소 주의 2.5배 이상(공구·특판 등 대량 출고) · 다 끝난 주만 표시</span></div>
     ${kpis}
     <div class="flowSeg"><button type="button" class="${FLOW_STOCK_VIEW!=='day'?'on':''}" onclick="flowStockView('week')">주별</button><button type="button" class="${FLOW_STOCK_VIEW==='day'?'on':''}" onclick="flowStockView('day')">일별 · 최근 ${FLOW_DAYS}일</button></div>
     <div class="flowChart"><canvas id="flowStockChart"></canvas></div></div>`;
-  // ② 품목 × 주차 표 (최근 8주, 마지막 열이 진행 중인 주면 흐리게)
-  const from=Math.max(0,L-FLOW_MX_WEEKS+1);
-  const wIdx=[]; for(let i=from;i<=L;i++) wIdx.push(i);
-  const head=wIdx.map(i=>`<th class="${st.partialLast&&i===L?'part':''}">${fmtMDfull(stAll.weeks[i])}~<br>${fmtMDfull(flowAddDays(stAll.weeks[i],6))}${st.partialLast&&i===L?`<br><span>진행 중 ${stAll.wDays[i]}일</span>`:''}</th>`).join('');
+  // ② 품목 × 주차 표 (다 끝난 주만, 최근 8주 — 진행 중인 주는 하루치뿐이라 헷갈리므로 뺀다)
+  const D=flowWeekCmp(stAll).done, from=Math.max(0,D-FLOW_MX_WEEKS+1);
+  const wIdx=[]; for(let i=from;i<=D;i++) wIdx.push(i);
+  const head=wIdx.map(i=>`<th>${fmtMDfull(stAll.weeks[i])}~<br>${fmtMDfull(flowAddDays(stAll.weeks[i],6))}</th>`).join("");
   const rowOf=(nm,label,s2,cls)=>{
     const cc=flowWeekCmp(s2), sp=flowSpikes(s2);
-    const cells=wIdx.map(i=>{ const v=s2.tot[i]||0, part=s2.partialLast&&i===L;
-      return `<td class="${part?'part':''}${sp[i]?' spk':''}"${sp[i]?' title="평소 주의 2.5배 이상 — 공구·특판 등 대량 출고"':''}>${v>=0.5?won(Math.round(v)):'-'}${sp[i]?' 🔶':''}</td>`; }).join('');
+    const cells=wIdx.map(i=>{ const v=s2.tot[i]||0;
+      return `<td class="${sp[i]?'spk':''}"${sp[i]?' title="평소 주의 2.5배 이상 — 공구·특판 등 대량 출고"':''}>${v>=0.5?won(Math.round(v)):'-'}${sp[i]?' 🔶':''}</td>`; }).join('');
     return `<tr class="${cls||''}${nm===FLOW_SEL?' on':''}" onclick="flowSelect(this.dataset.nm)" data-nm="${pEsc(nm)}"><td class="nm" title="${pEsc(label)}">${pEsc(String(label).replace(/^터블\s+(트루클린\s+)?/,''))}</td>${cells}
-      <td class="fc ${cc.chgPrev.cls}">${cc.chgPrev.txt}</td><td class="fc ${cc.chg4.cls}">${cc.chg4.txt}</td><td>${flowSpark(s2,from)}</td></tr>`;
+      <td class="fc ${cc.chgPrev.cls}">${cc.chgPrev.txt}</td><td class="fc ${cc.chg4.cls}">${cc.chg4.txt}</td><td>${flowSpark(s2,from,D)}</td></tr>`;
   };
   const sum4=s2=>{ const d=flowWeekCmp(s2).done; let t=0; for(let k=d-3;k<=d;k++) if(k>=0) t+=s2.tot[k]; return t; };
   const rows=items.filter(x=>x.st&&wIdx.some(i=>x.st.tot[i]>=0.5)).map(x=>({nm:x.s.nm,st:x.st,sum4:sum4(x.st)})).sort((a,b)=>b.sum4-a.sum4);
   const mx=`<div class="flowCard"><div class="flowH">품목별 주간 출고 <span>최근 ${FLOW_MX_WEEKS}주 · 최근 4주 출고 많은 순 · 행을 누르면 위 차트가 그 품목으로 바뀝니다</span></div>
     <div class="flowLegend"><span class="lg spk">1,234 🔶</span> <b>대량 출고 주</b> — 그 품목의 평소 주간 출고(13주 중간값)보다 2.5배 이상 나간 주입니다. 공구·특판 등 한 번에 크게 나간 출고로 보고, 숫자는 그대로 둡니다.
-      <span class="lg part">123</span> <b>진행 중인 주</b> — 아직 7일이 안 채워져 비교에서 뺍니다.
       <span class="lg"><b class="fc up">▲</b> <b class="fc down">▼</b></span> 지난주가 비교 기준보다 15% 이상 늘었거나(▲ 빨강) 줄었으면(▼ 파랑) 색으로 표시합니다.</div>
     <div class="flowOvWrap"><table class="flowTbl flowOv flowMx"><thead><tr><th>품목</th>${head}<th>전주 대비<br><span>지난주 기준</span></th><th>4주 평균<br><span>대비</span></th><th>흐름</th></tr></thead>
     <tbody>${rowOf('__ALL__','전체 합계',stAll,'sum')}${rows.map(r=>rowOf(r.nm,r.nm,r.st)).join('')}</tbody></table></div>
@@ -9912,7 +9912,7 @@ function flowDrawSales(){
 function flowDrawCharts(){
   if(FLOW_CH_OPEN) flowDrawSales();
   const names=FLOW_SEL==='__ALL__'?flowItems().map(s=>s.nm):[FLOW_SEL];
-  const st=flowStockWeekly(names); if(!st) return;
+  let st=flowStockWeekly(names); if(!st) return;
   const SOLID='#e08a2b', PART='rgba(224,138,43,.35)', SPK='#c0392b';
   if(FLOW_STOCK_VIEW==='day'){
     makeChart('flowStockChart',{type:'bar',
@@ -9924,7 +9924,10 @@ function flowDrawCharts(){
         scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:14}},y:{title:{display:true,text:'하루 출고(개)'},ticks:{callback:v=>won(v)}}}}});
     return;
   }
-  const L=st.tot.length-1, sp=flowSpikes(st);
+  // 다 끝난 주만 그린다(진행 중인 주는 하루치뿐이라 막대가 뚝 떨어져 보여 오해를 산다)
+  const D=flowWeekCmp(st).done, sp=flowSpikes(st).slice(0,D+1);
+  st=Object.assign({},st,{weeks:st.weeks.slice(0,D+1),tot:st.tot.slice(0,D+1),wDays:st.wDays.slice(0,D+1),partialLast:0});
+  const L=D;
   makeChart('flowStockChart',{type:'bar',
     data:{labels:st.weeks.map((w,i)=>`${flowWeekLabel(w)}${st.partialLast&&i===L?` (${st.wDays[i]}일)`:''}${sp[i]?' 🔶':''}`),
       datasets:[
