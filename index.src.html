@@ -532,12 +532,27 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .flowJd td{white-space:nowrap;vertical-align:middle}
 .flowJd thead th{color:#fff}
 .flowJd thead th span{color:#c9d0ea}
-.flowJd td.jd{text-align:left;font-weight:700;white-space:normal;min-width:260px}
-.flowJd tr.jl0 td.jd{color:#c0392b}.flowJd tr.jl1 td.jd{color:#b5541a}.flowJd tr.jl2 td.jd{color:#d35400}.flowJd tr.jl3 td.jd{color:#27ae60}.flowJd tr.jl4 td.jd{color:#9aa1b2;font-weight:400}
-.flowJd tr.jl0 td.nm{box-shadow:inset 3px 0 0 #c0392b}.flowJd tr.jl2 td.nm{box-shadow:inset 3px 0 0 #e67e22}
-.flowJd .spIn{width:80px;text-align:right;padding:4px 6px;border:1px solid #d4dbe8;border-radius:5px;font-size:11.5px}
-.flowJd .spMemo{width:150px;padding:4px 6px;border:1px solid #d4dbe8;border-radius:5px;font-size:11px}
+/* [v121] 재고 판단 — 판단 배지: 빨강=오늘 발주, 주황=임박, 주황 테두리=재고 많음, 무색=적정 */
+.jb{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11.5px;font-weight:700;line-height:1.5;white-space:nowrap}
+.jb.b0{background:var(--red);color:#fff}.jb.b1{background:var(--amber);color:#fff}
+.jb.b2{background:#fff8ec;color:#a05a00;box-shadow:inset 0 0 0 1px var(--amber)}.jb.b3{background:#eef1f6;color:#4a5470}.jb.b4{background:none;color:#9aa1b2;font-weight:400;padding-left:0}
+.jChips{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 8px}.jChips .jb{font-size:12.5px;padding:3px 12px}
+.jLeg div{margin:1px 0}.jLeg .jb{font-size:10.5px;padding:0 7px;margin-right:4px}
+.jtag{display:inline-block;font-size:10.5px;padding:0 6px;border-radius:4px;background:#fff3e0;color:#a05a00;margin:3px 4px 0 0;font-weight:400;white-space:nowrap}
+.jtag.mut{background:#eef1f6;color:#4a5470}
+.flowJd td{white-space:nowrap;vertical-align:middle}
+.flowJd td.jd{text-align:left;white-space:normal;min-width:190px}
+.flowJd .jdet{display:block;font-size:10.5px;color:var(--mut);margin-top:3px}
+.flowJd td.jw,.flowJd td.jo{text-align:right;font-size:12px}
+.flowJd tr.jl0 td.jo b{color:var(--red)}
+.flowJd tr.jl0 td.nm{box-shadow:inset 3px 0 0 var(--red)}.flowJd tr.jl1 td.nm{box-shadow:inset 3px 0 0 var(--amber)}
+.flowJd tr.jl3 td,.flowJd tr.jl4 td{color:#6b7488}
+.flowJd .spIn{width:76px;text-align:right;padding:4px 6px;border:1px solid #d4dbe8;border-radius:5px;font-size:11.5px}
+.flowJd .spDate{width:118px;padding:3px 4px;border:1px solid #d4dbe8;border-radius:5px;font-size:11px}
+.flowJd .spDate.exp{color:#9aa1b2;text-decoration:line-through}
+.flowJd .spMemo{width:140px;padding:4px 6px;border:1px solid #d4dbe8;border-radius:5px;font-size:11px}
 .flowJd td.memo{text-align:left}
+.flowJd thead th:nth-child(2){text-align:left}
 .flowLegend{font-size:11px;color:#4a5470;line-height:1.9;background:#f6f8fc;border-radius:6px;padding:6px 10px;margin:2px 0 6px}
 .flowLegend .lg{display:inline-block;padding:0 6px;border-radius:4px;font-size:10.5px;margin-left:8px}
 .flowLegend .lg:first-child{margin-left:0}
@@ -9715,11 +9730,13 @@ function flowStockWeekly(names){
   const lastStockBefore=end=>{ let sum=0, any=false; recs.forEach(h=>{ let v=null; h.forEach(x=>{ if(x.dateObj<end&&isNormal(x)) v=x.stock; }); if(v!=null){ sum+=v; any=true; } }); return any?sum:null; };
   weeks.forEach((w,i)=>{ if(wRec[i]) level[i]=lastStockBefore(flowAddDays(w,7)); });   // 기록 없는 주는 비워 둔다(선 끊김)
   days.forEach((d,i)=>{ if(recDays.has(flowDayKey(d))) dLevel[i]=lastStockBefore(flowAddDays(d,1)); });
+  // [v121] 재고 기록이 처음 시작된 날 — 그 이전 주는 '판매 0'이 아니라 '기록 없음'(재고 판단 판매 속도에서 제외)
+  let first=null; recs.forEach(h=>h.forEach(x=>{ if(isNormal(x)&&x.dateObj&&(!first||x.dateObj<first)) first=x.dateObj; }));
   const lastDays=Math.round((lastD-lastWk)/86400000)+1;
   const wDays=weeks.map((w,i)=>i===weeks.length-1?lastDays:7);
   const tot=weeks.map((w,i)=>drop[i]+imp[i]), dTot=days.map((d,i)=>dDrop[i]+dImp[i]);
   // [v118] 월~금 기록이 다 있으면 그 주는 끝난 것으로 본다(주말은 출고가 없어 금요일 마감 = 주 마감)
-  return {weeks,drop,imp,tot,restock,level,wRec,wDays,partialLast:lastDays<5?lastDays:0,to:lastD,
+  return {weeks,drop,imp,tot,restock,level,wRec,wDays,partialLast:lastDays<5?lastDays:0,to:lastD,first,
     days,dDrop,dImp,dTot,dRestock,dEst,dLevel,dRec:days.map(d=>recDays.has(flowDayKey(d)))};
 }
 function flowAvg(arr,from,to){ const s=arr.slice(Math.max(0,from),to); return s.length?s.reduce((a,b)=>a+b,0)/s.length:0; }
@@ -9842,11 +9859,11 @@ window.flowExportExcel=function(){
       return [nm,...s2.tot.slice(0,DA+1).map(r0),r0(cc.last),cc.prev>0?pct(cc.last/cc.prev-1):'',r0(cc.avg4),cc.avg4>0?pct(cc.last/cc.avg4-1):'',s2.weeks.filter((w,i)=>i<=DA&&sp[i]).map(w=>fmtMDfull(w)+'주').join(', ')]; };
     const mxRows=[mxRow('전체 합계',stA)].concat(items.filter(x=>x.st).map(x=>({nm:x.s.nm,st:x.st,c:flowWeekCmp(x.st)})).sort((a,b)=>b.c.last-a.c.last).map(x=>mxRow(x.nm,x.st)));
     XLSX.utils.book_append_sheet(wb,sheet(H0,mxRows,[34,...wkA.map(()=>12),11,11,11,13,22]),'품목별 주간 출고');
-    // [v120] 재고 판단 — 화면 표와 같은 기준·같은 순서
-    const HJ=["품목","주 출고(최근 3개월 주평균)","주 판매(매출 월평균÷4.35)","현재고","입고 대기","영업 예정 수량","메모","보유 기간(주)","보유 기간(개월)","판단","권장 발주(3개월 주평균 기준)"];
-    const jr=items.map(x=>({x,j:flowJudge(x.s,x.st,x.salesCmp)})).filter(r=>r.j.rateW>0||r.j.pos>0).sort((a,b)=>a.j.lv-b.j.lv||((a.j.coverW==null?1e9:a.j.coverW)-(b.j.coverW==null?1e9:b.j.coverW)))
-      .map(({x,j})=>[x.s.nm,r0(j.r12),r0(j.salesW),r0(j.stock),r0(j.inc),j.plan||"",j.memo||"",j.coverW==null?"":Math.round(j.coverW),j.coverW==null?"":Math.round(j.coverW*7/30.44*10)/10,j.txt.replace(/^[^가-힣▲]+/,""),j.order||""]);
-    XLSX.utils.book_append_sheet(wb,sheet(HJ,jr,[34,14,16,10,10,12,22,11,12,44,14]),"재고 판단");
+    // [v121] 재고 판단 — 화면 표와 같은 기준·같은 순서·같은 열 순서(판단이 맨 앞)
+    const HJ=["품목","판단","설명","발주 시점","권장 발주","보유 기간(주)","보유 기간(개월)","주 출고(3개월 주평균)","최근 4주 주평균","주 판매(매출 기준)","현재고","입고 대기","영업 예정 수량","예정일","메모","참고"];
+    const jr=flowJudgeRows(items)
+      .map(({x,j})=>[x.s.nm,j.label,j.lv<4?j.detail:"",j.lv===4||j.toOrderW==null?"":j.toOrderW<=0?"지금":fmtDate(j.orderDate),j.order||"",j.coverW==null?"":Math.round(j.coverW),j.coverW==null?"":Math.round(j.coverW*7/30.44*10)/10,r0(j.r12),r0(j.r4),r0(j.salesW),r0(j.stock),r0(j.inc),j.P.qty||"",j.P.date||"",j.P.memo||"",j.tags.join(", ")]);
+    XLSX.utils.book_append_sheet(wb,sheet(HJ,jr,[34,11,34,12,12,11,12,14,12,14,10,10,12,12,22,24]),"재고 판단");
   }
   XLSX.utils.book_append_sheet(wb,sheet(H1,sum,[34,11,...chs.map(()=>11),11,11,8,12,14,14,8,12,14,14,8,12]),'요약');
   XLSX.utils.book_append_sheet(wb,sheet(H2,mon,[34,12,...ml.map(()=>10),11,10,14,8,14]),'판매처별 월 출고');
@@ -9882,74 +9899,118 @@ function flowSpark(st,from,to){
   const vals=st.tot.slice(from,(to==null?st.tot.length-1:to)+1), mx=Math.max(1,...vals);
   return `<span class="flowSpark">${vals.map(v=>`<i style="height:${Math.max(4,Math.round(v/mx*100))}%"></i>`).join("")}</span>`;
 }
-// [v120] 재고 판단 — 주간 출고 추세 × 현재고(+입고 대기) × 영업 예정 수량으로 "발주할지 / 영업을 더 할지"를 한 줄로.
-//  · 판매 속도 = 최근 4주(다 끝난 주) 주평균 출고. 출고가 없으면 매출 월평균(÷4.35)으로 대신한다.
-//  · 🔴 발주 필요: 보유 기간 < 발주 처리 + 리드타임 + 안전재고 / 🟠 재고 과다: 보유 기간 > 6개월 → 3개월분 초과 수량은 영업 확대 대상
-//  · ▲ 추세 상승: 최근 4주가 직전 4주보다 15%↑ — 발주 시점이 4주 안이면 "발주량 상향 검토"
-//  · 영업 예정 수량(s.salesPlan.qty): 앞으로 추가로 나갈 공구·특판 물량. 보유 재고에서 빼고 판단하고, 권장 발주에 더한다.
-//  · 권장 발주 = 3개월분 + 영업 예정 − 입고 시점 잔여(현재고+입고 대기 − 하루 판매×입고까지 일수), MOQ·배수 올림. 재고 탭(공구 평균 기준)과 기준이 달라 '추세 기준'으로 표시.
-const FLOW_OVER_WEEKS=26;   // 6개월
+// [v121] 재고 판단 — 표 맨 앞 "판단" 칸 하나로 "지금 발주 / 발주 임박 / 재고 많음(영업 확대) / 적정"을 읽게.
+//  · 판매 속도 = 최근 3개월 주평균 출고(공구·특판 포함). 출고 기록이 없으면 매출 월평균(÷4.35)으로 대신한다.
+//    [v121] 재고 기록이 시작된 주부터만 평균 — 기록 전 주(0)가 섞여 신규 품목 속도가 몇 배 낮게 나왔다(8종 선물세트 주 399 → '재고 과다'로 오판).
+//  · 지금 발주(빨강): 보유 기간 < 발주 처리 + 리드타임 + 안전재고 / 발주 임박(주황): 그 시점이 4주 안 / 재고 많음(주황 테두리): 6개월 초과 / 적정(무색)
+//    [v121] 이전엔 발주 시점이 며칠 남은 품목도 추세가 오르지 않으면 '적정'으로 나왔다(용기세척제 스타터10정: 재고 탭 D-0).
+//  · 영업 예정(s.salesPlan={qty,date,memo}): 앞으로 추가로 나갈 공구·특판. 보유 재고에서 빼고 판단하고, 권장 발주에 더한다.
+//    [v121] 예정일이 지나면 계산에서 뺀다 — 출고되면 현재고가 이미 줄어 있으므로 그대로 두면 두 번 빠진다.
+//  · 권장 발주 = 목표 개월분 + 영업 예정 − 입고 시점 잔여, MOQ·배수 올림. 지금 발주·발주 임박 품목에만 표시(화면·엑셀 동일).
+const FLOW_OVER_WEEKS=26, FLOW_SOON_WEEKS=4, FLOW_NEW_WEEKS=4;
 function flowRoundOrder(s,need){
   if(!(need>0)) return 0;
   const moq=typeof moqInStockUnit==='function'?moqInStockUnit(s):0, mult=Math.max(1,+s.orderMultiple||1);
   const floor=s.skipItemMoq?need:Math.max(need,moq);   // 재고 탭 roundOrder와 같은 MOQ 규칙
   return Math.ceil(floor/mult)*mult;
 }
+// 재고 기록이 시작된 주 — 그 앞 주는 '판매 0'이 아니라 '기록 없음'. 첫 주는 첫 기록 다음 평일 비율만큼만 한 주로 센다.
+function flowDataFrom(st){
+  if(!st||!st.first||!st.weeks.length) return {from:0,frac:1};
+  const fw=flowWeekStart(st.first);
+  if(+fw<+st.weeks[0]) return {from:0,frac:1};
+  const from=st.weeks.findIndex(w=>+w===+fw); if(from<0) return {from:0,frac:1};
+  let wd=0; for(let k=1;k<7;k++){ const d=flowAddDays(st.first,k); if(+flowWeekStart(d)!==+fw) break; const g=d.getDay(); if(g>=1&&g<=5) wd++; }
+  return wd?{from,frac:wd/5}:{from:from+1,frac:1};
+}
+function flowRate(st,a,b,df){
+  const lo=Math.max(0,a,df.from); let sum=0,n=0;
+  for(let i=lo;i<=b;i++){ sum+=st.tot[i]||0; n+=(i===df.from?df.frac:1); }
+  return {avg:n>0?sum/n:0,n};
+}
+function flowPlan(s){
+  const p=s.salesPlan||{}, qty=Math.max(0,+p.qty||0), date=/^\d{4}-\d{2}-\d{2}$/.test(p.date||'')?p.date:'';
+  const expired=!!(date&&date<fmtDate(NOW));
+  return {qty,date,memo:p.memo||'',expired,use:expired?0:qty};
+}
+const FLOW_JD_LABEL=['지금 발주','발주 임박','재고 많음','적정'];
 function flowJudge(s,st,salesCmp){
-  const plan=Math.max(0,+((s.salesPlan||{}).qty)||0), memo=(s.salesPlan||{}).memo||'';
-  let r4=0, p4=0, r12=0;
-  if(st){ const d=flowWeekCmp(st).done; r4=flowAvg(st.tot,d-3,d+1); p4=flowAvg(st.tot,d-7,d-3); r12=flowAvg(st.tot,d-11,d+1); }
+  const P=flowPlan(s), plan=P.use, memo=P.memo, stop=/단종/.test(memo);
+  let r4=0,p4=0,r12=0,dataW=null,p4ok=false;
+  if(st){ const d=flowWeekCmp(st).done, df=flowDataFrom(st);
+    const a=flowRate(st,d-11,d,df), b=flowRate(st,d-3,d,df), c=flowRate(st,d-7,d-4,df);
+    r12=a.avg; r4=b.avg; p4=c.avg; dataW=a.n; p4ok=c.n>=3.5; }
   const salesW=salesCmp&&salesCmp.avg>0?salesCmp.avg/FLOW_WPM:0;
-  const rateW=r12>0?r12:salesW, daily=rateW/7;   // 판매 속도는 3개월 주평균(공구 섞인 평균) — 4주는 공구 몇 주에 크게 흔들려 추세 판단에만 쓴다
+  const rateW=r12>0?r12:salesW, daily=rateW/7;
   const stock=invTotal(s), inc=incomingTotal(s), pos=stock+inc, eff=pos-plan;
   const set=DATA.stockset||{}, leadTot=Math.max(0,+s.lead||0)+orderPrepDays(), buffer=Math.max(0,+set.buffer||14);
   const tMon=s.targetMonths!=null?+s.targetMonths:(+set.target||3);
   const needW=(leadTot+buffer)/7, coverW=rateW>0?eff/rateW:null;
-  const trendUp=p4*7>0&&p4>=FLOW_TINY_W&&r4>=p4*1.15;
+  const toOrderW=coverW==null?null:coverW-needW;   // 발주 시점까지 남은 주(0 이하 = 지금)
+  const orderDate=toOrderW==null?null:toOrderW<=0?NOW:flowAddDays(NOW,Math.round(toOrderW*7));
+  const isNew=r12>0&&dataW!=null&&dataW<FLOW_NEW_WEEKS;
+  const trendUp=p4ok&&p4>=FLOW_TINY_W&&r4>=p4*1.15;
   const arrive=Math.max(0,pos-daily*leadTot)-plan;
-  const order=rateW>0&&!/단종/.test(memo)?flowRoundOrder(s,daily*tMon*30-arrive):0;
-  let lv, txt;
-  if(/단종/.test(memo)){ lv=4; txt='단종 예정 · 발주 판단 제외'; }   // 메모에 '단종'이 있으면 발주/과다 판단에서 뺀다
-  else if(!(rateW>0)){ lv=4; txt='출고 없음'; }
-  else if(coverW<needW){ lv=0; txt=`🔴 발주 필요${order?` · 권장 ${won(order)}`:''}`; }
-  else if(coverW>FLOW_OVER_WEEKS){ const over=Math.round(eff-daily*tMon*30); lv=2; txt=`🟠 재고 과다 · 3개월분 대비 약 ${won(over)}개 초과 → 영업 확대 필요`; }
-  else if(trendUp&&coverW<needW+4){ lv=1; txt=`▲ 추세 상승 · 발주량 상향 검토${order?` · 권장 ${won(order)}`:''}`; }
-  else { lv=3; txt=`🟢 적정${trendUp?' · 추세 ▲':''}`; }
-  return {plan,memo,r4,p4,r12,salesW,rateW,stock,inc,pos,eff,coverW,needW,trendUp,order,lv,txt};
+  const orderRaw=rateW>0&&!stop?flowRoundOrder(s,daily*tMon*30-arrive):0;
+  let lv, detail='';
+  if(stop){ lv=4; detail='단종 예정 · 판단 제외'; }
+  else if(!(rateW>0)){ lv=4; detail='출고 없음'; }
+  else if(toOrderW<0){ lv=0; detail=coverW<leadTot/7?'입고 전에 재고가 떨어질 수 있음':''; }
+  else if(toOrderW<FLOW_SOON_WEEKS){ lv=1; detail=`${fmtMDfull(orderDate)}까지 발주`; }
+  else if(coverW>FLOW_OVER_WEEKS){ lv=2; const over=Math.round(eff-daily*tMon*30); detail=`${tMon}개월분보다 약 ${won(over)}개 많음 → 영업 확대`; }
+  else lv=3;
+  const order=lv<=1?orderRaw:0;
+  const tags=[]; if(trendUp) tags.push('판매 증가 중'); if(isNew) tags.push(`신규 · 기록 ${Math.max(1,Math.round(dataW))}주`); if(P.expired&&P.qty) tags.push('예정일 지남 · 계산 제외');
+  const label=lv===4?(stop?'단종 예정':'출고 없음'):FLOW_JD_LABEL[lv];
+  const txt=[label,order?`권장 ${won(order)}개`:'',lv===4?'':detail].filter(Boolean).join(' · ');
+  return {P,plan,memo,r4,p4,r12,dataW,salesW,rateW,stock,inc,pos,eff,coverW,needW,toOrderW,orderDate,isNew,trendUp,order,lv,label,detail,tags,txt};
 }
 const flowCoverTxt=w=>w==null?'-':w<0?'부족':`약 ${Math.round(w)}주 <span class="flowMut">(${(w*7/30.44).toFixed(1)}개월)</span>`;
+const flowOrderWhen=j=>j.lv===4||j.toOrderW==null?'-':j.toOrderW<=0?'<b>지금</b>':`${fmtMDfull(j.orderDate)}<br><span class="flowMut">${j.toOrderW<1?'이번 주':Math.round(j.toOrderW)+'주 후'}</span>`;
+const flowJudgeRows=items=>items.map(x=>({x,j:flowJudge(x.s,x.st,x.salesCmp)})).filter(r=>r.j.rateW>0||r.j.pos>0)
+  .sort((a,b)=>a.j.lv-b.j.lv||((a.j.toOrderW==null?1e9:a.j.toOrderW)-(b.j.toOrderW==null?1e9:b.j.toOrderW)));
 window.flowSetPlan=function(nm,f,v){
   const s=(DATA.stock||[]).find(x=>x.nm===nm); if(!s) return;
   const p=Object.assign({},s.salesPlan||{});
-  if(f==='qty') p.qty=Math.max(0,Math.round(+String(v).replace(/[^0-9.]/g,'')||0)); else p.memo=String(v||'').trim();
+  if(f==='qty') p.qty=Math.max(0,Math.round(+String(v).replace(/[^0-9.]/g,'')||0));
+  else if(f==='date'){ if(/^\d{4}-\d{2}-\d{2}$/.test(v||'')) p.date=v; else delete p.date; }
+  else p.memo=String(v||'').trim();
   p.updated=fmtDate(NOW);
-  if(!p.qty&&!p.memo) delete s.salesPlan; else s.salesPlan=p;
+  if(!p.qty&&!p.memo&&!p.date) delete s.salesPlan; else s.salesPlan=p;
   markDirty(); renderFlowBoard();
 };
 function flowJudgeCard(items){
   const ro=VIEWONLY||(typeof EXTERNAL!=='undefined'&&EXTERNAL);
-  const rows=items.map(x=>({x,j:flowJudge(x.s,x.st,x.salesCmp)})).filter(r=>r.j.rateW>0||r.j.pos>0)
-    .sort((a,b)=>a.j.lv-b.j.lv||((a.j.coverW==null?1e9:a.j.coverW)-(b.j.coverW==null?1e9:b.j.coverW)));
+  const rows=flowJudgeRows(items);
   const cnt=lv=>rows.filter(r=>r.j.lv===lv).length;
+  const set=DATA.stockset||{};
+  const stop='onclick="event.stopPropagation()"', chg=f=>`onchange="flowSetPlan(this.closest('tr').dataset.nm,'${f}',this.value)"`;
   const tr=rows.map(({x,j})=>{
-    const nm=x.s.nm, q=pEsc(nm), diff=j.r12>0&&j.salesW>=FLOW_TINY_W?j.r12/j.salesW-1:null;
-    const planCell=ro?`${j.plan?won(j.plan):'-'}`:`<input type="text" inputmode="numeric" class="spIn" value="${j.plan?won(j.plan):''}" placeholder="0" onclick="event.stopPropagation()" onchange="flowSetPlan(this.closest('tr').dataset.nm,'qty',this.value)">`;
-    const memoCell=ro?pEsc(j.memo||''):`<input type="text" class="spMemo" value="${pEsc(j.memo)}" placeholder="예: 12월 공구 2건" onclick="event.stopPropagation()" onchange="flowSetPlan(this.closest('tr').dataset.nm,'memo',this.value)">`;
+    const nm=x.s.nm, q=pEsc(nm), P=j.P, diff=j.r12>0&&j.salesW>=FLOW_TINY_W?j.r12/j.salesW-1:null;
+    const planCell=ro?(P.qty?won(P.qty):'-'):`<input type="text" inputmode="numeric" class="spIn" value="${P.qty?won(P.qty):''}" placeholder="0" ${stop} ${chg('qty')}>`;
+    const dateCell=ro?(P.date?fmtMDfull(new Date(P.date+'T00:00:00')):'-'):`<input type="date" class="spDate${P.expired?' exp':''}" value="${P.date}" ${stop} ${chg('date')}>`;
+    const memoCell=ro?pEsc(P.memo||''):`<input type="text" class="spMemo" value="${pEsc(P.memo)}" placeholder="예: 12월 공구 2건" ${stop} ${chg('memo')}>`;
+    const tags=j.tags.map(t=>`<span class="jtag${j.lv>=3&&!/예정일/.test(t)?' mut':''}">${t}</span>`).join('');
     return `<tr class="jl${j.lv}${nm===FLOW_SEL?' on':''}" onclick="flowSelect(this.dataset.nm)" data-nm="${q}">
       <td class="nm" title="${q}">${pEsc(nm.replace(/^터블\s+(트루클린\s+)?/,''))}</td>
-      <td>${j.r12>0?won(Math.round(j.r12)):'-'}${j.r4>0&&j.r12>0&&j.r12>=FLOW_TINY_W&&Math.abs(j.r4/j.r12-1)>=0.15?`<br><span class="flowMut">최근 4주 ${won(Math.round(j.r4))}</span>`:''}</td>
-      <td title="매출 3개월 월평균 ÷ 4.35">${j.salesW>0?won(Math.round(j.salesW)):'-'}${diff!=null&&Math.abs(diff)>=0.3?` <span class="flowMut" title="재고 기준과 매출 기준 차이 30% 이상 — 대량 출고·매출 기록 시점 확인">${diff>0?'▲':'▼'}${Math.abs(Math.round(diff*100))}%</span>`:''}</td>
+      <td class="jd"><span class="jb b${j.lv}">${j.label}</span>${j.lv<4&&j.lv!==1&&j.detail?`<span class="jdet">${j.detail}</span>`:''}${tags?`<div>${tags}</div>`:''}</td>
+      <td class="jw">${flowOrderWhen(j)}</td>
+      <td class="jo">${j.order?`<b>${won(j.order)}</b>`:'<span class="flowMut">-</span>'}</td>
+      <td>${flowCoverTxt(j.coverW)}${j.plan?`<br><span class="flowMut">영업 예정 ${won(j.plan)} 반영</span>`:''}</td>
+      <td>${j.r12>0?won(Math.round(j.r12)):'-'}${j.r4>0&&j.r12>=FLOW_TINY_W&&Math.abs(j.r4/j.r12-1)>=0.15?`<br><span class="flowMut">최근 4주 ${won(Math.round(j.r4))}</span>`:''}</td>
+      <td title="매출 3개월 월평균 ÷ 4.35">${j.salesW>0?won(Math.round(j.salesW)):'-'}${diff!=null&&Math.abs(diff)>=0.3?`<br><span class="jtag mut" title="재고 기준과 매출 기준 차이 30% 이상 — 대량 출고·매출 기록 시점 확인">차이 ${diff>0?'▲':'▼'}${Math.abs(Math.round(diff*100))}%</span>`:''}</td>
       <td>${won(Math.round(j.stock))}${j.inc?`<br><span class="flowMut">+입고 ${won(j.inc)}</span>`:''}</td>
-      <td>${planCell}</td><td class="memo">${memoCell}</td>
-      <td>${flowCoverTxt(j.coverW)}</td>
-      <td class="jd">${j.txt}</td></tr>`;
+      <td class="sp">${planCell}</td><td class="sp">${dateCell}</td><td class="memo sp">${memoCell}</td></tr>`;
   }).join('');
-  return `<div class="flowCard"><div class="flowH">재고 판단 · 발주/영업 액션 <span>최근 3개월 주평균 출고 × 현재고(+입고 대기) × 영업 예정 수량 · 🔴 ${cnt(0)} · ▲ ${cnt(1)} · 🟠 ${cnt(2)} · 🟢 ${cnt(3)}</span></div>
-    <div class="flowLegend"><b>🔴 발주 필요</b> 보유 기간이 발주 처리 7일 + 리드타임 + 안전재고 2주보다 짧음 · <b>▲ 추세 상승</b> 최근 4주가 직전 4주보다 15% 이상 늘었고 발주 시점이 4주 안 → 발주량 상향 검토 ·
-      <b>🟠 재고 과다</b> 보유 기간 6개월 초과 → 3개월분을 넘는 수량만큼 영업 확대 필요 · <b>🟢 적정</b><br>
-      <b>영업 예정 수량</b>에 앞으로 추가로 나갈 공구·특판 물량을 넣으면 보유 재고에서 빼고 다시 판단하고, 권장 발주에 더합니다(팀원 모두 같은 값을 봅니다). 메모에 <b>단종</b>을 쓰면 판단에서 뺍니다.
-      판매 속도는 공구·특판이 섞인 <b>최근 3개월 주평균</b>이고(4주는 공구 몇 주에 크게 흔들려 추세 판단에만 씀), 권장 발주는 이 기준이라 재고 탭과 조금 다를 수 있습니다.</div>
-    <div class="flowOvWrap"><table class="flowTbl flowOv flowJd"><thead><tr><th>품목</th><th>주 출고<br><span>최근 3개월 주평균 · 재고 기준</span></th><th>주 판매<br><span>매출 월평균÷4.35</span></th><th>현재고<br><span>+입고 대기</span></th><th>영업 예정 수량<br><span>추가 공구·특판</span></th><th>메모</th><th>보유 기간<br><span>영업 예정 반영</span></th><th>판단</th></tr></thead>
+  const chip=(lv,t)=>`<span class="jb b${lv}">${t} ${cnt(lv)}</span>`;
+  return `<div class="flowCard"><div class="flowH">재고 판단 · 발주/영업 액션 <span>최근 3개월 주평균 출고 기준 · 위에서부터 급한 순</span></div>
+    <div class="jChips">${chip(0,'지금 발주')}${chip(1,'발주 임박')}${chip(2,'재고 많음')}${chip(3,'적정')}</div>
+    <div class="flowLegend jLeg">
+      <div><span class="jb b0">지금 발주</span> 남은 재고가 입고까지 걸리는 기간(발주 처리 ${orderPrepDays()}일 + 품목 리드타임 + 안전재고 ${Math.max(0,+set.buffer||14)}일)보다 짧음 → 오늘 발주</div>
+      <div><span class="jb b1">발주 임박</span> 발주할 날이 ${FLOW_SOON_WEEKS}주 안 → '발주 시점' 날짜에 발주 &nbsp; <span class="jb b2">재고 많음</span> 6개월 넘게 버틸 재고 → 영업 확대 &nbsp; <span class="jb b3">적정</span> 할 일 없음</div>
+      <div class="flowMut">영업 예정: 앞으로 나갈 공구·특판 수량과 예정일을 넣으면 재고에서 미리 빼고 판단합니다. 예정일이 지나면 자동으로 빠집니다(출고되면 현재고에 이미 반영됨). 메모에 '단종'을 쓰면 판단에서 뺍니다.
+        판매 속도는 공구·특판이 섞인 최근 3개월 주평균이고, 신규 품목은 재고 기록이 시작된 주부터만 평균합니다.</div></div>
+    <div class="flowOvWrap"><table class="flowTbl flowOv flowJd"><thead><tr><th>품목</th><th>판단</th><th>발주 시점</th><th>권장 발주</th><th>보유 기간</th><th>주 출고<br><span>3개월 주평균</span></th><th>주 판매<br><span>매출 기준</span></th><th>현재고<br><span>+입고 대기</span></th><th>영업 예정 수량<br><span>추가 공구·특판</span></th><th>예정일</th><th>메모</th></tr></thead>
     <tbody>${tr}</tbody></table></div></div>`;
 }
 function flowBoardHtml(){
@@ -9973,7 +10034,7 @@ function flowBoardHtml(){
     ${kpi('4주 평균 대비',c.chg4.txt,`직전 4주 평균 ${won(Math.round(c.avg4))}개/주`,c.chg4)}
   </div>`;
   const selItem=FLOW_SEL!=="__ALL__"?items.find(x=>x.s.nm===FLOW_SEL):null, selJ=selItem?flowJudge(selItem.s,selItem.st,selItem.salesCmp):null;
-  const sumLine=`<div class="flowSum"><b>${pEsc(selName)}</b> · 지난주(${flowRange(st.weeks[c.done])}) <b>${won(Math.round(c.last))}개</b> 출고 — 전주 대비 <b class="fc ${c.chgPrev.cls}">${c.chgPrev.txt}</b>, 최근 4주 평균 대비 <b class="fc ${c.chg4.cls}">${c.chg4.txt}</b>${selJ?`<br><b>재고 판단</b> · ${selJ.txt} · 보유 ${flowCoverTxt(selJ.coverW)}${selJ.plan?` · 영업 예정 ${won(selJ.plan)}개 반영`:""}`:""}</div>`;
+  const sumLine=`<div class="flowSum"><b>${pEsc(selName)}</b> · 지난주(${flowRange(st.weeks[c.done])}) <b>${won(Math.round(c.last))}개</b> 출고 — 전주 대비 <b class="fc ${c.chgPrev.cls}">${c.chgPrev.txt}</b>, 최근 4주 평균 대비 <b class="fc ${c.chg4.cls}">${c.chg4.txt}</b>${selJ?`<br><b>재고 판단</b> <span class="jb b${selJ.lv}">${selJ.label}</span> ${[selJ.order?`권장 ${won(selJ.order)}개`:'',selJ.lv<4?selJ.detail:''].filter(Boolean).join(' · ')} · 보유 ${flowCoverTxt(selJ.coverW)}${selJ.plan?` · 영업 예정 ${won(selJ.plan)}개 반영`:""}`:""}</div>`;
   // [v119] 최근 10영업일 하루 출고 숫자 — 차트만으로는 수량이 안 읽힌다는 요청
   const di=flowWeekdayIdx(st,10), dsum=di.reduce((a,i)=>a+st.dTot[i],0);
   const dayTbl=`<div class="flowOvWrap"><table class="flowTbl flowDay"><thead><tr><th>최근 10영업일</th>${di.map(i=>`<th>${flowDayLabel(st.days[i])}</th>`).join('')}<th>평균</th></tr></thead>
