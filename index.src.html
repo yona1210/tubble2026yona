@@ -4323,14 +4323,24 @@ function dayGap(a,b){
   if(!da||!db)return null;
   return Math.max(1,Math.round((db-da)/86400000));
 }
+// [v118] 재고 기록 날짜 = 파일명 날짜(재고현황_YYMMDD) — 올린 날로 기록하면 금요일 마감 재고가 월요일에 들어가
+//  주가 바뀌어 섞인다. 파일 날짜가 올린 날보다 0~7일 앞일 때만 쓰고, 아니면 올린 날 그대로. 저장 데이터는 바꾸지 않는다.
+function stockFileDate(file,recDate){
+  const m=String(file||'').match(/(?:^|[^0-9])(2\d)(\d{2})(\d{2})(?![0-9])/); if(!m||!recDate) return null;
+  const d=new Date(2000+(+m[1]),+m[2]-1,+m[3]);
+  if(d.getMonth()!==+m[2]-1||d.getDate()!==+m[3]) return null;
+  const gap=Math.round((recDate-d)/86400000);
+  return gap>=0&&gap<=7?d:null;
+}
 function getDailyHistory(nm,simStock){
-  const hist=((DATA.dailyStockHistory||{})[nm]||[]).map(x=>({
-    date:x.date, dateObj:parseYMD(x.date), stock:+x.stock||0,
-    source:x.source||'데일리', file:x.file||'', status:x.status||'정상 마감 재고'
-  })).filter(x=>x.dateObj&&Number.isFinite(x.stock));
-  if(simStock!=null){ hist.push({date:fmt(NOW),dateObj:new Date(NOW.getFullYear(),NOW.getMonth(),NOW.getDate()),stock:+simStock||0,source:'미리보기',file:'',status:'정상 마감 재고'}); }
-  hist.sort((a,b)=>a.dateObj-b.dateObj);
-  const byDate={}; hist.forEach(x=>byDate[x.date]=x);  // 동일 날짜는 마지막 값(재업로드 덮어쓰기)
+  const hist=((DATA.dailyStockHistory||{})[nm]||[]).map(x=>{
+    const rec=parseYMD(x.date), fd=stockFileDate(x.file,rec), d=fd||rec;
+    return {date:d?fmt(d):x.date, dateObj:d, recDate:rec, stock:+x.stock||0,
+      source:x.source||'데일리', file:x.file||'', status:x.status||'정상 마감 재고'};
+  }).filter(x=>x.dateObj&&Number.isFinite(x.stock));
+  if(simStock!=null){ const t=new Date(NOW.getFullYear(),NOW.getMonth(),NOW.getDate()); hist.push({date:fmt(NOW),dateObj:t,recDate:t,stock:+simStock||0,source:'미리보기',file:'',status:'정상 마감 재고'}); }
+  hist.sort((a,b)=>a.recDate-b.recDate);
+  const byDate={}; hist.forEach(x=>byDate[x.date]=x);  // 동일 날짜는 나중에 올린 값(재업로드 덮어쓰기)
   return Object.values(byDate).sort((a,b)=>a.dateObj-b.dateObj);
 }
 function dailyStockVelocity(s,simStock){
@@ -9636,6 +9646,7 @@ function flowSalesMonthly(names){
 //  앞뒤 ±21일 정상 감소 구간의 하루 평균으로 판매를 추정해 채우고(추정분 따로 표시), 입고량 = 재고 증가 + 추정 판매.
 //  추정 기준에서는 공구·특판처럼 평소의 3배 넘게 빠진 구간을 뺀다(추정이 부풀지 않게).
 const FLOW_LOWBASE=50;   // 하루 평균이 이보다 작으면 % 변동은 참고용으로 흐리게
+const FLOW_TINY_W=100;  // [v118] 기준이 주 100개 미만이면 % 대신 "소량"
 function flowItemIntervals(h){
   const isNormal=x=>(x.status==='정상 마감 재고'||x.source==='미리보기');
   const iv=[]; let prev=null;
@@ -9673,9 +9684,13 @@ function flowStockWeekly(names){
   const dDrop=D(), dImp=D(), dRestock=D(), dEst=days.map(()=>false), dLevel=days.map(()=>null);
   recs.forEach(h=>{
     flowItemIntervals(h).forEach(v=>{
+      // [v118] 출고는 평일에 나간다 — 기록 사이 감소는 평일에만 나눠 담는다(금→월 감소가 토·일로 새지 않게). 평일이 없으면 전체 일수.
+      const isWd=d=>{ const g=d.getDay(); return g>=1&&g<=5; };
+      let wdN=0; for(let k=1;k<=v.gap;k++) if(isWd(flowAddDays(v.from,k))) wdN++;
       for(let k=1;k<=v.gap;k++){
         const day=flowAddDays(v.from,k), wi=wkIdx[flowDayKey(flowWeekStart(day))], di=dIdx[flowDayKey(day)];
-        const sold=v.diff>0?v.diff/v.gap:0, im=v.diff<0?v.imp/v.gap:0, inb=v.diff<0?v.inbound/v.gap:0;
+        const n=wdN?wdN:v.gap; if(wdN&&!isWd(day)) continue;
+        const sold=v.diff>0?v.diff/n:0, im=v.diff<0?v.imp/n:0, inb=v.diff<0?v.inbound/n:0;
         if(wi!=null){ drop[wi]+=sold; imp[wi]+=im; restock[wi]+=inb; }
         if(di!=null){ dDrop[di]+=sold; dImp[di]+=im; dRestock[di]+=inb; if(v.gap>1&&v.diff>0) dEst[di]=true; }
       }
@@ -9690,7 +9705,8 @@ function flowStockWeekly(names){
   const lastDays=Math.round((lastD-lastWk)/86400000)+1;
   const wDays=weeks.map((w,i)=>i===weeks.length-1?lastDays:7);
   const tot=weeks.map((w,i)=>drop[i]+imp[i]), dTot=days.map((d,i)=>dDrop[i]+dImp[i]);
-  return {weeks,drop,imp,tot,restock,level,wRec,wDays,partialLast:lastDays<7?lastDays:0,to:lastD,
+  // [v118] 월~금 기록이 다 있으면 그 주는 끝난 것으로 본다(주말은 출고가 없어 금요일 마감 = 주 마감)
+  return {weeks,drop,imp,tot,restock,level,wRec,wDays,partialLast:lastDays<5?lastDays:0,to:lastD,
     days,dDrop,dImp,dTot,dRestock,dEst,dLevel,dRec:days.map(d=>recDays.has(flowDayKey(d)))};
 }
 function flowAvg(arr,from,to){ const s=arr.slice(Math.max(0,from),to); return s.length?s.reduce((a,b)=>a+b,0)/s.length:0; }
@@ -9729,8 +9745,11 @@ const flowMonLabel=m=>`${+String(m).slice(5)}월`;
 // 기준(prev) 하루 평균이 FLOW_LOWBASE 미만이면 % 는 흐리게(참고) — 작은 수의 큰 % 변동에 눈이 끌리지 않게
 function flowChg(cur,prev,baseDaily){
   if(!(prev>0)) return {txt:cur>0?'비교 기준 없음':'-',cls:'flat'};
+  const bd=baseDaily!=null?baseDaily:prev;
+  // [v118] 기준이 주 100개 미만이면 % 대신 '소량' — 30개→90개 같은 ▲200% 가 미팅에서 눈만 끈다
+  if(bd*7<FLOW_TINY_W) return {txt:'소량',cls:'flat low',p:null,low:true};
   const p=cur/prev-1, cls=p>=0.15?'up':p<=-0.15?'down':'flat';
-  const low=(baseDaily!=null?baseDaily:prev)<FLOW_LOWBASE;
+  const low=bd<FLOW_LOWBASE;
   return {txt:`${p>=0?'▲':'▼'} ${Math.abs(Math.round(p*100))}%`,cls:cls+(low?' low':''),p,low};
 }
 function flowStockDetail(st){
@@ -9858,9 +9877,9 @@ function flowBoardHtml(){
   const c=flowWeekCmp(st), L=st.tot.length-1;
   const kpi=(lab,big,sub,chg)=>`<div class="wkK"><span>${lab}</span><b class="${chg?'fc '+chg.cls:''}">${big}</b><em>${sub}</em></div>`;
   const kpis=`<div class="wkKs">
-    ${kpi(`지난주 출고 · ${flowRange(st.weeks[c.done])}`,`${won(Math.round(c.last))}개`,`하루 평균 ${won(Math.round(c.last/7))}개`)}
+    ${kpi(`지난주 출고 · ${flowRange(st.weeks[c.done])}`,`${won(Math.round(c.last))}개`,`평일 하루 평균 ${won(Math.round(c.last/5))}개`)}
     ${kpi('전주 대비',c.chgPrev.txt,`그 전주 ${won(Math.round(c.prev))}개`,c.chgPrev)}
-    ${kpi('최근 4주 평균 대비',c.chg4.txt,`4주 평균 ${won(Math.round(c.avg4))}개/주`,c.chg4)}
+    ${kpi('4주 평균 대비',c.chg4.txt,`직전 4주 평균 ${won(Math.round(c.avg4))}개/주`,c.chg4)}
   </div>`;
   const sumLine=`<div class="flowSum"><b>${pEsc(selName)}</b> · 지난주(${flowRange(st.weeks[c.done])}) <b>${won(Math.round(c.last))}개</b> 출고 — 전주 대비 <b class="fc ${c.chgPrev.cls}">${c.chgPrev.txt}</b>, 최근 4주 평균 대비 <b class="fc ${c.chg4.cls}">${c.chg4.txt}</b></div>`;
   const chartCard=`<div class="flowCard"><div class="flowH">주간 출고 추이 <span>${pEsc(selName)} · 최근 ${FLOW_WEEKS}주 · 🔶 평소 주의 2.5배 이상(공구·특판 등 대량 출고) · 다 끝난 주만 표시</span></div>
@@ -9882,11 +9901,11 @@ function flowBoardHtml(){
   const rows=items.filter(x=>x.st&&wIdx.some(i=>x.st.tot[i]>=0.5)).map(x=>({nm:x.s.nm,st:x.st,sum4:sum4(x.st)})).sort((a,b)=>b.sum4-a.sum4);
   const mx=`<div class="flowCard"><div class="flowH">품목별 주간 출고 <span>최근 ${FLOW_MX_WEEKS}주 · 최근 4주 출고 많은 순 · 행을 누르면 위 차트가 그 품목으로 바뀝니다</span></div>
     <div class="flowLegend"><span class="lg spk">1,234 🔶</span> <b>대량 출고 주</b> — 그 품목의 평소 주간 출고(13주 중간값)보다 2.5배 이상 나간 주입니다. 공구·특판 등 한 번에 크게 나간 출고로 보고, 숫자는 그대로 둡니다.
-      <span class="lg"><b class="fc up">▲</b> <b class="fc down">▼</b></span> 지난주가 비교 기준보다 15% 이상 늘었거나(▲ 빨강) 줄었으면(▼ 파랑) 색으로 표시합니다.</div>
-    <div class="flowOvWrap"><table class="flowTbl flowOv flowMx"><thead><tr><th>품목</th>${head}<th>전주 대비<br><span>지난주 기준</span></th><th>4주 평균<br><span>대비</span></th><th>흐름</th></tr></thead>
+      <span class="lg"><b class="fc up">▲</b> <b class="fc down">▼</b></span> <b>전주 대비</b>는 지난주를 그 전주와, <b>4주 평균 대비</b>는 지난주를 그 직전 4주의 주평균(지난주 제외)과 비교합니다. 15% 이상 늘면 ▲ 빨강, 줄면 ▼ 파랑이고, 기준이 주 100개 미만이면 % 대신 <b>소량</b>으로 표시합니다.</div>
+    <div class="flowOvWrap"><table class="flowTbl flowOv flowMx"><thead><tr><th>품목</th>${head}<th>전주 대비<br><span>지난주 vs 그 전주</span></th><th>4주 평균 대비<br><span>지난주 vs 직전 4주 평균</span></th><th>흐름</th></tr></thead>
     <tbody>${rowOf('__ALL__','전체 합계',stAll,'sum')}${rows.map(r=>rowOf(r.nm,r.nm,r.st)).join('')}</tbody></table></div>
-    <div class="flowNote">주간 출고는 매일 올린 재고가 줄어든 양입니다(월~일). 재고 기록이 며칠 비면 그 사이 감소를 나눠 채우고, 입고가 낀 주는 앞뒤 3주 평균으로 판매를 추정해 더합니다.
-      전주·4주 평균 비교는 다 채워진 주(지난주)를 기준으로 합니다. 기준이 하루 ${FLOW_LOWBASE}개 미만인 % 는 흐리게 표시합니다.</div></div>`;
+    <div class="flowNote">주간 출고는 매일 올린 재고가 줄어든 양입니다(월~일, 재고 파일명 날짜 기준). 재고 기록이 며칠 비면 그 사이 감소를 평일에 나눠 채우고, 입고가 낀 주는 앞뒤 3주 평균으로 판매를 추정해 더합니다.
+      금요일 재고까지 들어온 주를 끝난 주로 봅니다.</div></div>`;
   // ③ 판매처별 월 출고 — 참고(접힘)
   let chPart='<div class="flowEmpty">매출 데이터 없음</div>';
   if(sm){
