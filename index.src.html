@@ -3274,6 +3274,10 @@ if(!DATA.catGroupMap || typeof DATA.catGroupMap!=='object') DATA.catGroupMap={};
 if(DATA.catGroupMap['얼룩제거제']==null) DATA.catGroupMap['얼룩제거제']='세탁';
 // [v83] 캡슐 7종 세트는 캡슐세제가 아닌 기타 — 재고 cat 강제 정정(원가·재고 탭 일관성, salesCategory와 일치)
 (DATA.stock||[]).forEach(function(s){ if(s&&s.nm&&s.nm.indexOf('캡슐')>=0&&s.nm.indexOf('7종')>=0&&s.cat!=='기타') s.cat='기타'; });
+// [v123] 신상품 카테고리 — 변기클리너(청소)·건조기시트(세탁)·선물세트(기타). 대분류 미지정 시 기본값, 재고 cat이 '기타'였으면 정정
+[['변기클리너','청소'],['건조기시트','세탁'],['선물세트','기타']].forEach(function(p){ if(DATA.catGroupMap[p[0]]==null) DATA.catGroupMap[p[0]]=p[1]; });
+(DATA.stock||[]).forEach(function(s){ if(!s||!s.nm||(s.cat&&s.cat!=='기타')) return; const n=s.nm; if(n.indexOf('캡슐')>=0&&n.indexOf('7종')>=0) return;
+  const c=n.indexOf('변기')>=0?'변기클리너':n.indexOf('건조기시트')>=0?'건조기시트':n.indexOf('선물세트')>=0?'선물세트':null; if(c) s.cat=c; });
 // [v80] ERP 업로드로 갱신된 채널 월별 데이터 복원 (CHANNEL_DATA는 const라 DATA에 저장해 영속화)
 if(DATA.channelData && DATA.channelData.months && DATA.channelData.months.length){
   try{ CHANNEL_DATA.months=DATA.channelData.months; CHANNEL_DATA.channels=DATA.channelData.channels; CHANNEL_DATA.items=DATA.channelData.items; }catch(e){}
@@ -10298,6 +10302,10 @@ function salesCategory(nm){
   if(n.includes('세탁조')) return '세탁조클리너';
   if(n.includes('이염방지')||n.includes('시트세제')) return '이염방지시트세제';
   if(n.includes('얼룩제거')) return '얼룩제거제';   // 스팟 얼룩제거제 5종(용도별) — 캡슐(얼룩 땀냄새)은 위에서 이미 처리됨
+  // [v123] 9종 이후 신상품 — 기타에 묻히지 않게 (7종세트·배송비는 기타 유지)
+  if(n.includes('변기')) return '변기클리너';
+  if(n.includes('건조기시트')) return '건조기시트';
+  if(n.includes('선물세트')) return '선물세트';
   return '기타';
 }
 // 품명 정규화(인하/차수 꼬리표 제거 → 같은 품목 합산)
@@ -11041,9 +11049,9 @@ function handleSalesUpload(file){
 // KPI + 본문 렌더
 function renderSales(){
   // [v83] 배포 시드의 salesData는 예전 분류 규칙으로 집계돼 있을 수 있음 → 원본(salesAcc)에서 1회 재집계해 최신 분류 반영
-  if(!DATA._salesReaggV84 && DATA.salesAcc && DATA.salesAcc.rows && DATA.salesAcc.rows.length){
-    try{ rebuildSalesData(); }catch(e){ console.warn('salesData 재집계 실패', e); }   // v84: qtyByMonth(월별 수량) 반영 위해 1회 재집계
-    DATA._salesReaggV84 = true;
+  if((!DATA._salesReaggV84 || !DATA._salesReaggV123) && DATA.salesAcc && DATA.salesAcc.rows && DATA.salesAcc.rows.length){
+    try{ rebuildSalesData(); }catch(e){ console.warn('salesData 재집계 실패', e); }   // v84: qtyByMonth(월별 수량) 반영 위해 1회 재집계 · v123: 신상품 카테고리
+    DATA._salesReaggV84 = true; DATA._salesReaggV123 = true;
   }
   const meta=document.getElementById('salesMeta');
   const kpis=document.getElementById('salesKpis');
