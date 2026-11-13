@@ -562,6 +562,20 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .flowJd td.jr.push b{color:#a05a00}
 .flowJd tr.jl3 td.jr b{color:#1E2761}
 .flowJd td.jq{text-align:right}
+/* [v132] 쿠팡 카테고리 지도 */
+.cmSum{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12.5px;color:#4a5470;margin:2px 0 10px}
+.cmSum .in b{color:#1E9E63}.cmSum .opp b{color:#a05a00}
+.cmFilter{display:inline-flex;border:1px solid #d4dbe8;border-radius:8px;overflow:hidden;margin-bottom:10px}
+.cmFilter button{border:0;background:#fff;color:#4a5470;font-size:12px;font-weight:600;padding:4px 14px;cursor:pointer}
+.cmFilter button.on{background:#1E2761;color:#fff}
+.cmTbl tr.cmP td{background:#f4f6fb;font-weight:700;color:#1E2761}
+.cmTbl tr.cmP.d0 td{background:#1E2761;color:#fff;font-size:13px}
+.cmTbl tr.cmL td{color:#6b7488}.cmTbl tr.cmL.in td{color:#1E2761}
+.cmTbl .cmNote{display:block;font-size:10.5px;color:#9aa1b2;font-weight:400}
+.cmTbl .cmSub{display:block;font-size:10.5px;color:#9aa1b2}
+.cmTbl .cmMut{color:#c8ccd6}
+.cmB{display:inline-block;padding:1px 9px;border-radius:10px;font-size:11px;font-weight:700;white-space:nowrap}
+.cmB.in{background:#e6f6ee;color:#1E9E63}.cmB.opp{background:#fff8ec;color:#a05a00;box-shadow:inset 0 0 0 1px var(--amber)}.cmB.out{background:#eef1f6;color:#7a8194;font-weight:400}
 /* [v128] 발주 순/영업 순 전환 · 영업 관점 묶음 */
 .jView{display:inline-flex;border:1px solid #d4dbe8;border-radius:8px;overflow:hidden;margin-right:6px}
 .jView button{border:0;background:#fff;color:#4a5470;font-size:12px;font-weight:600;padding:3px 12px;cursor:pointer}
@@ -2362,6 +2376,7 @@ body{padding-bottom:48px}
     <div class="marketSeg" id="marketSeg">
       <button class="mktTab" data-mkt="overview">종합 요약</button>
       <button class="mktTab" data-mkt="structure">시장 구조</button>
+      <button class="mktTab" data-mkt="catmap">카테고리 지도</button>
       <button class="mktTab" data-mkt="sales">터블 실매출</button>
       <button class="mktTab on" data-mkt="matrix">경쟁 매트릭스</button>
       <button class="mktTab" data-mkt="top5">Top5 경쟁사</button>
@@ -7071,6 +7086,81 @@ function categoryStructureHtml(){
     <div class="tmWrap">${cols}</div></div>`;
 }
 window.tmZoomTo=function(big){ tmZoom=(tmZoom===big)?null:big; if(typeof renderMarket==='function') renderMarket(); };
+// ===== [v132] 쿠팡 카테고리 지도 — 세제 시장 전체 분류(쿠팡 기준, 2026.11 사용자 제공) × 터블 진출 · 시장 규모 · 경쟁사 조사 =====
+//  m = 경쟁 매트릭스 카테고리명(시장 규모·쿠팡 Top5 연결), t = 터블 매출 카테고리(salesCategory) — 매출·재고 품목 연결
+const COUPANG_CATS=[
+  {n:'세탁세제',c:[
+    {n:'액체세제',m:'액체세제'},{n:'분말세제',m:'분말세제'},
+    {n:'캡슐세제',m:'세탁세제 (실내건조 중심)',t:['캡슐세제'],note:'시장 규모 8,500억은 세탁세제 전체(액체·분말·캡슐·시트)'},
+    {n:'시트세제',m:'이염방지 시트',t:['이염방지시트세제'],note:'터블 이염방지 시트세제'},
+    {n:'섬유유연제',c:[{n:'액체섬유유연제',m:'섬유유연제'},{n:'시트섬유유연제',m:'드라이시트/건조기시트',t:['건조기시트']}]},
+    {n:'울세제/홈드라이세제',c:[{n:'울세제',m:'울세제'},{n:'홈드라이세제',m:'홈드라이세제'}]},
+    {n:'섬유향균제',m:'섬유 향균제'},{n:'향기지속제',m:'향기지속제'},{n:'표백제',m:'표백제'},{n:'세탁비누',m:'세탁비누'},
+    {n:'얼룩/찌든때 제거제',m:'얼룩제거제',t:['얼룩제거제']},{n:'운동화/가죽크리너',m:'운동화/가죽크리너'},
+    {n:'유아세제/섬유유연제',m:'유아세제'},{n:'세제선물세트',t:['선물세트']}]},
+  {n:'청소/주방세제',c:[
+    {n:'친환경/천연세제',c:[{n:'구연산'},{n:'베이킹소다'},{n:'과탄산소다'}]},
+    {n:'청소세제',c:[{n:'욕실세정제',m:'욕실세정제 (일반)',t:['욕실클리너']},{n:'락스/살균소독제'},{n:'변기세정제',m:'변기세정제',t:['변기클리너']},
+      {n:'기름때세정제',m:'주방후드/오븐'},{n:'씽크대세정제'},{n:'배수구세정제',m:'배수구 세정제'},{n:'다목적세제',m:'다목적 세정제',t:['세정티슈']},
+      {n:'곰팡이세정제',m:'곰팡이 제거제'},{n:'에어컨세정제',m:'가전전용 클리너'},{n:'세탁조세정제',m:'세탁조클리너',t:['세탁조클리너']},
+      {n:'유리세정제',m:'유리세정제'},{n:'광택왁스/크리너'}]},
+    {n:'주방세제',c:[{n:'일반주방세제',m:'주방세제',t:['주방세제']},{n:'천연주방세제'},{n:'텀블러클리너',m:'용기세척제 (텀블러)',t:['다목적용기세척제']},
+      {n:'야채/과일세정제'},{n:'식기세척기용세제',m:'식기세척기세제',t:['식기세척기세제']},{n:'행주/도마세제'},{n:'기름때 제거제',m:'기름때 제거제'},{n:'유아 주방세제'}]},
+    {n:'세제선물세트'}]},
+  {n:'탈취/방향/살충',c:[
+    {n:'탈취제',c:[{n:'섬유탈취제'},{n:'실내용탈취제',m:'탈취제 (공간 겔)',t:['탈취제']},{n:'차량용탈취제'},{n:'화장실탈취제'},{n:'냉장고탈취제'},
+      {n:'옷장/서랍/신발장탈취제'},{n:'신발탈취제'},{n:'새집증후군제거',c:[{n:'피톤치드'},{n:'새집증후군제거제'},{n:'살균소독제'}]}]},
+    {n:'제습제'}]}
+];
+let catMapFilter='all';
+window.catMapSet=function(f){ catMapFilter=f; renderMarket(); };
+function catMapHtml(){
+  const M=MKT(), mx={}; (M.matrix||[]).forEach(r=>{ if(r&&r.cat&&!mx[r.cat]) mx[r.cat]=r; });
+  const sd=DATA.salesData||{}, cy=(typeof salesCurYear==='function'&&sd.months)?salesCurYear(sd):'';
+  const catAmt=c=>{ const o=(sd.category||{})[c]; return o&&cy?salesYearAmt(o,cy):0; };
+  const stockBy={}; (DATA.stock||[]).filter(s=>!s.archived&&!s._pendingDel).forEach(s=>{ const k=salesCategory(s.nm); (stockBy[k]=stockBy[k]||[]).push(s.nm); });   // 재고 cat 이름은 제각각이라 매출과 같은 품명 규칙으로 연결
+  const used=new Set(); const leaves=[];
+  // 노드별 값 계산(부모는 자식 합)
+  const calc=(node,depth,path)=>{
+    node.depth=depth; node.path=path;
+    if(node.c){ node.c.forEach(ch=>calc(ch,depth+1,path.concat(node.n))); node.amt=node.c.reduce((a,ch)=>a+(ch.amt||0),0); node.items=[].concat(...node.c.map(ch=>ch.items||[])); return; }
+    const r=node.m?mx[node.m]:null; if(node.m) used.add(node.m);
+    node.mkt=r&&r.mktSize>0?r.mktSize:null; node.top5=r&&r.top5Sum>0?r.top5Sum:null; node.comp=r?r.comp:'';
+    node.amt=(node.t||[]).reduce((a,c)=>a+catAmt(c),0); node.items=[].concat(...(node.t||[]).map(c=>stockBy[c]||[]));
+    node.in=node.amt>0||node.items.length>0; leaves.push(node);
+  };
+  const tree=JSON.parse(JSON.stringify(COUPANG_CATS)); tree.forEach(g=>calc(g,0,[]));
+  const nIn=leaves.filter(l=>l.in).length, nMkt=leaves.filter(l=>l.mkt||l.top5).length;
+  const opp=leaves.filter(l=>!l.in&&((l.mkt||0)>=200||(l.top5||0)>=20));
+  const eok=v=>v>=10?won(Math.round(v)):(Math.round(v*10)/10);
+  const fmtAmt=v=>v>0?salesEok(v):'';
+  const show=l=>catMapFilter==='in'?l.in:catMapFilter==='out'?!l.in:true;
+  const anyShow=n=>n.c?n.c.some(anyShow):show(n);
+  const rows=[];
+  const walk=n=>{
+    if(!anyShow(n)) return;
+    const pad=8+n.depth*18;
+    if(n.c){
+      rows.push(`<tr class="cmP d${n.depth}"><td class="l" style="padding-left:${pad}px">${n.depth?'▾ ':''}${pEsc(n.n)}</td><td class="r">${n.amt>0?`<b>${fmtAmt(n.amt)}</b>`:''}</td><td></td><td></td><td></td><td></td></tr>`);
+      n.c.forEach(walk); return;
+    }
+    const st=n.in?'<span class="cmB in">터블 진출</span>':((n.mkt||0)>=200||(n.top5||0)>=20)?'<span class="cmB opp">미진출 · 시장 큼</span>':'<span class="cmB out">미진출</span>';
+    const itemsTip=n.items.length?` title="${pEsc(n.items.join(', '))}"`:'';
+    rows.push(`<tr class="cmL${n.in?' in':''}"><td class="l" style="padding-left:${pad}px">${pEsc(n.n)}${n.note?`<span class="cmNote">${pEsc(n.note)}</span>`:''}</td>
+      <td class="r"${itemsTip}>${n.amt>0?`<b>${fmtAmt(n.amt)}</b>`:''}${n.items.length?`<span class="cmSub">${n.items.length}품목</span>`:''}</td>
+      <td class="r">${n.mkt?eok(n.mkt):'<span class="cmMut">-</span>'}</td><td class="r">${n.top5?eok(n.top5):'<span class="cmMut">-</span>'}</td>
+      <td class="c">${n.comp?pEsc(n.comp):''}</td><td class="c">${st}</td></tr>`);
+  };
+  tree.forEach(walk);
+  const outside=(M.matrix||[]).filter(r=>r&&r.cat&&!used.has(r.cat)&&r.cat!=='이염방지시트').map(r=>`${pEsc(r.cat)}${r.mktSize>0?` ${won(Math.round(r.mktSize))}억`:''}`);
+  const fb=(k,t)=>`<button type="button" class="${catMapFilter===k?'on':''}" onclick="catMapSet('${k}')">${t}</button>`;
+  return `<div class="mCard"><h4>쿠팡 기준 세제 카테고리 지도 <span class="hsub">세탁세제 · 청소/주방세제 · 탈취제 전체 분류 × 터블 진출 · 시장 규모 · 경쟁사 조사</span></h4>
+    <div class="cmSum"><span><b>${leaves.length}</b>개 세부 카테고리</span><span class="in">터블 진출 <b>${nIn}</b></span><span>시장·경쟁사 데이터 있음 <b>${nMkt}</b></span><span class="opp">미진출 중 시장 큼 <b>${opp.length}</b>${opp.length?` — ${opp.map(l=>pEsc(l.n)).join(', ')}`:''}</span></div>
+    <div class="cmFilter">${fb('all','전체')}${fb('in','터블 진출')}${fb('out','미진출')}</div>
+    <div style="overflow-x:auto"><table class="mTbl cmTbl"><thead><tr><th class="l">쿠팡 카테고리</th><th class="r">터블 ${cy||''} 매출</th><th class="r">시장 규모(억)</th><th class="r">쿠팡 Top5(억)</th><th class="c">경쟁력</th><th class="c">상태</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>
+    <div class="csNote">시장 규모 = 로드맵 추정(국내 전체) · 쿠팡 Top5 = 경쟁 매트릭스(상위 5개 제품 연매출 추정 합) · 터블 매출 = 매출 데이터 ${cy}년 누적(카테고리 연결). 미진출 · 시장 큼 = 시장 200억 이상 또는 쿠팡 Top5 20억 이상.
+      ${outside.length?`<br>쿠팡 분류에 따로 없는 로드맵 항목: ${outside.join(' · ')}`:''}</div></div>`;
+}
 function mktStructureHtml(){
   const big=MARKET_DATA.bigCat.map(b=>`<tr><td class="l">${b.name}</td><td class="r">${b.size}</td><td class="r"><b>${b.pct}</b></td></tr>`).join('');
   const sub=MARKET_DATA.subCat.map(c=>`<tr><td>${c.big}</td><td class="l">${c.name}</td><td class="r">${won(c.min)}</td><td class="r">${won(c.max)}</td><td class="r"><b>${won(c.mid)}</b></td><td class="r">${c.pct!=null?(c.pct*100).toFixed(1)+'%':'-'}</td><td class="c">${confBadge(c.conf)}</td><td class="l muted">${c.src}</td></tr>`).join('');
@@ -7197,7 +7287,7 @@ function mktNotesHtml(){
 }
 function renderMarket(){
   const body=document.getElementById('marketBody'); if(!body) return;
-  const map={overview:mktOverviewHtml,structure:mktStructureHtml,sales:mktSalesHtml,matrix:mktMatrixHtml,top5:mktTop5Html,strategy:mktStrategyHtml,notes:mktNotesHtml};
+  const map={overview:mktOverviewHtml,structure:mktStructureHtml,catmap:catMapHtml,sales:mktSalesHtml,matrix:mktMatrixHtml,top5:mktTop5Html,strategy:mktStrategyHtml,notes:mktNotesHtml};
   body.innerHTML=(map[marketTab]||mktOverviewHtml)();
   document.querySelectorAll('#marketSeg .mktTab').forEach(b=>b.classList.toggle('on',b.dataset.mkt===marketTab));
   const f=document.getElementById('marketFooter');
