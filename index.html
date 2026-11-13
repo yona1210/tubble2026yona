@@ -615,6 +615,28 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .msRef summary:before{content:'▸';color:#9aa1b2;font-size:12px}.msRef[open] summary:before{content:'▾'}
 .msRef summary b{font-size:14.5px;color:#141a33}.msRef summary span{font-size:12px;color:#9aa1b2}
 .msRefB{padding:0 14px 14px}
+/* [v135] 시장 지도 */
+.mpLeg{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin:0 2px 14px;font-size:12px;color:#5a6175}
+.mpL{display:inline-flex;align-items:center;gap:6px;font-weight:600}.mpL i{width:12px;height:12px;border-radius:4px;display:inline-block}
+.mpL.keep i{background:#1E9E63}.mpL.grow i{background:#3355FF}.mpL.weak i{background:var(--red)}.mpL.opp i{background:var(--amber)}.mpL.ref i{background:#d5d9e2}
+.mpLn{color:#9aa1b2;font-size:11.5px}
+.mpG{background:#fff;border-radius:18px;box-shadow:0 0 0 1px #edf0f5;padding:18px 20px;margin-bottom:16px}
+.mpGH{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;padding-bottom:14px;border-bottom:1px solid #f0f2f6;margin-bottom:14px}
+.mpGH h3{font-size:19px;font-weight:800;color:#141a33;margin:0 0 4px}.mpGH span{font-size:12.5px;color:#7a8194}.mpGH span b{color:#1E9E63}
+.mpGN{display:flex;gap:22px}.mpGN div{display:flex;flex-direction:column;align-items:flex-end}.mpGN small{font-size:11px;color:#9aa1b2}.mpGN b{font-size:20px;font-weight:800;color:#141a33}
+.mpBs{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.mpB{background:#f7f8fb;border-radius:14px;padding:12px}
+.mpBH{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:9px}.mpBH b{font-size:14px;color:#141a33}.mpBH span{font-size:11px;color:#8a90a2;text-align:right}
+.mpSub{font-size:11.5px;font-weight:700;color:#5a6175;margin:10px 2px 6px}
+.mpTs{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:7px}
+.mpT{background:#fff;border-radius:10px;padding:8px 10px;border-left:4px solid #d5d9e2;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-height:52px;box-shadow:0 0 0 1px #eceff4}
+.mpT:hover{box-shadow:0 0 0 2px #3355FF}
+.mpT b{font-size:12.5px;color:#141a33;line-height:1.25}.mpT span{font-size:11px;color:#8a90a2}.mpT em{font-style:normal;font-size:11px;font-weight:700}
+.mpT.keep{border-left-color:#1E9E63;background:#f2fbf6}.mpT.keep em{color:#127a4b}
+.mpT.grow{border-left-color:#3355FF;background:#f3f6ff}.mpT.grow em{color:#2443d6}
+.mpT.weak{border-left-color:var(--red);background:#fdf3f2}.mpT.weak em{color:#c0392b}
+.mpT.opp{border-left-color:var(--amber);background:#fff8ec}
+.mpT.ref b{color:#7a8194;font-weight:600}
 @media(max-width:720px){.msMixR{grid-template-columns:1fr 70px;}.msMixR .msMixBar,.msMixR .msMixS{display:none}.msSearch{margin-left:0;width:100%}}
 /* [v132] 쿠팡 카테고리 지도 */
 .cmSum{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12.5px;color:#4a5470;margin:2px 0 10px}
@@ -2429,6 +2451,7 @@ body{padding-bottom:48px}
   <div class="toolbar">
     <div class="marketSeg" id="marketSeg">
       <button class="mktTab on" data-mkt="home">한눈에</button>
+      <button class="mktTab" data-mkt="map">시장 지도</button>
       <button class="mktTab" data-mkt="cats">카테고리별</button>
       <button class="mktTab" data-mkt="ref">근거 자료</button>
     </div>
@@ -7274,6 +7297,40 @@ function msCatsHtml(){
       점유율 = 터블 올해 누적 매출 ÷ 연간 시장 규모.</div></div>
     <div class="msSrc">${msSrcChips(M,L)}</div>`;
 }
+// [v135] 시장 지도 — 대분류 → 중분류 → 품목을 카드·타일로 펼쳐 '세제 시장 전체가 어떻게 생겼나'를 한 화면에.
+//  타일 = 쿠팡 세부 카테고리. 색 = 판정(진출 여부 포함), 숫자 = 시장 규모(없으면 쿠팡 Top5), 터블 매출이 있으면 함께.
+function msMapHtml(){
+  const {rows,L,M}=msRows(); let k=0;
+  const tile=r=>`<div class="mpT ${r.v}" onclick="msGo('${r.id}')" title="${pEsc(r.n)} · ${MS_V[r.v].t}">
+      <b>${pEsc(r.n)}</b>
+      <span>${r.mkt?`시장 ${msEok(r.mkt)}`:r.top5?`쿠팡 Top5 ${msEok(r.top5)}`:'규모 미조사'}</span>
+      ${r.rev>0?`<em>터블 ${msEok(r.rev)}</em>`:''}</div>`;
+  const flat=n=>n.c?[].concat(...n.c.map(flat)):[rows[k++]];
+  const stat=rs=>{ const mk=rs.reduce((a,r)=>a+(r.mkt||0),0), rev=rs.reduce((a,r)=>a+r.rev,0), nin=rs.filter(r=>r.v!=='opp'&&r.v!=='ref').length;
+    return {mk,rev,nin,n:rs.length,unk:rs.filter(r=>!r.mkt).length}; };
+  const groups=COUPANG_CATS.map(g=>{
+    const blocks=[], base=[];
+    g.c.forEach(ch=>{ if(!ch.c){ base.push(rows[k++]); return; }
+      // 한 단계 더 깊은 묶음(예: 탈취제 › 새집증후군제거)은 블록 안 소제목으로
+      const parts=[]; const own=[];
+      ch.c.forEach(x=>{ if(x.c) parts.push({t:x.n,rs:flat(x)}); else own.push(rows[k++]); });
+      blocks.push({t:ch.n,rs:own,parts}); });
+    if(base.length) blocks.unshift({t:g.n+' 일반',rs:base,parts:[],base:true});
+    const all=[].concat(...blocks.map(b=>b.rs.concat(...b.parts.map(p=>p.rs)))), S=stat(all);
+    const bHtml=blocks.map(b=>{ const bs=stat(b.rs.concat(...b.parts.map(p=>p.rs)));
+      return `<div class="mpB"><div class="mpBH"><b>${pEsc(b.t)}</b><span>${bs.n}개${bs.nin?` · 진출 ${bs.nin}`:''}${bs.mk?` · 시장 ${msEok(bs.mk)}`:''}${bs.rev>0?` · 터블 ${msEok(bs.rev)}`:''}</span></div>
+        <div class="mpTs">${b.rs.map(tile).join('')}</div>
+        ${b.parts.map(p=>`<div class="mpSub">${pEsc(p.t)}</div><div class="mpTs">${p.rs.map(tile).join('')}</div>`).join('')}</div>`; }).join('');
+    return `<div class="mpG"><div class="mpGH"><div><h3>${pEsc(g.n)}</h3><span>${S.n}개 품목 · 터블 진출 <b>${S.nin}</b></span></div>
+        <div class="mpGN"><div><small>시장 규모(조사분)</small><b>${S.mk?msEok(S.mk):'-'}</b></div><div><small>터블 ${L?L.cy:''} 매출</small><b>${S.rev>0?msEok(S.rev):'-'}</b></div></div></div>
+      <div class="mpBs">${bHtml}</div></div>`;
+  }).join('');
+  const leg=['keep','grow','weak','opp','ref'].map(v=>`<span class="mpL ${v}"><i></i>${MS_V[v].t}</span>`).join('');
+  return `<div class="msHead"><h2>세제 시장 지도</h2><p>쿠팡 기준 세제 시장을 대분류 → 중분류 → 품목으로 펼쳤습니다. 타일을 누르면 카테고리별 상세(경쟁 Top5)로 이동합니다.</p></div>
+    <div class="mpLeg">${leg}<span class="mpLn">타일 숫자 = 시장 규모(로드맵) · 없으면 쿠팡 Top5 · '터블' = 올해 누적 매출</span></div>
+    ${groups}
+    <div class="msSrc">${msSrcChips(M,L)}</div>`;
+}
 function msRefHtml(){
   const M=MKT(), L=M._live;
   const sec=(t,sub,html,open)=>`<details class="msRef"${open?' open':''} ontoggle="if(this.open&&typeof drawMarketCharts==='function')drawMarketCharts()"><summary><b>${t}</b><span>${sub}</span></summary><div class="msRefB">${html}</div></details>`;
@@ -7463,7 +7520,7 @@ function mktNotesHtml(){
 function renderMarket(){
   const body=document.getElementById('marketBody'); if(!body) return;
   // [v134] 3탭(한눈에 / 카테고리별 / 근거 자료) — 예전 탭들은 근거 자료 안에 접어서 보관
-  const map={home:msHomeHtml,cats:msCatsHtml,ref:msRefHtml};
+  const map={home:msHomeHtml,map:msMapHtml,cats:msCatsHtml,ref:msRefHtml};
   if(!map[marketTab]) marketTab='home';
   body.innerHTML=map[marketTab]();
   document.querySelectorAll('#marketSeg .mktTab').forEach(b=>b.classList.toggle('on',b.dataset.mkt===marketTab));
