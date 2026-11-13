@@ -553,7 +553,7 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .flowJd .spDate.exp{color:#9aa1b2;text-decoration:line-through}
 .flowJd .spMemo{width:140px;padding:4px 6px;border:1px solid #d4dbe8;border-radius:5px;font-size:11px}
 .flowJd td.memo{text-align:left}
-.flowJd thead th:nth-child(2){text-align:left}
+.flowJd thead th.jdh{text-align:left}
 /* [v124] 영업 여유 · 주 출고(평소/공구) */
 .flowJd td.jr{text-align:right;min-width:118px}
 .flowJd td.jr b{font-size:13px;color:#1E2761}
@@ -9901,10 +9901,11 @@ window.flowExportExcel=function(){
     const mxRows=[mxRow('전체 합계',stA)].concat(items.filter(x=>x.st).map(x=>({nm:x.s.nm,st:x.st,c:flowWeekCmp(x.st)})).sort((a,b)=>b.c.last-a.c.last).map(x=>mxRow(x.nm,x.st)));
     XLSX.utils.book_append_sheet(wb,sheet(H0,mxRows,[34,...wkA.map(()=>12),11,11,11,13,22]),'품목별 주간 출고');
     // [v121] 재고 판단 — 화면 표와 같은 기준·같은 순서·같은 열 순서(판단이 맨 앞)
-    const HJ=["품목","판단","설명","영업 여유","영업 여유 수량","영업 여유 설명","발주 시점","권장 발주","보유 기간(주)","보유 기간(개월)","주 출고(12주 주평균)","평소 주 출고(공구 주 제외)","공구 횟수(12주)","공구 추가 출고(12주)","최근 4주 주평균","주 판매(매출 기준)","현재고","입고 대기","영업 예정 수량","예정일","메모","참고"];
+    // [v126] 화면과 같은 흐름 순서: 현재고 → 주 출고 → 보유 기간 → 판단 → 발주 시점 → 권장 발주 → 영업 여유 → 영업 예정
+    const HJ=["품목","현재고","입고 대기","주 출고(12주 주평균)","평소 주 출고(공구 주 제외)","공구 횟수(12주)","공구 추가 출고(12주)","최근 4주 주평균","주 판매(매출 기준)","보유 기간(주)","보유 기간(개월)","판단","설명","발주 시점","권장 발주","영업 여유","영업 여유 수량","영업 여유 설명","영업 예정 수량","예정일","메모","참고"];
     const jr=flowJudgeRows(items)
-      .map(({x,j})=>[x.s.nm,j.label,j.lv<4?j.detail:"",j.room.k?j.room.t:"",j.room.q==null?"":(j.room.k==='hold'?-j.room.q:j.room.q),j.room.sub||"",j.lv===4||j.toOrderW==null?"":j.toOrderW<=0?"지금":fmtDate(j.orderDate),j.order||"",j.coverW==null?"":Math.round(j.coverW),j.coverW==null?"":Math.round(j.coverW*7/30.44*10)/10,r0(j.r12),r0(j.baseW),j.promoN||0,r0(j.promoX),r0(j.r4),r0(j.salesW),r0(j.stock),r0(j.inc),j.P.qty||"",j.P.date||"",j.P.memo||"",j.tags.join(", ")]);
-    XLSX.utils.book_append_sheet(wb,sheet(HJ,jr,[34,11,34,14,12,24,12,12,11,12,14,16,12,14,12,14,10,10,12,12,22,24]),"재고 판단");
+      .map(({x,j})=>[x.s.nm,r0(j.stock),r0(j.inc),r0(j.r12),r0(j.baseW),j.promoN||0,r0(j.promoX),r0(j.r4),r0(j.salesW),j.coverW==null?"":Math.round(j.coverW),j.coverW==null?"":Math.round(j.coverW*7/30.44*10)/10,j.label,j.lv<4?j.detail:"",j.lv===4||j.toOrderW==null?"":j.toOrderW<=0?"지금":fmtDate(j.orderDate),j.order||"",j.room.k?j.room.t:"",j.room.q==null?"":(j.room.k==='hold'?-j.room.q:j.room.q),j.room.sub||"",j.P.qty||"",j.P.date||"",j.P.memo||"",j.tags.join(", ")]);
+    XLSX.utils.book_append_sheet(wb,sheet(HJ,jr,[34,10,10,14,16,12,14,12,14,11,12,11,34,12,12,14,12,24,12,12,22,24]),"재고 판단");
   }
   XLSX.utils.book_append_sheet(wb,sheet(H1,sum,[34,11,...chs.map(()=>11),11,11,8,12,14,14,8,12,14,14,8,12]),'요약');
   XLSX.utils.book_append_sheet(wb,sheet(H2,mon,[34,12,...ml.map(()=>10),11,10,14,8,14]),'판매처별 월 출고');
@@ -10077,13 +10078,13 @@ function flowJudgeCard(items,one){
     const tags=j.tags.map(t=>`<span class="jtag${j.lv>=3&&!/예정일|품절/.test(t)?' mut':''}">${t}</span>`).join('');
     return `<tr class="jl${j.lv}${nm===FLOW_SEL?' on':''}" onclick="flowSelect(this.dataset.nm)" data-nm="${q}">
       <td class="nm" title="${q}">${pEsc(nm.replace(/^터블\s+(트루클린\s+)?/,''))}</td>
+      <td>${won(Math.round(j.stock))}${j.inc?`<br><span class="flowMut">+입고 ${won(j.inc)}</span>`:''}</td>
+      <td class="jq">${j.r12>0?`<b>${won(Math.round(j.r12))}</b>`:j.salesW>0?`${won(Math.round(j.salesW))}<br><span class="flowMut">재고 기록 없음 · 매출 기준</span>`:'-'}${j.promoN&&j.baseW>0?`<span class="jdet">평소 ${won(Math.round(j.baseW))} + 공구 ${j.promoN}회 ${won(Math.round(j.promoX/100)*100)}</span>`:''}${j.r4>0&&j.r12>=FLOW_TINY_W&&Math.abs(j.r4/j.r12-1)>=0.15?`<span class="jdet">최근 4주 ${won(Math.round(j.r4))}</span>`:''}${diff!=null&&Math.abs(diff)>=0.5?`<span class="jdet" title="매출 3개월 월평균 ÷ 4.35 — 재고 기준과 50% 넘게 차이: 재고 입력·매출 기록 시점 확인">매출 기준 ${won(Math.round(j.salesW))}</span>`:''}</td>
+      <td>${flowCoverTxt(j.coverW)}${j.plan?`<br><span class="flowMut">영업 예정 ${won(j.plan)} 반영</span>`:''}</td>
       <td class="jd"><span class="jb b${j.lv}">${j.label}</span>${j.lv<4&&j.lv!==1&&j.detail?`<span class="jdet">${j.detail}</span>`:''}${tags?`<div>${tags}</div>`:''}</td>
-      <td class="jr ${j.room.k}"${j.room.tip?` title="${pEsc(j.room.tip)}"`:''}>${j.room.k?`<b>${j.room.t}</b>`:'<span class="flowMut">-</span>'}${j.room.sub?`<span class="jdet">${j.room.sub}</span>`:''}${j.room.calc?`<span class="jcalc">${j.room.calc}</span>`:''}</td>
       <td class="jw">${flowOrderWhen(j)}</td>
       <td class="jo">${j.order?`<b>${won(j.order)}</b>`:'<span class="flowMut">-</span>'}</td>
-      <td>${flowCoverTxt(j.coverW)}${j.plan?`<br><span class="flowMut">영업 예정 ${won(j.plan)} 반영</span>`:''}</td>
-      <td class="jq">${j.r12>0?`<b>${won(Math.round(j.r12))}</b>`:j.salesW>0?`${won(Math.round(j.salesW))}<br><span class="flowMut">재고 기록 없음 · 매출 기준</span>`:'-'}${j.promoN&&j.baseW>0?`<span class="jdet">평소 ${won(Math.round(j.baseW))} + 공구 ${j.promoN}회 ${won(Math.round(j.promoX/100)*100)}</span>`:''}${j.r4>0&&j.r12>=FLOW_TINY_W&&Math.abs(j.r4/j.r12-1)>=0.15?`<span class="jdet">최근 4주 ${won(Math.round(j.r4))}</span>`:''}${diff!=null&&Math.abs(diff)>=0.5?`<span class="jdet" title="매출 3개월 월평균 ÷ 4.35 — 재고 기준과 50% 넘게 차이: 재고 입력·매출 기록 시점 확인">매출 기준 ${won(Math.round(j.salesW))}</span>`:''}</td>
-      <td>${won(Math.round(j.stock))}${j.inc?`<br><span class="flowMut">+입고 ${won(j.inc)}</span>`:''}</td>
+      <td class="jr ${j.room.k}"${j.room.tip?` title="${pEsc(j.room.tip)}"`:''}>${j.room.k?`<b>${j.room.t}</b>`:'<span class="flowMut">-</span>'}${j.room.sub?`<span class="jdet">${j.room.sub}</span>`:''}${j.room.calc?`<span class="jcalc">${j.room.calc}</span>`:''}</td>
       <td class="sp">${planCell}</td><td class="sp">${dateCell}</td><td class="memo sp">${memoCell}</td></tr>`;
   }).join('');
   const chip=(lv,t)=>`<span class="jb b${lv}">${t} ${cnt(lv)}</span>`;
@@ -10095,7 +10096,7 @@ function flowJudgeCard(items,one){
       <div><b>영업 여유</b> = 보유 재고 − 남겨 둘 몫(지금 발주해도 물건이 들어와 안전하게 돌기까지: 발주 처리 ${orderPrepDays()}일 + 리드타임 + 안전재고 ${Math.max(0,+set.buffer||14)}일 동안 나갈 양). 판매 속도는 평소 + 지난 12주 공구 빈도 → 그 위에 <b>더 받을 수 있는 공구·특판 수량</b>. 이만큼 넘게 팔면 바로 발주가 필요합니다. 공구 자제 = 지금 발주해도 입고까지(안전재고 포함) 모자람 · 더 팔기 = 6개월분 초과분</div>
       <div class="flowMut">영업 예정: 앞으로 나갈 공구·특판 수량과 예정일을 넣으면 재고에서 미리 빼고 판단합니다. 예정일이 지나면 자동으로 빠집니다(출고되면 현재고에 이미 반영됨). 메모에 '단종'을 쓰면 판단에서 뺍니다.
         판매 속도는 공구·특판이 섞인 최근 3개월 주평균이고, 신규 품목은 재고 기록이 시작된 주부터만 평균합니다.</div></div>
-    <div class="flowOvWrap"><table class="flowTbl flowOv flowJd"><thead><tr><th>품목</th><th>판단</th><th>영업 여유<br><span>추가 공구 가능 수량</span></th><th>발주 시점</th><th>권장 발주</th><th>보유 기간</th><th>주 출고<br><span>최근 12주 주평균</span></th><th>현재고<br><span>+입고 대기</span></th><th>영업 예정 수량<br><span>추가 공구·특판</span></th><th>예정일</th><th>메모</th></tr></thead>
+    <div class="flowOvWrap"><table class="flowTbl flowOv flowJd"><thead><tr><th>품목</th><th>현재고<br><span>+입고 대기</span></th><th>주 출고<br><span>최근 12주 주평균</span></th><th>보유 기간</th><th class="jdh">판단</th><th>발주 시점</th><th>권장 발주</th><th>영업 여유<br><span>추가 공구 가능 수량</span></th><th>영업 예정 수량<br><span>추가 공구·특판</span></th><th>예정일</th><th>메모</th></tr></thead>
     <tbody>${tr}</tbody></table></div></div>`;
 }
 function flowBoardHtml(){
@@ -10132,7 +10133,8 @@ function flowBoardHtml(){
       <div><div class="flowSub">주별 출고 · 최근 ${FLOW_WEEKS}주</div><div class="flowChart"><canvas id="flowStockChart"></canvas></div></div>
       <div><div class="flowSub">일별 출고 · 최근 ${FLOW_DAYS}일 중 평일</div><div class="flowChart"><canvas id="flowDayChart"></canvas></div></div>
     </div>
-    ${dayTbl}</div>`;
+    </div>`;
+  const dayCard=`<div class="flowCard"><div class="flowH">최근 10영업일 하루 출고 <span>${pEsc(selName)}</span></div>${dayTbl}</div>`;   // [v126] 주간 표 다음으로 이동(큰 흐름 → 최근 며칠 순)
   // ② 품목 × 주차 표 (다 끝난 주만, 최근 8주 — 진행 중인 주는 하루치뿐이라 헷갈리므로 뺀다)
   const D=flowWeekCmp(stAll).done, from=Math.max(0,D-FLOW_MX_WEEKS+1);
   const wIdx=[]; for(let i=from;i<=D;i++) wIdx.push(i);
@@ -10166,7 +10168,7 @@ function flowBoardHtml(){
       <tr class="sum"><td>전체</td>${sm.total.map(v=>`<td>${won(Math.round(v))}</td>`).join('')}<td><b>${won(Math.round(salesCmp.avg))}</b></td><td>100%</td><td class="${salesCmp.dir.c}">${salesCmp.dir.t}${flowPct(salesCmp.dir.p)}</td></tr></tbody></table></div></div>`;
   }
   const chCard=`<div class="flowCard"><div class="flowH">판매처별 월 출고 <span>${pEsc(selName)} · 매출 데이터 ${sm?`${flowMonLabel(sm.months[0])}~${flowMonLabel(sm.months[sm.months.length-1])}`:''} · 월말 일괄 기록이라 주 단위 판매처 구분은 불가</span></div>${chPart}</div>`;
-  return top+sumLine+chartCard+mx+flowJudgeCard(one?items.filter(x=>x.s.nm===FLOW_SEL):items,one)+chCard;
+  return top+sumLine+chartCard+mx+dayCard+flowJudgeCard(one?items.filter(x=>x.s.nm===FLOW_SEL):items,one)+chCard;
 }
 function flowDrawSales(){
   const names=FLOW_SEL==='__ALL__'?flowItems().map(s=>s.nm):[FLOW_SEL];
