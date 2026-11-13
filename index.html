@@ -624,9 +624,12 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .mpGH{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;padding-bottom:14px;border-bottom:1px solid #f0f2f6;margin-bottom:14px}
 .mpGH h3{font-size:19px;font-weight:800;color:#141a33;margin:0 0 4px}.mpGH span{font-size:12.5px;color:#7a8194}.mpGH span b{color:#1E9E63}
 .mpGN{display:flex;gap:22px}.mpGN div{display:flex;flex-direction:column;align-items:flex-end}.mpGN small{font-size:11px;color:#9aa1b2}.mpGN b{font-size:20px;font-weight:800;color:#141a33}
-.mpBs{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.mpBs{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;align-items:start}
+.mpB.base{background:#fafbfd}
+.mpVg{font-style:normal;font-size:10px;font-weight:600;color:#8a90a2;background:#e9ecf3;border-radius:6px;padding:1px 6px;margin-left:4px;vertical-align:middle}
+.mpT .mpBasis{font-size:10px;color:#a3a9b8}
 .mpB{background:#f7f8fb;border-radius:14px;padding:12px}
-.mpBH{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:9px}.mpBH b{font-size:14px;color:#141a33}.mpBH span{font-size:11px;color:#8a90a2;text-align:right}
+.mpBH{display:flex;flex-direction:column;gap:3px;margin-bottom:9px}.mpBH b{font-size:14px;color:#141a33;white-space:nowrap}.mpBH span{font-size:11px;color:#8a90a2}
 .mpSub{font-size:11.5px;font-weight:700;color:#5a6175;margin:10px 2px 6px}
 .mpTs{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:7px}
 .mpT{background:#fff;border-radius:10px;padding:8px 10px;border-left:4px solid #d5d9e2;cursor:pointer;display:flex;flex-direction:column;gap:2px;min-height:52px;box-shadow:0 0 0 1px #eceff4}
@@ -7188,14 +7191,15 @@ window.tmZoomTo=function(big){ tmZoom=(tmZoom===big)?null:big; if(typeof renderM
 //  m = 경쟁 매트릭스 카테고리명(시장 규모·쿠팡 Top5 연결), t = 터블 매출 카테고리(salesCategory) — 매출·재고 품목 연결
 const COUPANG_CATS=[
   {n:'세탁세제',c:[
-    {n:'액체세제',m:'액체세제'},{n:'분말세제',m:'분말세제'},
-    {n:'캡슐세제',m:'세탁세제 (실내건조 중심)',t:['캡슐세제'],note:'시장 규모 8,500억은 세탁세제 전체(액체·분말·캡슐·시트)'},
-    {n:'시트세제',m:'이염방지 시트',t:['이염방지시트세제'],note:'터블 이염방지 시트세제'},
+    // [v136] 쿠팡에선 세탁세제 바로 아래 평평하게 나열 — 읽기 쉽게 '본세제'·'보조·특수'로 묶음(vg=가상 묶음). 시장 8,500억은 본세제 묶음 전체에.
+    {n:'세탁 본세제',vg:true,mkm:'세탁세제 (실내건조 중심)',c:[{n:'액체세제',m:'액체세제'},{n:'분말세제',m:'분말세제'},
+      {n:'캡슐세제',m:'세탁세제 (실내건조 중심)',mktOff:true,t:['캡슐세제'],note:'시장 8,500억은 본세제 전체(액체·분말·캡슐·시트) — 묶음에 표시'},
+      {n:'시트세제',m:'이염방지 시트',basis:'이염방지 시트 기준',t:['이염방지시트세제'],note:'터블 이염방지 시트세제 · 시장·경쟁 숫자는 이염방지 시트 기준'}]},
     {n:'섬유유연제',c:[{n:'액체섬유유연제',m:'섬유유연제'},{n:'시트섬유유연제',m:'드라이시트/건조기시트',t:['건조기시트']}]},
     {n:'울세제/홈드라이세제',c:[{n:'울세제',m:'울세제'},{n:'홈드라이세제',m:'홈드라이세제'}]},
-    {n:'섬유향균제',m:'섬유 향균제'},{n:'향기지속제',m:'향기지속제'},{n:'표백제',m:'표백제'},{n:'세탁비누',m:'세탁비누'},
-    {n:'얼룩/찌든때 제거제',m:'얼룩제거제',t:['얼룩제거제']},{n:'운동화/가죽크리너',m:'운동화/가죽크리너'},
-    {n:'유아세제/섬유유연제',m:'유아세제'},{n:'세제선물세트',t:['선물세트']}]},
+    {n:'세탁 보조·특수',vg:true,c:[{n:'섬유향균제',m:'섬유 향균제'},{n:'향기지속제',m:'향기지속제'},{n:'표백제',m:'표백제'},{n:'세탁비누',m:'세탁비누'},
+      {n:'얼룩/찌든때 제거제',m:'얼룩제거제',t:['얼룩제거제']},{n:'운동화/가죽크리너',m:'운동화/가죽크리너'},{n:'유아세제/섬유유연제',m:'유아세제'}]},
+    {n:'세제선물세트',t:['선물세트']}]},
   {n:'청소/주방세제',c:[
     {n:'친환경/천연세제',c:[{n:'구연산'},{n:'베이킹소다'},{n:'과탄산소다'}]},
     {n:'청소세제',c:[{n:'욕실세정제',m:'욕실세정제 (일반)',t:['욕실클리너']},{n:'락스/살균소독제'},{n:'변기세정제',m:'변기세정제',t:['변기클리너']},
@@ -7228,11 +7232,11 @@ function msRows(){
   const rows=[];
   const walk=(n,path)=>{ if(n.c){ n.c.forEach(ch=>walk(ch,path.concat(n.n))); return; }
     const r=n.m?mx[n.m]:null, rev=(n.t||[]).reduce((a,c)=>a+(ca[c]||0),0)/1e8, items=[].concat(...(n.t||[]).map(c=>stockBy[c]||[]));
-    const mkt=r&&r.mktSize>0?+r.mktSize:null, top5=r&&r.top5Sum>0?+r.top5Sum:null, share=mkt&&rev>0?rev/mkt*100:null, comp=r?String(r.comp||''):'';
+    const mkt=!n.mktOff&&r&&r.mktSize>0?+r.mktSize:null, top5=r&&r.top5Sum>0?+r.top5Sum:null, share=mkt&&rev>0?rev/mkt*100:null, comp=r?String(r.comp||''):'';   // [v136] mktOff: 시장 규모가 상위 묶음 전체 값인 품목(캡슐)
     const isIn=rev>0||items.length>0; let v;
     if(isIn){ if(/선도/.test(comp)||(share!=null&&share>=1)) v='keep'; else if(/약세/.test(comp)||(top5>=20&&rev<top5*0.03)) v='weak'; else v='grow'; }
     else v=((mkt||0)>=200||(top5||0)>=20)?'opp':'ref';
-    rows.push({id:'c'+rows.length,n:n.n,group:path[0],sub:path.slice(1).join(' › '),note:n.note||'',rev,items,mkt,top5,share,comp,
+    rows.push({id:'c'+rows.length,n:n.n,group:path[0],sub:path.slice(1).join(' › '),note:n.note||'',basis:n.basis||'',rev,items,mkt,top5,share,comp,
       top1:r&&r.top1&&r.top1!=='-'?r.top1:'',top1Rev:r&&r.yearRev>0?+r.yearRev:null,v,t5:(n.m&&t5[n.m])||[]});
   };
   COUPANG_CATS.forEach(g=>walk(g,[]));
@@ -7283,7 +7287,7 @@ function msCatsHtml(){
         ${r.items.length?`<div class="msXi"><b>터블 품목</b> ${r.items.map(x=>`<span>${pEsc(x.replace(/^터블\s+(트루클린\s+|파워클린\s+|케어클린\s+|올클린\s+)?/,''))}</span>`).join('')}</div>`:''}
         ${r.t5.length?`<table class="msT5"><thead><tr><th>순위</th><th class="l">브랜드</th><th class="l">제품</th><th>판가</th><th>월판매</th><th>연매출</th></tr></thead><tbody>${r.t5.map(x=>`<tr><td>${x.rank||''}</td><td class="l"><b>${pEsc(x.brand||'-')}</b></td><td class="l">${pEsc(x.product||'')}</td><td>${x.price?won(x.price)+'원':'-'}</td><td>${x.monthQty?won(x.monthQty):'-'}</td><td>${x.yearRev!=null&&x.yearRev!==''?x.yearRev+'억':'-'}</td></tr>`).join('')}</tbody></table>`:'<div class="msEmpty">쿠팡 경쟁사 조사 없음</div>'}</td></tr>`:'';
       return `<tr class="msR ${r.v}${open?' open':''}" data-ms="${r.id}"${canOpen?` onclick="msToggle('${r.id}')"`:''}>
-        <td class="l"><span class="msCar">${canOpen?(open?'▾':'▸'):''}</span><b>${pEsc(r.n)}</b>${r.sub?`<small>${pEsc(r.sub)}</small>`:''}</td>
+        <td class="l"><span class="msCar">${canOpen?(open?'▾':'▸'):''}</span><b>${pEsc(r.n)}</b>${r.sub?`<small>${pEsc(r.sub)}</small>`:''}${r.note?`<small>${pEsc(r.note)}</small>`:''}</td>
         <td>${msPill(r.v)}</td><td class="r">${r.rev>0?`<b>${msEok(r.rev)}</b>`:'<span class="msDim">-</span>'}</td>
         <td class="r">${r.share!=null?msPct(r.share):'<span class="msDim">-</span>'}</td><td class="r">${r.mkt?msEok(r.mkt):'<span class="msDim">-</span>'}</td>
         <td class="r">${r.top5?msEok(r.top5):'<span class="msDim">-</span>'}</td>
@@ -7304,7 +7308,9 @@ function msMapHtml(){
   const tile=r=>`<div class="mpT ${r.v}" onclick="msGo('${r.id}')" title="${pEsc(r.n)} · ${MS_V[r.v].t}">
       <b>${pEsc(r.n)}</b>
       <span>${r.mkt?`시장 ${msEok(r.mkt)}`:r.top5?`쿠팡 Top5 ${msEok(r.top5)}`:'규모 미조사'}</span>
+      ${r.basis?`<span class="mpBasis">${pEsc(r.basis)}</span>`:''}
       ${r.rev>0?`<em>터블 ${msEok(r.rev)}</em>`:''}</div>`;
+  const mxOf=c=>(M.matrix||[]).find(x=>x&&x.cat===c);
   const flat=n=>n.c?[].concat(...n.c.map(flat)):[rows[k++]];
   const stat=rs=>{ const mk=rs.reduce((a,r)=>a+(r.mkt||0),0), rev=rs.reduce((a,r)=>a+r.rev,0), nin=rs.filter(r=>r.v!=='opp'&&r.v!=='ref').length;
     return {mk,rev,nin,n:rs.length,unk:rs.filter(r=>!r.mkt).length}; };
@@ -7314,11 +7320,13 @@ function msMapHtml(){
       // 한 단계 더 깊은 묶음(예: 탈취제 › 새집증후군제거)은 블록 안 소제목으로
       const parts=[]; const own=[];
       ch.c.forEach(x=>{ if(x.c) parts.push({t:x.n,rs:flat(x)}); else own.push(rows[k++]); });
-      blocks.push({t:ch.n,rs:own,parts}); });
-    if(base.length) blocks.unshift({t:g.n+' 일반',rs:base,parts:[],base:true});
-    const all=[].concat(...blocks.map(b=>b.rs.concat(...b.parts.map(p=>p.rs)))), S=stat(all);
-    const bHtml=blocks.map(b=>{ const bs=stat(b.rs.concat(...b.parts.map(p=>p.rs)));
-      return `<div class="mpB"><div class="mpBH"><b>${pEsc(b.t)}</b><span>${bs.n}개${bs.nin?` · 진출 ${bs.nin}`:''}${bs.mk?` · 시장 ${msEok(bs.mk)}`:''}${bs.rev>0?` · 터블 ${msEok(bs.rev)}`:''}</span></div>
+      const mr=ch.mkm?mxOf(ch.mkm):null;   // [v136] 묶음 전체 시장 규모(세탁 본세제 8,500억)
+      blocks.push({t:ch.n,rs:own,parts,vg:!!ch.vg,mk:mr&&mr.mktSize>0?+mr.mktSize:null}); });
+    if(base.length) blocks.push({t:'기타',rs:base,parts:[],base:true});   // [v136] 낱개 품목은 맨 뒤 '기타'
+    const all=[].concat(...blocks.map(b=>b.rs.concat(...b.parts.map(p=>p.rs)))), S0=stat(all);
+    const S=Object.assign({},S0,{mk:blocks.reduce((a,b)=>a+(b.mk!=null?b.mk:stat(b.rs.concat(...b.parts.map(p=>p.rs))).mk),0)});
+    const bHtml=blocks.map(b=>{ const bs=stat(b.rs.concat(...b.parts.map(p=>p.rs))); const mk=b.mk!=null?b.mk:bs.mk;
+      return `<div class="mpB${b.base?' base':''}"><div class="mpBH"><b>${pEsc(b.t)}${b.vg?` <i class="mpVg" title="쿠팡에선 '${pEsc(g.n)}' 바로 아래 품목들 — 보기 쉽게 묶은 것">묶음</i>`:''}</b><span>${bs.n}개${bs.nin?` · 진출 ${bs.nin}`:''}${mk?` · 시장 ${msEok(mk)}`:''}${bs.rev>0?` · 터블 ${msEok(bs.rev)}`:''}</span></div>
         <div class="mpTs">${b.rs.map(tile).join('')}</div>
         ${b.parts.map(p=>`<div class="mpSub">${pEsc(p.t)}</div><div class="mpTs">${p.rs.map(tile).join('')}</div>`).join('')}</div>`; }).join('');
     return `<div class="mpG"><div class="mpGH"><div><h3>${pEsc(g.n)}</h3><span>${S.n}개 품목 · 터블 진출 <b>${S.nin}</b></span></div>
