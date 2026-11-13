@@ -10073,6 +10073,10 @@ const FLOW_SALES_GROUPS=[
 const flowSalesGroupKey=j=>j.room&&j.room.k?j.room.k:'';
 let FLOW_JD_VIEW=(function(){ try{ return localStorage.getItem('tubbleFlowJdView')||'order'; }catch(e){ return 'order'; } })();
 window.flowJdView=function(v){ FLOW_JD_VIEW=v; try{ localStorage.setItem('tubbleFlowJdView',v); }catch(e){} renderFlowBoard(); };
+// [v130] 품목 선택에 '영업 관점 묶음'(__G:push 등) — 고르면 그 묶음 품목만 차트(합계)·표에 나온다
+const flowSelGroup=()=>/^__G:/.test(FLOW_SEL)?(FLOW_SALES_GROUPS.find(g=>g.k&&g.k===FLOW_SEL.slice(4))||null):null;
+function flowGroupNames(k){ return flowItems().filter(s=>{ const it=flowItemSummary(s); return flowSalesGroupKey(flowJudge(s,it.st,it.salesCmp))===k; }).map(s=>s.nm); }
+function flowSelNames(){ const g=flowSelGroup(); if(FLOW_SEL==='__ALL__') return flowItems().map(s=>s.nm); if(g) return flowGroupNames(g.k); return [FLOW_SEL]; }
 const flowCoverTxt=w=>w==null?'-':w<0?'부족':`약 ${Math.round(w)}주 <span class="flowMut">(${(w*7/30.44).toFixed(1)}개월)</span>`;
 const flowOrderWhen=j=>j.lv===4||j.toOrderW==null?'-':j.toOrderW<=0?'<b>지금</b>':`${fmtMDfull(j.orderDate)}<br><span class="flowMut">${j.toOrderW<1?'이번 주':Math.round(j.toOrderW)+'주 후'}</span>`;
 const flowJudgeRows=items=>items.map(x=>({x,j:flowJudge(x.s,x.st,x.salesCmp)})).filter(r=>r.j.rateW>0||r.j.pos>0)
@@ -10136,15 +10140,22 @@ function flowJudgeCard(items,one){
 function flowBoardHtml(){
   const items=flowItems().map(flowItemSummary);
   const all=items.map(x=>x.s.nm);
-  const selName=FLOW_SEL==='__ALL__'?'전체 품목 합계':FLOW_SEL;
-  const names=FLOW_SEL==='__ALL__'?all:[FLOW_SEL];
-  const st=flowStockWeekly(names), stAll=FLOW_SEL==='__ALL__'?st:flowStockWeekly(all);
-  const sm=flowSalesMonthly(names);
-  const opts=`<option value="__ALL__"${FLOW_SEL==='__ALL__'?' selected':''}>전체 품목 합계</option>`+items.slice().sort((a,b)=>a.s.nm.localeCompare(b.s.nm,'ko')).map(x=>`<option value="${pEsc(x.s.nm)}"${x.s.nm===FLOW_SEL?' selected':''}>${pEsc(x.s.nm)}</option>`).join('');
+  // [v130] 영업 관점 묶음 — 품목별 판단으로 묶음을 나누고, 묶음을 고르면 그 품목들만
+  const gOf=new Map(items.map(x=>[x.s.nm,flowSalesGroupKey(flowJudge(x.s,x.st,x.salesCmp))]));
+  const grp=flowSelGroup(), one=FLOW_SEL!=='__ALL__'&&!grp;
+  const names=FLOW_SEL==='__ALL__'?all:grp?all.filter(n=>gOf.get(n)===grp.k):[FLOW_SEL];
+  const selName=FLOW_SEL==='__ALL__'?'전체 품목 합계':grp?`${grp.t} · ${names.length}개 품목 합계`:FLOW_SEL;
+  const st=names.length?flowStockWeekly(names):null, stAll=FLOW_SEL==='__ALL__'?st:flowStockWeekly(all);
+  const sm=names.length?flowSalesMonthly(names):null;
+  const gCnt=k=>all.filter(n=>gOf.get(n)===k).length;
+  const opts=`<option value="__ALL__"${FLOW_SEL==='__ALL__'?' selected':''}>전체 품목 합계</option>`
+    +`<optgroup label="영업 관점 묶음">${FLOW_SALES_GROUPS.filter(g=>g.k).map(g=>`<option value="__G:${g.k}"${grp&&grp.k===g.k?' selected':''}>▶ ${g.t} (${gCnt(g.k)}개)</option>`).join('')}</optgroup>`
+    +`<optgroup label="품목">${items.slice().sort((a,b)=>a.s.nm.localeCompare(b.s.nm,'ko')).map(x=>`<option value="${pEsc(x.s.nm)}"${x.s.nm===FLOW_SEL?' selected':''}>${pEsc(x.s.nm)}</option>`).join('')}</optgroup>`;
   const top=`<div class="flowTop"><select id="flowSel" onchange="flowSelect(this.value)">${opts}</select>
     <span class="flowMut">주간 출고 = 데일리 재고 감소 기준(월~일) · 마지막 재고 기록 ${st?fmtMDfull(st.to):'-'}</span>
     ${FLOW_SEL!=='__ALL__'?`<button type="button" class="tbtn flowAllBtn" onclick="flowSelect('__ALL__')">← 전체 품목 보기</button>`:''}
     <button type="button" class="tbtn" style="margin-left:auto" onclick="flowExportExcel()">⬇ 엑셀 다운로드</button></div>`;
+  if(grp&&!names.length) return top+`<div class="flowEmpty">지금 '${grp.t}'에 해당하는 품목이 없습니다</div>`;
   if(!st||!stAll) return top+'<div class="flowEmpty">데일리 재고 이력이 없어 주간 출고를 계산할 수 없습니다</div>';
   // ① 지난주 핵심 숫자 + 주간 차트
   const c=flowWeekCmp(st), L=st.tot.length-1;
@@ -10154,8 +10165,8 @@ function flowBoardHtml(){
     ${kpi('전주 대비',c.chgPrev.txt,`그 전주 ${won(Math.round(c.prev))}개`,c.chgPrev)}
     ${kpi('4주 평균 대비',c.chg4.txt,`직전 4주 평균 ${won(Math.round(c.avg4))}개/주`,c.chg4)}
   </div>`;
-  const selItem=FLOW_SEL!=="__ALL__"?items.find(x=>x.s.nm===FLOW_SEL):null, selJ=selItem?flowJudge(selItem.s,selItem.st,selItem.salesCmp):null;
-  const sumLine=`<div class="flowSum"><b>${pEsc(selName)}</b> · 지난주(${flowRange(st.weeks[c.done])}) <b>${won(Math.round(c.last))}개</b> 출고 — 전주 대비 <b class="fc ${c.chgPrev.cls}">${c.chgPrev.txt}</b>, 최근 4주 평균 대비 <b class="fc ${c.chg4.cls}">${c.chg4.txt}</b>${selJ?`<br><b>재고 판단</b> <span class="jb b${selJ.lv}">${selJ.label}</span> ${[selJ.order?`권장 ${won(selJ.order)}개`:'',selJ.lv<4?selJ.detail:''].filter(Boolean).join(' · ')} · 보유 ${flowCoverTxt(selJ.coverW)}${selJ.room.k?` · 영업 여유 <b>${selJ.room.t}</b>${selJ.room.sub?` (${selJ.room.sub})`:''}`:''}${selJ.promoN&&selJ.baseW>0?` · 주 출고 평소 ${won(Math.round(selJ.baseW))} + 공구 ${selJ.promoN}회`:''}${selJ.plan?` · 영업 예정 ${won(selJ.plan)}개 반영`:""}`:""}</div>`;
+  const selItem=one?items.find(x=>x.s.nm===FLOW_SEL):null, selJ=selItem?flowJudge(selItem.s,selItem.st,selItem.salesCmp):null;
+  const sumLine=`<div class="flowSum"><b>${pEsc(selName)}</b> · 지난주(${flowRange(st.weeks[c.done])}) <b>${won(Math.round(c.last))}개</b> 출고 — 전주 대비 <b class="fc ${c.chgPrev.cls}">${c.chgPrev.txt}</b>, 최근 4주 평균 대비 <b class="fc ${c.chg4.cls}">${c.chg4.txt}</b>${selJ?`<br><b>재고 판단</b> <span class="jb b${selJ.lv}">${selJ.label}</span> ${[selJ.order?`권장 ${won(selJ.order)}개`:'',selJ.lv<4?selJ.detail:''].filter(Boolean).join(' · ')} · 보유 ${flowCoverTxt(selJ.coverW)}${selJ.room.k?` · 영업 여유 <b>${selJ.room.t}</b>${selJ.room.sub?` (${selJ.room.sub})`:''}`:''}${selJ.promoN&&selJ.baseW>0?` · 주 출고 평소 ${won(Math.round(selJ.baseW))} + 공구 ${selJ.promoN}회`:''}${selJ.plan?` · 영업 예정 ${won(selJ.plan)}개 반영`:""}`:""}${grp?`<br><span class="jsc ${grp.cls}">${grp.t}</span> ${grp.d} — ${names.map(n=>pEsc(n.replace(/^터블\s+(트루클린\s+|파워클린\s+|케어클린\s+|올클린\s+)?/,''))).join(', ')}`:''}</div>`;
   // [v119] 최근 10영업일 하루 출고 숫자 — 차트만으로는 수량이 안 읽힌다는 요청
   const di=flowWeekdayIdx(st,10), dsum=di.reduce((a,i)=>a+st.dTot[i],0);
   const dayTbl=`<div class="flowOvWrap"><table class="flowTbl flowDay"><thead><tr><th>최근 10영업일</th>${di.map(i=>`<th>${flowDayLabel(st.days[i])}</th>`).join('')}<th>평균</th></tr></thead>
@@ -10182,13 +10193,12 @@ function flowBoardHtml(){
   };
   const sum4=s2=>{ const d=flowWeekCmp(s2).done; let t=0; for(let k=d-3;k<=d;k++) if(k>=0) t+=s2.tot[k]; return t; };
   // [v122] 품목을 고르면 표도 그 품목만 — 전체 품목이 늘 나열돼 화면이 너무 길다는 요청. 전체 보기는 '← 전체 품목 보기'.
-  const one=FLOW_SEL!=='__ALL__';
-  const rows=items.filter(x=>x.st&&(one?x.s.nm===FLOW_SEL:wIdx.some(i=>x.st.tot[i]>=0.5))).map(x=>({nm:x.s.nm,st:x.st,sum4:sum4(x.st)})).sort((a,b)=>b.sum4-a.sum4);
-  const mx=`<div class="flowCard"><div class="flowH">${one?`${pEsc(selName.replace(/^터블\s+(트루클린\s+)?/,''))} 주간 출고`:'품목별 주간 출고'} <span>최근 ${FLOW_MX_WEEKS}주${one?'':' · 최근 4주 출고 많은 순 · 품목을 누르면 그 품목만 보입니다'}</span></div>
+  const rows=items.filter(x=>x.st&&(one?x.s.nm===FLOW_SEL:grp?names.includes(x.s.nm):wIdx.some(i=>x.st.tot[i]>=0.5))).map(x=>({nm:x.s.nm,st:x.st,sum4:sum4(x.st)})).sort((a,b)=>b.sum4-a.sum4);
+  const mx=`<div class="flowCard"><div class="flowH">${one?`${pEsc(selName.replace(/^터블\s+(트루클린\s+)?/,''))} 주간 출고`:grp?`${grp.t} · 품목별 주간 출고`:'품목별 주간 출고'} <span>최근 ${FLOW_MX_WEEKS}주${one?'':' · 최근 4주 출고 많은 순 · 품목을 누르면 그 품목만 보입니다'}</span></div>
     <div class="flowLegend"><span class="lg spk">1,234 🔶</span> <b>대량 출고 주</b> — 그 품목의 평소 주간 출고(13주 중간값)보다 2.5배 이상 나간 주입니다. 공구·특판 등 한 번에 크게 나간 출고로 보고, 숫자는 그대로 둡니다.
       <span class="lg"><b class="fc up">▲</b> <b class="fc down">▼</b></span> <b>전주 대비</b>는 지난주를 그 전주와, <b>4주 평균 대비</b>는 지난주를 그 직전 4주의 주평균(지난주 제외)과 비교합니다. 15% 이상 늘면 ▲ 빨강, 줄면 ▼ 파랑이고, 기준이 주 100개 미만이면 % 대신 <b>늘어난·줄어든 개수</b>(예: +182개)로 표시합니다.</div>
     <div class="flowOvWrap"><table class="flowTbl flowOv flowMx"><thead><tr><th>품목</th>${head}<th>전주 대비<br><span>지난주 vs 그 전주</span></th><th>4주 평균 대비<br><span>지난주 vs 직전 4주 평균</span></th><th>흐름</th></tr></thead>
-    <tbody>${one?'':rowOf('__ALL__','전체 합계',stAll,'sum')}${rows.map(r=>rowOf(r.nm,r.nm,r.st)).join('')}</tbody></table></div>
+    <tbody>${one?'':grp?rowOf(FLOW_SEL,'묶음 합계',st,'sum'):rowOf('__ALL__','전체 합계',stAll,'sum')}${rows.map(r=>rowOf(r.nm,r.nm,r.st)).join('')}</tbody></table></div>
     <div class="flowNote">주간 출고는 매일 올린 재고가 줄어든 양입니다(월~일, 재고 파일명 날짜 기준). 재고 기록이 며칠 비면 그 사이 감소를 평일에 나눠 채우고, 입고가 낀 주는 앞뒤 3주 평균으로 판매를 추정해 더합니다.
       금요일 재고까지 들어온 주를 끝난 주로 봅니다.</div></div>`;
   // ③ 판매처별 월 출고 — 참고(접힘)
@@ -10202,10 +10212,10 @@ function flowBoardHtml(){
       <tr class="sum"><td>전체</td>${sm.total.map(v=>`<td>${won(Math.round(v))}</td>`).join('')}<td><b>${won(Math.round(salesCmp.avg))}</b></td><td>100%</td><td class="${salesCmp.dir.c}">${salesCmp.dir.t}${flowPct(salesCmp.dir.p)}</td></tr></tbody></table></div></div>`;
   }
   const chCard=`<div class="flowCard"><div class="flowH">판매처별 월 출고 <span>${pEsc(selName)} · 매출 데이터 ${sm?`${flowMonLabel(sm.months[0])}~${flowMonLabel(sm.months[sm.months.length-1])}`:''} · 월말 일괄 기록이라 주 단위 판매처 구분은 불가</span></div>${chPart}</div>`;
-  return top+sumLine+chartCard+mx+dayCard+flowJudgeCard(one?items.filter(x=>x.s.nm===FLOW_SEL):items,one)+chCard;
+  return top+sumLine+chartCard+mx+dayCard+flowJudgeCard(one?items.filter(x=>x.s.nm===FLOW_SEL):grp?items.filter(x=>names.includes(x.s.nm)):items,one||!!grp)+chCard;
 }
 function flowDrawSales(){
-  const names=FLOW_SEL==='__ALL__'?flowItems().map(s=>s.nm):[FLOW_SEL];
+  const names=flowSelNames();   // [v130] 묶음 선택 포함
   const sm=flowSalesMonthly(names); if(!sm||!document.getElementById('flowSalesChart')) return;
   makeChart('flowSalesChart',{type:'bar',
     data:{labels:sm.months.map(flowMonLabel),
@@ -10215,7 +10225,7 @@ function flowDrawSales(){
 }
 function flowDrawCharts(){
   flowDrawSales();
-  const names=FLOW_SEL==='__ALL__'?flowItems().map(s=>s.nm):[FLOW_SEL];
+  const names=flowSelNames();   // [v130] 묶음 선택 포함
   let st=flowStockWeekly(names); if(!st) return;
   const SOLID='#e08a2b', PART='rgba(224,138,43,.35)', SPK='#c0392b';
   // [v119] 일별 — 평일만(주말은 출고가 없어 0으로 비어 보이므로 뺀다), 5영업일 평균선
@@ -10244,7 +10254,7 @@ function renderFlowBoard(){
   const box=document.getElementById('flowBoard');
   if(typeof EXTERNAL!=='undefined'&&EXTERNAL){ if(box) box.style.display='none'; return; }
   if(box&&!box.open) return;
-  if(FLOW_SEL!=='__ALL__'&&!flowItems().some(s=>s.nm===FLOW_SEL)) FLOW_SEL='__ALL__';
+  if(FLOW_SEL!=='__ALL__'&&!flowSelGroup()&&!flowItems().some(s=>s.nm===FLOW_SEL)) FLOW_SEL='__ALL__';
   body.innerHTML=flowBoardHtml();
   flowDrawCharts();
 }
