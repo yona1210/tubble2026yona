@@ -562,6 +562,60 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .flowJd td.jr.push b{color:#a05a00}
 .flowJd tr.jl3 td.jr b{color:#1E2761}
 .flowJd td.jq{text-align:right}
+/* [v134] 시장 전략 개편 — 큰 숫자 카드 · 결론 카드 · 상태 pill */
+#tab-market .mktTab{font-size:13.5px;padding:8px 20px;border-radius:20px}
+.msHead{margin:4px 2px 14px}.msHead h2{font-size:22px;font-weight:800;color:#141a33;margin:0}.msHead p{font-size:13px;color:#7a8194;margin:4px 0 0}
+.msKpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:14px}
+.msKpi{background:#fff;border-radius:16px;padding:18px 20px;box-shadow:0 1px 2px rgba(20,26,51,.06),0 0 0 1px #edf0f5;display:flex;flex-direction:column;gap:6px}
+.msKpi .msK{font-size:12.5px;color:#7a8194;font-weight:600}
+.msKpi b{font-size:30px;font-weight:800;color:#141a33;letter-spacing:-.5px;line-height:1.1}.msKpi b small{font-size:16px;color:#9aa1b2;font-weight:700}
+.msKpi em{font-style:normal;font-size:11.5px;color:#9aa1b2}
+.msKpi.hero{background:linear-gradient(135deg,#1E2761,#3355FF);box-shadow:none}.msKpi.hero .msK,.msKpi.hero em{color:rgba(255,255,255,.78)}.msKpi.hero b{color:#fff}
+.msDecs{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:14px}
+.msDec{background:#fff;border-radius:16px;padding:16px 18px;box-shadow:0 0 0 1px #edf0f5;border-top:4px solid #c8ccd6}
+.msDec.keep{border-top-color:#1E9E63}.msDec.grow{border-top-color:#3355FF}.msDec.weak{border-top-color:var(--red)}.msDec.opp{border-top-color:var(--amber)}
+.msDecH{display:flex;align-items:center;justify-content:space-between}.msDecN{font-size:20px;font-weight:800;color:#141a33}
+.msDecD{font-size:12px;color:#7a8194;margin:6px 0 10px}
+.msDecR{display:flex;flex-direction:column;gap:2px;padding:8px 0;border-top:1px solid #f0f2f6;cursor:pointer}.msDecR:hover .msDecNm{color:#3355FF}
+.msDecNm{font-size:13.5px;font-weight:700;color:#141a33}.msDecV{font-size:12px;color:#5a6175}.msDecV b{color:#141a33}.msVs{color:#b0b6c4;margin:0 2px}
+.msMore{font-size:12px;color:#3355FF;font-weight:600;margin-top:8px;cursor:pointer}
+.msPill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.msPill.keep{background:#e6f6ee;color:#127a4b}.msPill.grow{background:#eaefff;color:#2443d6}.msPill.weak{background:#fdecea;color:#c0392b}.msPill.opp{background:#fff3e0;color:#a05a00}.msPill.ref{background:#f1f3f7;color:#8a90a2;font-weight:600}
+.msCard{background:#fff;border-radius:16px;padding:18px 20px;box-shadow:0 0 0 1px #edf0f5;margin-bottom:14px}
+.msCardH{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 14px;margin-bottom:12px}.msCardH h3{font-size:16px;font-weight:800;color:#141a33;margin:0}
+.msSum{font-size:12px;color:#9aa1b2}
+.msSearch{margin-left:auto;border:1px solid #e1e5ee;border-radius:10px;padding:7px 12px;font-size:12.5px;min-width:200px}
+.msMix{display:flex;flex-direction:column}
+.msMixR{display:grid;grid-template-columns:minmax(120px,190px) 1fr 70px 110px 74px;align-items:center;gap:12px;padding:8px 4px;border-top:1px solid #f3f4f8;cursor:pointer}
+.msMixR:hover{background:#f8f9fc}.msMixNm{font-size:13px;font-weight:700;color:#141a33}
+.msMixBar{height:10px;background:#f1f3f7;border-radius:6px;overflow:hidden}.msMixBar i{display:block;height:100%;background:#3355FF;border-radius:6px}
+.msMixV{font-size:13px;font-weight:800;color:#141a33;text-align:right}.msMixS{font-size:11.5px;color:#7a8194}
+.msFilt{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.msFilt button{border:1px solid #e1e5ee;background:#fff;border-radius:999px;padding:5px 14px;font-size:12.5px;font-weight:600;color:#4a5470;cursor:pointer}
+.msFilt button b{margin-left:3px}.msFilt button.on{background:#141a33;border-color:#141a33;color:#fff}
+.msTbl{width:100%;border-collapse:collapse;font-size:13px}
+.msTbl thead th{font-size:11.5px;color:#8a90a2;font-weight:600;text-align:center;padding:9px 10px;border-bottom:1px solid #edf0f5;background:#fafbfd;white-space:nowrap}
+.msTbl th.l,.msTbl td.l{text-align:left}.msTbl th.r,.msTbl td.r{text-align:right}
+.msTbl td{padding:10px;border-bottom:1px solid #f3f4f8;text-align:center;color:#3a3f52;vertical-align:middle}
+.msTbl td small{display:block;font-size:10.5px;color:#a3a9b8;font-weight:400;margin-left:16px}
+.msTbl tr.msG td{background:#f4f6fb;text-align:left;font-weight:800;color:#141a33;font-size:13px;padding:9px 12px}.msTbl tr.msG td span{font-weight:600;color:#8a90a2;font-size:12px;margin-left:6px}
+.msTbl tr.msR{cursor:pointer}.msTbl tr.msR:hover td{background:#f8f9fc}.msTbl tr.msR.ref td{color:#9aa1b2}.msTbl tr.msR.ref b{font-weight:600;color:#7a8194}
+.msTbl tr.msR.open td{background:#f4f7ff}
+.msCar{display:inline-block;width:16px;color:#9aa1b2;font-size:11px}
+.msDim{color:#c8ccd6}
+.msTbl tr.msX td{background:#f8faff;padding:10px 14px 14px 30px;text-align:left}
+.msXi{font-size:12px;color:#5a6175;margin-bottom:8px}.msXi span{display:inline-block;background:#fff;border:1px solid #e1e5ee;border-radius:8px;padding:2px 8px;margin:2px 4px 2px 0}
+.msT5{width:100%;border-collapse:collapse;font-size:12px;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px #edf0f5}
+.msT5 th{background:#fafbfd;color:#8a90a2;font-weight:600;padding:6px 8px;text-align:center}.msT5 td{padding:6px 8px;border-top:1px solid #f3f4f8;text-align:center}.msT5 .l{text-align:left}
+.msNote{font-size:11.5px;color:#9aa1b2;margin-top:10px;line-height:1.6}
+.msEmpty{font-size:12px;color:#b0b6c4;padding:8px 0;text-align:center}
+.msSrc{display:flex;flex-wrap:wrap;gap:6px}.msSrc span{font-size:11px;color:#7a8194;background:#f1f3f7;border-radius:999px;padding:3px 10px}
+.msRef{background:#fff;border-radius:14px;box-shadow:0 0 0 1px #edf0f5;margin-bottom:10px}
+.msRef summary{cursor:pointer;padding:14px 18px;display:flex;align-items:baseline;gap:10px;list-style:none}.msRef summary::-webkit-details-marker{display:none}
+.msRef summary:before{content:'▸';color:#9aa1b2;font-size:12px}.msRef[open] summary:before{content:'▾'}
+.msRef summary b{font-size:14.5px;color:#141a33}.msRef summary span{font-size:12px;color:#9aa1b2}
+.msRefB{padding:0 14px 14px}
+@media(max-width:720px){.msMixR{grid-template-columns:1fr 70px;}.msMixR .msMixBar,.msMixR .msMixS{display:none}.msSearch{margin-left:0;width:100%}}
 /* [v132] 쿠팡 카테고리 지도 */
 .cmSum{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12.5px;color:#4a5470;margin:2px 0 10px}
 .cmSum .in b{color:#1E9E63}.cmSum .opp b{color:#a05a00}
@@ -2374,14 +2428,9 @@ body{padding-bottom:48px}
 <div id="tab-market" style="display: none;">
   <div class="toolbar">
     <div class="marketSeg" id="marketSeg">
-      <button class="mktTab" data-mkt="overview">종합 요약</button>
-      <button class="mktTab" data-mkt="structure">시장 구조</button>
-      <button class="mktTab" data-mkt="catmap">카테고리 지도</button>
-      <button class="mktTab" data-mkt="sales">터블 실매출</button>
-      <button class="mktTab on" data-mkt="matrix">경쟁 매트릭스</button>
-      <button class="mktTab" data-mkt="top5">Top5 경쟁사</button>
-      <button class="mktTab" data-mkt="strategy">전략 로드맵</button>
-      <button class="mktTab" data-mkt="notes">참고·주석</button>
+      <button class="mktTab on" data-mkt="home">한눈에</button>
+      <button class="mktTab" data-mkt="cats">카테고리별</button>
+      <button class="mktTab" data-mkt="ref">근거 자료</button>
     </div>
     <div style="margin-left:auto;display:flex;gap:6px">
       <button class="tbtn accent" id="btnMatrixUpload">📊 경쟁사 조사 업로드</button>
@@ -6862,7 +6911,7 @@ window.selectCost=function(nm){ costSel=nm; renderCost(); };
 })();
 
 // ===== 시장·전략 탭 (v18) — 시장 분석 로드맵 임베드 =====
-let marketTab='overview';
+let marketTab='home';
 function compBadge(comp){
   // 🟢선도 🟡유지 🟠성장 🔴약세 🟣신규
   const c=comp||'';
@@ -7138,6 +7187,105 @@ const COUPANG_CATS=[
       {n:'옷장/서랍/신발장탈취제'},{n:'신발탈취제'},{n:'새집증후군제거',c:[{n:'피톤치드'},{n:'새집증후군제거제'},{n:'살균소독제'}]}]},
     {n:'제습제'}]}
 ];
+// ===== [v134] 시장 전략 개편 — 한눈에 / 카테고리별 / 근거 자료 =====
+//  레퍼런스(큰 숫자 카드 + 섹션 요약줄 + 상태 pill): 첫 화면은 결론만, 카테고리는 표 하나(행을 펼치면 경쟁 Top5), 원자료는 근거 자료로.
+//  판정: 지킬 곳(점유 1%↑ 또는 선도) / 약한 곳(약세 또는 쿠팡 Top5 대비 3% 미만) / 키울 곳(그 외 진출) / 노릴 곳(미진출·시장 200억↑ 또는 Top5 20억↑) / 참고
+const MS_V={keep:{t:'지킬 곳',d:'점유 상위 — 지금 자리 방어',cls:'keep'},grow:{t:'키울 곳',d:'진출 중 — 판매 확대',cls:'grow'},
+  weak:{t:'약한 곳',d:'쿠팡 상위 대비 크게 열세 — 개선 또는 정리 검토',cls:'weak'},opp:{t:'노릴 곳',d:'미진출인데 시장이 큼 — 신규 검토',cls:'opp'},ref:{t:'참고',d:'미진출',cls:'ref'}};
+const MS_ORDER=['keep','grow','weak','opp','ref'];
+let msFilter='all', msQ='', msOpen=new Set();
+const msEok=v=>v==null||!(v>0)?'-':(v>=100?won(Math.round(v)):v>=10?(Math.round(v*10)/10):(Math.round(v*100)/100))+'억';
+const msPct=v=>v==null?'-':(v>=1?v.toFixed(1):v>=0.1?v.toFixed(2):v.toFixed(3))+'%';
+const msPill=v=>`<span class="msPill ${MS_V[v].cls}">${MS_V[v].t}</span>`;
+function msRows(){
+  const M=MKT(), mx={}; (M.matrix||[]).forEach(r=>{ if(r&&r.cat&&!mx[r.cat]) mx[r.cat]=r; });
+  const t5=M.top5||{}, L=M._live, sd=DATA.salesData||{}, cy=L?L.cy:'';
+  const ca={}; if(cy) Object.keys(sd.item||{}).forEach(nm=>{ const a=salesYearAmt(sd.item[nm],cy); if(a){ const c=salesCategory(nm); ca[c]=(ca[c]||0)+a; } });
+  const stockBy={}; (DATA.stock||[]).filter(s=>!s.archived&&!s._pendingDel).forEach(s=>{ const k=salesCategory(s.nm); (stockBy[k]=stockBy[k]||[]).push(s.nm); });
+  const rows=[];
+  const walk=(n,path)=>{ if(n.c){ n.c.forEach(ch=>walk(ch,path.concat(n.n))); return; }
+    const r=n.m?mx[n.m]:null, rev=(n.t||[]).reduce((a,c)=>a+(ca[c]||0),0)/1e8, items=[].concat(...(n.t||[]).map(c=>stockBy[c]||[]));
+    const mkt=r&&r.mktSize>0?+r.mktSize:null, top5=r&&r.top5Sum>0?+r.top5Sum:null, share=mkt&&rev>0?rev/mkt*100:null, comp=r?String(r.comp||''):'';
+    const isIn=rev>0||items.length>0; let v;
+    if(isIn){ if(/선도/.test(comp)||(share!=null&&share>=1)) v='keep'; else if(/약세/.test(comp)||(top5>=20&&rev<top5*0.03)) v='weak'; else v='grow'; }
+    else v=((mkt||0)>=200||(top5||0)>=20)?'opp':'ref';
+    rows.push({id:'c'+rows.length,n:n.n,group:path[0],sub:path.slice(1).join(' › '),note:n.note||'',rev,items,mkt,top5,share,comp,
+      top1:r&&r.top1&&r.top1!=='-'?r.top1:'',top1Rev:r&&r.yearRev>0?+r.yearRev:null,v,t5:(n.m&&t5[n.m])||[]});
+  };
+  COUPANG_CATS.forEach(g=>walk(g,[]));
+  return {rows,L,M};
+}
+function msHomeHtml(){
+  const {rows,L,M}=msRows(), s=MARKET_DATA.summary, mktEok=(parseFloat(String(s.market))||0)*10000;
+  const by=v=>rows.filter(r=>r.v===v), nIn=rows.filter(r=>r.v!=='opp'&&r.v!=='ref').length;
+  const kpis=`<div class="msKpis">
+    <div class="msKpi hero"><span class="msK">터블 ${L?L.cy:''} 매출</span><b>${L?L.total.toFixed(1)+'억':s.tubble2025}</b><em>${L?`${L.from}~${L.to}월 누적 · 2025년 연간 ${s.tubble2025}`:'2025 ERP'}</em></div>
+    <div class="msKpi"><span class="msK">국내 세제 시장</span><b>${s.market}</b><em>2026.04 로드맵 추정 (연간)</em></div>
+    <div class="msKpi"><span class="msK">전체 점유율</span><b>${L&&mktEok?msPct(L.total/mktEok*100):s.share}</b><em>누적 매출 ÷ 연간 시장 규모</em></div>
+    <div class="msKpi"><span class="msK">진출 카테고리</span><b>${nIn}<small> / ${rows.length}</small></b><em>쿠팡 세부 카테고리 기준</em></div></div>`;
+  const line={keep:r=>`${msEok(r.rev)} · 점유 <b>${msPct(r.share)}</b>`, grow:r=>`${msEok(r.rev)}${r.share!=null?` · 점유 ${msPct(r.share)}`:''}`,
+    weak:r=>`터블 ${msEok(r.rev)} <span class="msVs">vs</span> 쿠팡 Top5 <b>${msEok(r.top5)}</b>`, opp:r=>r.top5?`쿠팡 Top5 <b>${msEok(r.top5)}</b>${r.mkt?` · 시장 ${msEok(r.mkt)}`:''}`:`시장 <b>${msEok(r.mkt)}</b>`};
+  const sortK={keep:(a,b)=>b.rev-a.rev,grow:(a,b)=>b.rev-a.rev,weak:(a,b)=>(b.top5||0)-(a.top5||0),opp:(a,b)=>((b.top5||0)*20+(b.mkt||0))-((a.top5||0)*20+(a.mkt||0))};
+  const card=v=>{ const rs=by(v).sort(sortK[v]), show=rs.slice(0,4);
+    return `<div class="msDec ${MS_V[v].cls}"><div class="msDecH">${msPill(v)}<span class="msDecN">${rs.length}개</span></div>
+      <div class="msDecD">${MS_V[v].d}</div>
+      ${show.length?show.map(r=>`<div class="msDecR" onclick="msGo('${r.id}')"><span class="msDecNm">${pEsc(r.n)}</span><span class="msDecV">${line[v](r)}</span></div>`).join(''):'<div class="msEmpty">해당 없음</div>'}
+      ${rs.length>show.length?`<div class="msMore" onclick="msSet('${v}')">+ ${rs.length-show.length}개 더 보기 →</div>`:''}</div>`; };
+  const ins=rows.filter(r=>r.rev>0).sort((a,b)=>b.rev-a.rev), mx=Math.max(...ins.map(r=>r.rev),1);
+  const mix=`<div class="msCard"><div class="msCardH"><h3>터블 매출은 어디서 나오나</h3><span class="msSum">진출 ${ins.length}개 카테고리 · ${L?L.cy+'년 '+L.from+'~'+L.to+'월':''} · 막대 = 터블 매출</span></div>
+    <div class="msMix">${ins.map(r=>`<div class="msMixR" onclick="msGo('${r.id}')"><span class="msMixNm">${pEsc(r.n)}</span><span class="msMixBar"><i style="width:${Math.max(2,r.rev/mx*100).toFixed(1)}%"></i></span><span class="msMixV">${msEok(r.rev)}</span><span class="msMixS">${r.share!=null?'점유 '+msPct(r.share):'시장 규모 미조사'}</span>${msPill(r.v)}</div>`).join('')}</div></div>`;
+  return `<div class="msHead"><h2>시장 전략</h2><p>국내 세제 시장에서 터블이 지킬 곳, 키울 곳, 약한 곳, 노릴 곳</p></div>${kpis}
+    <div class="msDecs">${['keep','grow','weak','opp'].map(card).join('')}</div>${mix}
+    <div class="msSrc">${msSrcChips(M,L)}</div>`;
+}
+function msSrcChips(M,L){
+  return `<span>시장 규모 · 2026.04 로드맵</span><span>쿠팡 경쟁사 조사 · ${M._matrixAt||M._top5At||'기본 데이터'}</span><span>터블 매출 · ${L?`${L.cy}년 ${L.to}월까지 업로드`:'없음'}</span>`;
+}
+window.msSet=function(f){ msFilter=f; marketTab='cats'; renderMarket(); };
+window.msGo=function(id){ msFilter='all'; msQ=''; msOpen.add(id); marketTab='cats'; renderMarket();
+  setTimeout(()=>{ const el=document.querySelector(`tr[data-ms="${id}"]`); if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); },60); };
+window.msToggle=function(id){ if(msOpen.has(id)) msOpen.delete(id); else msOpen.add(id); renderMarket(); };
+window.msSearch=function(v){ msQ=String(v||'').trim(); renderMarket(); const i=document.getElementById('msQ'); if(i){ i.focus(); i.setSelectionRange(i.value.length,i.value.length); } };
+function msCatsHtml(){
+  const {rows,L,M}=msRows();
+  const cnt=v=>rows.filter(r=>r.v===v).length;
+  const vis=rows.filter(r=>(msFilter==='all'||r.v===msFilter)&&(!msQ||(r.n+r.sub+r.group+r.items.join(' ')+r.top1).includes(msQ)));
+  const pills=`<button class="${msFilter==='all'?'on':''}" onclick="msSet('all')">전체 <b>${rows.length}</b></button>`+MS_ORDER.map(v=>`<button class="${msFilter===v?'on':''} ${MS_V[v].cls}" onclick="msSet('${v}')">${MS_V[v].t} <b>${cnt(v)}</b></button>`).join('');
+  const groups=[...new Set(rows.map(r=>r.group))];
+  const body=groups.map(g=>{ const rs=vis.filter(r=>r.group===g); if(!rs.length) return '';
+    const gRev=rs.reduce((a,r)=>a+r.rev,0);
+    return `<tr class="msG"><td colspan="7">${pEsc(g)} <span>${rs.length}개${gRev>0?` · 터블 ${msEok(gRev)}`:''}</span></td></tr>`+rs.map(r=>{
+      const open=msOpen.has(r.id), canOpen=r.t5.length||r.items.length;
+      const t5=open?`<tr class="msX"><td colspan="7">
+        ${r.items.length?`<div class="msXi"><b>터블 품목</b> ${r.items.map(x=>`<span>${pEsc(x.replace(/^터블\s+(트루클린\s+|파워클린\s+|케어클린\s+|올클린\s+)?/,''))}</span>`).join('')}</div>`:''}
+        ${r.t5.length?`<table class="msT5"><thead><tr><th>순위</th><th class="l">브랜드</th><th class="l">제품</th><th>판가</th><th>월판매</th><th>연매출</th></tr></thead><tbody>${r.t5.map(x=>`<tr><td>${x.rank||''}</td><td class="l"><b>${pEsc(x.brand||'-')}</b></td><td class="l">${pEsc(x.product||'')}</td><td>${x.price?won(x.price)+'원':'-'}</td><td>${x.monthQty?won(x.monthQty):'-'}</td><td>${x.yearRev!=null&&x.yearRev!==''?x.yearRev+'억':'-'}</td></tr>`).join('')}</tbody></table>`:'<div class="msEmpty">쿠팡 경쟁사 조사 없음</div>'}</td></tr>`:'';
+      return `<tr class="msR ${r.v}${open?' open':''}" data-ms="${r.id}"${canOpen?` onclick="msToggle('${r.id}')"`:''}>
+        <td class="l"><span class="msCar">${canOpen?(open?'▾':'▸'):''}</span><b>${pEsc(r.n)}</b>${r.sub?`<small>${pEsc(r.sub)}</small>`:''}</td>
+        <td>${msPill(r.v)}</td><td class="r">${r.rev>0?`<b>${msEok(r.rev)}</b>`:'<span class="msDim">-</span>'}</td>
+        <td class="r">${r.share!=null?msPct(r.share):'<span class="msDim">-</span>'}</td><td class="r">${r.mkt?msEok(r.mkt):'<span class="msDim">-</span>'}</td>
+        <td class="r">${r.top5?msEok(r.top5):'<span class="msDim">-</span>'}</td>
+        <td class="l">${r.top1?`${pEsc(r.top1)}${r.top1Rev?` <span class="msDim">${msEok(r.top1Rev)}</span>`:''}`:'<span class="msDim">-</span>'}</td></tr>`+t5; }).join(''); }).join('');
+  return `<div class="msCard"><div class="msCardH"><h3>카테고리별 위치</h3><span class="msSum">쿠팡 세부 카테고리 ${rows.length}개 · 행을 누르면 터블 품목과 쿠팡 경쟁 Top5</span>
+      <input id="msQ" class="msSearch" placeholder="카테고리·브랜드 검색" value="${pEsc(msQ)}" oninput="msSearch(this.value)"></div>
+    <div class="msFilt">${pills}</div>
+    <div style="overflow-x:auto"><table class="msTbl"><thead><tr><th class="l">카테고리</th><th>판정</th><th class="r">터블 매출</th><th class="r">점유율</th><th class="r">시장 규모</th><th class="r">쿠팡 Top5</th><th class="l">쿠팡 1위</th></tr></thead>
+    <tbody>${body||'<tr><td colspan="7" class="msEmpty">조건에 맞는 카테고리가 없습니다</td></tr>'}</tbody></table></div>
+    <div class="msNote">판정 — <b>지킬 곳</b> 점유 1% 이상 또는 선도 · <b>약한 곳</b> 경쟁력 약세 또는 터블 매출이 쿠팡 Top5 합의 3% 미만 · <b>키울 곳</b> 그 외 진출 · <b>노릴 곳</b> 미진출이면서 시장 200억 이상 또는 쿠팡 Top5 20억 이상.
+      점유율 = 터블 올해 누적 매출 ÷ 연간 시장 규모.</div></div>
+    <div class="msSrc">${msSrcChips(M,L)}</div>`;
+}
+function msRefHtml(){
+  const M=MKT(), L=M._live;
+  const sec=(t,sub,html,open)=>`<details class="msRef"${open?' open':''} ontoggle="if(this.open&&typeof drawMarketCharts==='function')drawMarketCharts()"><summary><b>${t}</b><span>${sub}</span></summary><div class="msRefB">${html}</div></details>`;
+  return `<div class="msHead"><h2>근거 자료</h2><p>회의·검토 때 펼쳐 보는 원자료입니다. 화면의 판정은 모두 이 자료에서 계산됩니다.</p></div>
+    <div class="msSrc" style="margin-bottom:12px">${msSrcChips(M,L)}</div>
+    ${sec('세부 시장 규모','로드맵 23개 카테고리 · 범위·신뢰도·출처',mktStructureHtml(),false)}
+    ${sec('경쟁 매트릭스 원본','쿠팡 조사 카테고리별 경쟁력·Top5·기회 점수',mktMatrixHtml(),false)}
+    ${sec('쿠팡 경쟁사 Top5 전체','카테고리별 상위 제품',mktTop5Html(),false)}
+    ${sec('전략 로드맵','방향·라인업 갭·추진 일정',mktStrategyHtml(),false)}
+    ${sec('2025 터블 실매출 (ERP)','로드맵 작성 당시 카테고리별 매출',mktSalesHtml(),false)}
+    ${sec('참고·주석','출처와 산정 방식',mktNotesHtml(),false)}`;
+}
 let catMapFilter='all';
 window.catMapSet=function(f){ catMapFilter=f; renderMarket(); };
 function catMapHtml(){
@@ -7191,7 +7339,7 @@ function catMapHtml(){
 function mktStructureHtml(){
   const big=MARKET_DATA.bigCat.map(b=>`<tr><td class="l">${b.name}</td><td class="r">${b.size}</td><td class="r"><b>${b.pct}</b></td></tr>`).join('');
   const sub=MARKET_DATA.subCat.map(c=>`<tr><td>${c.big}</td><td class="l">${c.name}</td><td class="r">${won(c.min)}</td><td class="r">${won(c.max)}</td><td class="r"><b>${won(c.mid)}</b></td><td class="r">${c.pct!=null?(c.pct*100).toFixed(1)+'%':'-'}</td><td class="c">${confBadge(c.conf)}</td><td class="l muted">${c.src}</td></tr>`).join('');
-  return `${categoryStructureHtml()}<div class="mCard"><h4>4대 대분류 시장 규모</h4>
+  return `<div class="mCard"><h4>4대 대분류 시장 규모</h4>
     <table class="mTbl"><thead><tr><th class="l">대분류</th><th class="r">시장 규모(억)</th><th class="r">비중</th></tr></thead><tbody>${big}</tbody></table></div>
     <div class="mCard"><h4>23개 세부 카테고리 시장 규모 <span class="hsub">범위(min~max) · 신뢰도 A공식 / B조사 / C추정 / D단일</span></h4>
     <table class="mTbl"><thead><tr><th>대분류</th><th class="l">세부 카테고리</th><th class="r">최소</th><th class="r">최대</th><th class="r">중간값</th><th class="r">비중</th><th class="c">신뢰</th><th class="l">대표 브랜드·출처</th></tr></thead><tbody>${sub}</tbody></table></div>`;
@@ -7314,11 +7462,13 @@ function mktNotesHtml(){
 }
 function renderMarket(){
   const body=document.getElementById('marketBody'); if(!body) return;
-  const map={overview:mktOverviewHtml,structure:mktStructureHtml,catmap:catMapHtml,sales:mktSalesHtml,matrix:mktMatrixHtml,top5:mktTop5Html,strategy:mktStrategyHtml,notes:mktNotesHtml};
-  body.innerHTML=(map[marketTab]||mktOverviewHtml)();
+  // [v134] 3탭(한눈에 / 카테고리별 / 근거 자료) — 예전 탭들은 근거 자료 안에 접어서 보관
+  const map={home:msHomeHtml,cats:msCatsHtml,ref:msRefHtml};
+  if(!map[marketTab]) marketTab='home';
+  body.innerHTML=map[marketTab]();
   document.querySelectorAll('#marketSeg .mktTab').forEach(b=>b.classList.toggle('on',b.dataset.mkt===marketTab));
   const f=document.getElementById('marketFooter');
-  if(f) f.innerHTML='시장 분석 출처: 터블 국내세제시장 로드맵(2026.04) · 시장 규모는 추정 범위 기반이며 신뢰도 등급(A~D) 병기. 발주·전략 판단의 상위 맥락 참고용.';
+  if(f) f.innerHTML='';   // [v134] 출처는 각 화면 아래 칩으로
   if(typeof drawMarketCharts==='function') drawMarketCharts();
   queueVisibleTabLayoutSync();
 }
