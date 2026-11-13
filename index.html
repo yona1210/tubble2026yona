@@ -3607,10 +3607,32 @@ if(!DATA.manufacturers){ DATA.manufacturers=[
 if(!(window.__TUBBLE_DATA__ && window.__TUBBLE_DATA__.viewonly) && typeof loadWeeklySnapsLocal==='function') loadWeeklySnapsLocal();   // VIEWONLY 선언 전이라 직접 확인
 if(typeof loadMfrLocal==='function' && loadMfrLocal()){ setTimeout(()=>{ try{toast('저장된 제조사 데이터를 불러왔습니다');}catch(e){} },800); }
 // 시장 데이터 접근자: 기본 MARKET_DATA + 업로드 override 병합
+// [v133] 터블 매출을 업로드한 매출 데이터(올해 누적)로 — 경쟁 매트릭스에 6/26 업로드 당시 숫자가 굳어 있었음.
+//  카테고리 연결은 카테고리 지도(COUPANG_CATS)의 m(매트릭스명) ↔ t(터블 매출 카테고리)와 같다.
+function mktLiveTub(){
+  try{
+    const sd=DATA.salesData; if(!sd||!sd.item||!sd.months||!sd.months.length) return null;
+    const cy=salesCurYear(sd); const by={}, catAmt={}; let total=0;
+    // 저장된 카테고리 집계는 예전 분류일 수 있어(매출 탭을 열어야 재집계) 품목 원자료에서 현재 규칙으로 직접 분류
+    Object.keys(sd.item).forEach(nm=>{ const a=salesYearAmt(sd.item[nm],cy); if(!a) return; total+=a; const c=salesCategory(nm); catAmt[c]=(catAmt[c]||0)+a; });
+    const walk=n=>{ if(n.c){ n.c.forEach(walk); return; } if(!n.m||!n.t) return;
+      const a=n.t.reduce((s,c)=>s+(catAmt[c]||0),0); by[n.m]=(by[n.m]||0)+a/1e8; };
+    COUPANG_CATS.forEach(walk);
+    const ms=sd.months.filter(m=>m.slice(0,4)===cy);
+    return {cy,by,total:total/1e8,from:ms.length?+ms[0].slice(5):0,to:ms.length?+ms[ms.length-1].slice(5):0};
+  }catch(e){ return null; }
+}
 function MKT(){
   const base=MARKET_DATA, ov=DATA.marketOverride||{};
+  // [v133] 같은 카테고리 중복(예: '이염방지시트'·'이염방지 시트') 한 줄로 — 데이터 많은 쪽 유지
+  const dedupe=arr=>{ const seen=new Map(), sc=x=>(x.top5Sum>0?2:0)+(x.mktSize>0?1:0);
+    (arr||[]).forEach(r=>{ if(!r) return; const k=String(r.cat||'').replace(/\s+/g,''); const p=seen.get(k); if(!p||sc(r)>sc(p)) seen.set(k,r); }); return [...seen.values()]; };
+  const live=mktLiveTub();
+  const withLive=arr=>live?arr.map(r=>{ const v=live.by[r.cat]; const rev=v>0?Math.round(v*100)/100:null;
+    return Object.assign({},r,{tubRev:rev!=null?rev:'-',tubShare:rev!=null&&r.mktSize>0?Math.round(rev/r.mktSize*10000)/100:null}); }):arr;
   return Object.assign({}, base, {
-    matrix: (ov.matrix && ov.matrix.length) ? ov.matrix : base.matrix,
+    _live: live,
+    matrix: withLive(dedupe((ov.matrix && ov.matrix.length) ? ov.matrix : base.matrix)),
     top5: (ov.top5 && Object.keys(ov.top5).length) ? ov.top5 : (base.top5||{}),
     _matrixUploaded: !!(ov.matrix && ov.matrix.length),
     _top5Uploaded: !!(ov.top5 && Object.keys(ov.top5).length),
@@ -6958,11 +6980,15 @@ function drawMarketCharts(){
   }
 }
 function mktOverviewHtml(){
-  const s=MARKET_DATA.summary;
+  const s=MARKET_DATA.summary, L=MKT()._live;
+  // [v133] 터블 매출·점유율은 업로드한 매출 데이터(올해 누적)로. 시장 규모는 로드맵 고정값임을 표시.
+  const mktEok=(parseFloat(String(s.market))||0)*10000;   // '2.33조' → 23,300억
+  const tubTxt=L?`${L.total.toFixed(1)}억`:s.tubble2025, tubLab=L?`터블 ${L.cy} 매출 (${L.from}~${L.to}월)`:'터블 2025 매출(ERP)';
+  const shareTxt=L&&mktEok?`${(L.total/mktEok*100).toFixed(3)}%`:s.share;
   const kpis=`<div class="mKpis">
-    <div class="mKpi"><div class="mv">${s.market}</div><div class="ml">국내 세제 시장 규모</div></div>
-    <div class="mKpi"><div class="mv">${s.tubble2025}</div><div class="ml">터블 2025 매출(ERP)</div></div>
-    <div class="mKpi alert"><div class="mv">${s.share}</div><div class="ml">전체 시장 점유율</div></div>
+    <div class="mKpi"><div class="mv">${s.market}</div><div class="ml">국내 세제 시장 규모</div><div class="ml" style="font-size:10.5px;color:#9aa1b2">2026.04 로드맵 추정</div></div>
+    <div class="mKpi"><div class="mv">${tubTxt}</div><div class="ml">${tubLab}</div>${L?`<div class="ml" style="font-size:10.5px;color:#9aa1b2">2025년 연간 ${s.tubble2025}</div>`:''}</div>
+    <div class="mKpi alert"><div class="mv">${shareTxt}</div><div class="ml">전체 시장 점유율</div>${L?`<div class="ml" style="font-size:10.5px;color:#9aa1b2">${L.cy} 누적 ÷ 시장 규모(연간)</div>`:''}</div>
     <div class="mKpi good"><div class="mv">★ ${s.lead}</div><div class="ml">유일 선도 카테고리</div></div>
   </div>`;
   // [v76] 핵심 결론 제거 — KPI·대분류 차트·기회/강점/주의 콜아웃과 전부 중복이라 삭제
@@ -6990,7 +7016,7 @@ function mktOverviewHtml(){
       <div class="mKpi good"><div class="mv" style="font-size:15px;line-height:1.25">${bestShare?bestShare.cat:'-'}</div><div class="ml">최고 점유 (${bestShare?bestShare.tubShare+'%':'-'})</div></div>
     </div>
     <div style="position:relative;height:${Math.max(150,entered.length*26+44)}px;width:100%;margin-top:8px"><canvas id="mktOverviewShare"></canvas></div>
-    <div class="basisNote">막대 = 진입 카테고리별 터블 점유율(매출÷시장규모). 색 = 경쟁력 등급.</div></div>`;
+    <div class="basisNote">막대 = 진입 카테고리별 터블 점유율(매출÷시장규모). 터블 매출 = ${L?`업로드한 매출 데이터 ${L.cy}년 ${L.from}~${L.to}월 누적`:'경쟁 매트릭스 업로드 당시'} · 시장 규모 = 2026.04 로드맵(연간). 색 = 경쟁력 등급.</div></div>`;
   const callout=`<div class="mCard"><h4>기회 · 강점 · 주의 <span class="hsub">매트릭스 자동 도출</span></h4>
     <div class="mCallGrid">
       <div class="mCall opp"><div class="mCallH">🎯 최우선 기회</div><b>${topOpp?topOpp.cat:'-'}</b><div class="mCallSub">시장 ${topOpp?won(topOpp.mkt)+'억':'-'} · 터블 ${topOpp?(topOpp.tubShare?topOpp.tubShare+'%':'미진입'):'-'}${topOpp&&topOpp.planCnt?` · 기획 ${topOpp.planCnt}건`:''}</div></div>
@@ -7117,7 +7143,8 @@ window.catMapSet=function(f){ catMapFilter=f; renderMarket(); };
 function catMapHtml(){
   const M=MKT(), mx={}; (M.matrix||[]).forEach(r=>{ if(r&&r.cat&&!mx[r.cat]) mx[r.cat]=r; });
   const sd=DATA.salesData||{}, cy=(typeof salesCurYear==='function'&&sd.months)?salesCurYear(sd):'';
-  const catAmt=c=>{ const o=(sd.category||{})[c]; return o&&cy?salesYearAmt(o,cy):0; };
+  const _ca={}; if(cy) Object.keys(sd.item||{}).forEach(nm=>{ const a=salesYearAmt(sd.item[nm],cy); if(a){ const c=salesCategory(nm); _ca[c]=(_ca[c]||0)+a; } });   // [v133] 품목 원자료에서 현재 분류 규칙으로
+  const catAmt=c=>_ca[c]||0;
   const stockBy={}; (DATA.stock||[]).filter(s=>!s.archived&&!s._pendingDel).forEach(s=>{ const k=salesCategory(s.nm); (stockBy[k]=stockBy[k]||[]).push(s.nm); });   // 재고 cat 이름은 제각각이라 매출과 같은 품명 규칙으로 연결
   const used=new Set(); const leaves=[];
   // 노드별 값 계산(부모는 자식 합)
