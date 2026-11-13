@@ -4633,7 +4633,7 @@ function runoutBasisHtml(s,c){
   // 3. 데일리 순재고 감소 기준
   rows.push({k:'데일리 순재고 감소 기준',daily:c.invDaily||0,run:c.runoutInv,
     use: c.source==='daily'?'적용':(c.invDaily!=null?'참고':'-'),
-    note: c.invDaily!=null? `유효 ${c.invValidCnt}건·${c.invSpanDays||0}일·순감소 ${won(Math.round(c.invNetDrop||0))}${u} (${tierLabel(c.invTier)})` : '데일리 이력 부족'});
+    note: c.invDaily!=null? `유효 ${c.invValidCnt}건·${c.invSpanDays||0}일·순감소 ${won(Math.round(c.invNetDrop||0))}${u} (${(c.source==='flow12'?'참고 · 발주 판단은 12주 평균':tierLabel(c.invTier))})` : '데일리 이력 부족'});
   // 4. 최종 적용
   rows.push({k:'발주 판단 적용 기준',daily:c.daily,run:c.runout,use:'최종',final:true,note:c.sourceLabel||'-'});
   const baseRun=c.runoutBase||c.runout;
@@ -4654,7 +4654,7 @@ function runoutBasisHtml(s,c){
       ${exc?`<span style="color:#c0392b">제외 구간 <b>${exc}</b></span>`:''}
       <span>유효 분석기간 <b>${fromTo}</b></span><span>순감소 <b>${won(Math.round(c.invNetDrop||0))}${u}</b></span>
       <span>일평균 감소 <b>${c.invDaily!=null?won(Math.round(c.invDaily))+u:'-'}</b></span>
-      <span>적용: <b>${c.source==='daily'?'데일리 순재고 감소 추이':tierLabel(c.invTier)}</b></span></div>`;
+      <span>적용: <b>${c.source==='daily'?'데일리 순재고 감소 추이':(c.source==='flow12'?'최근 12주 주평균 출고':tierLabel(c.invTier))}</b></span></div>`;
   }
   return `<div class="basisExplain" style="margin-bottom:5px"><b>계산 기준 비교</b> · 아래 표는 예상 소진일을 <b>어떤 일판매 기준으로 계산했는지</b> 비교한 것입니다. 판매가 오르는지 내리는지 <b>방향성(추이)</b>은 아래 「단계별 판매 추이」·「채널별 추이」에서 확인하세요.</div><table class="basisTbl"><thead><tr><th>기준</th><th>일판매(${u})</th><th>예상 소진일</th><th>사용</th><th>월평균 대비</th><th>산식/근거</th></tr></thead><tbody>${trs}</tbody></table>${invBlock}`;
 }
@@ -5532,7 +5532,7 @@ function dailyCellHtml(c){
   const arrow=diff>0?'<span class="dcUp">▲</span>':diff<0?'<span class="dcDn">▼</span>':'';
   const adoptCls=diff>0?'dcAdopt up':diff<0?'dcAdopt dn':'dcAdopt';
   // [v83] 근거는 짧은 태그로만 표시, 전체 문구는 hover 툴팁 · '*'=재입고 보정
-  const shortTag=c.tagCls==='daily'?'데일리':c.tagCls==='mix'?'보정':'월평균';
+  const shortTag=c.source==='flow12'?'12주':c.tagCls==='daily'?'데일리':c.tagCls==='mix'?'보정':'월평균';
   const restock=/재입고/.test(c.sourceLabel||'');
   const tagHtml=`<span class="speedtag ${c.tagCls||'month'}" title="${pEsc(c.sourceLabel||'')}">${shortTag}${restock?'*':''}</span>`;
   // 월평균과 동일(보정 없음) → 숫자 + 태그만
@@ -6280,6 +6280,7 @@ function cartCoverage(nm, qty){
     trend=mk('m2',`최근 추세 · 최근 2개월 평균 ${shortP(c.momentum.periodText)}`,c.momentum.recent2Avg,c.source==='momentum'||c.source==='momentum-ref');
   }
   if(c.source==='promo') trend=mk('promo','최근 추세 · 평소 + 공구·특판 평균',(c.daily||0)*30,true);   // [v102]
+  if(c.source==='flow12') trend=mk('w12','최근 12주 주평균 출고 (공구·특판 포함 · 판매 흐름 표와 같은 기준)',(c.daily||0)*30,true);   // [v125]
   const bases=[avg,trend].filter(Boolean);
   if(!bases.length) return {s,c,u,qty,stock,none:true,price};
   const applied=bases.find(b=>b.applied)||bases[0];   // 발주 판단에 실제 적용된 기준(재고 탭과 동일) — 상단 카드·경고에 씀
@@ -9332,7 +9333,7 @@ runoutBasisHtml=function(s,c){
   const rows=[];
   rows.push({k:'월판매 평균 기준',daily:c.baseDaily,run:c.runoutBase,use:(c.source==='monthly')?'적용':'참고',note:`${salesText} · 월평균 ${won(Math.round(c.baseMonthly||0))}${u}`});
   rows.push({k:'채널 3개월 추이',daily:c.chDaily,run:c.runoutTrend,use:'참고',note:(c.channel&&c.channel.has)?`${c.channel.prevPeriod} → ${c.channel.recentPeriod} · 최근 N개월 평균에 중복 가산 안 함`:'채널 데이터 없음'});
-  rows.push({k:'데일리 순재고 감소 기준',daily:c.invDaily||0,run:c.runoutInv,use:c.source==='daily'?'적용':(c.invDaily!=null?'참고':'-'),note:c.invDaily!=null?`유효 ${c.invValidCnt}건·${c.invSpanDays||0}일·순감소 ${won(Math.round(c.invNetDrop||0))}${u} (${tierLabel(c.invTier)})`:'데일리 이력 부족'});
+  rows.push({k:'데일리 순재고 감소 기준',daily:c.invDaily||0,run:c.runoutInv,use:c.source==='daily'?'적용':(c.invDaily!=null?'참고':'-'),note:c.invDaily!=null?`유효 ${c.invValidCnt}건·${c.invSpanDays||0}일·순감소 ${won(Math.round(c.invNetDrop||0))}${u} (${(c.source==='flow12'?'참고 · 발주 판단은 12주 평균':tierLabel(c.invTier))})`:'데일리 이력 부족'});
   rows.push({k:'발주 판단 적용 기준',daily:c.daily,run:c.runout,use:'최종',final:true,note:c.sourceLabel||'-'});
   const baseRun=c.runoutBase||c.runout;
   const trs=rows.map(r=>{
@@ -9512,6 +9513,21 @@ demandAnalysis=function(s,simStock){
     invPeriodFrom:inv.periodFrom,invPeriodTo:inv.periodTo,invExcluded:inv.excluded||[],source,sourceLabel,tagCls
   };
 };
+// [v125] 판매 속도 통일 — 재고 기록이 있으면 재고 탭도 판매 흐름 표와 같은 '최근 12주 주평균 출고'(공구·특판 포함)를 쓴다.
+//  이전엔 재고 탭은 최근 22~28일 데일리 감소, 판매 흐름 표는 12주 평균이라 같은 품목 발주 시점이 달랐다
+//  (세탁조 클리너: 재고 탭 하루 32개·11.30 vs 판매 흐름 주 177개·12.18 — 10/20주 공구 1회가 짧은 기간에 섞여 부풀림).
+//  기존 데일리·월평균 계산은 참고값(legacy*)으로 남기고, 재고 기록이 없는 품목만 기존 방식(월판매 평균 등)을 쓴다.
+const _demandAnalysisV124=demandAnalysis;
+demandAnalysis=function(s,simStock){
+  const da=_demandAnalysisV124(s,simStock);
+  let R=null; try{ R=flowRate12Of(s); }catch(e){ R=null; }   // 초기화 중(판매 흐름 상수 정의 전)에는 기존 방식
+  if(R&&R.r12>0){
+    da.legacyDaily=da.daily; da.legacySource=da.source; da.legacyLabel=da.sourceLabel;
+    da.daily=R.r12/7; da.source='flow12'; da.tagCls='daily'; da.flow12=R;
+    da.sourceLabel=`최근 12주 주평균 출고 ${won(Math.round(R.r12))}/주 (데일리 재고 감소 · 공구·특판 포함${R.promoN&&R.baseW>0?` · 평소 ${won(Math.round(R.baseW))} + 공구 ${R.promoN}회`:''}${R.dataW!=null&&R.dataW<11.5?` · 기록 ${Math.max(1,Math.round(R.dataW))}주`:''}) — 판매 흐름 표와 같은 기준`;
+  }
+  return da;
+};
 
 function orderPrepDays(){ const v=Number((DATA.stockset||{}).prep); return Number.isFinite(v)&&v>=0?v:7; }
 // [v111] 입고 대기 발주(이미 발주한 건) — s.incoming=[{date:'YYYY-MM-DD',qty}]
@@ -9548,7 +9564,9 @@ function calcStockCoreV47(s,stock,da){
   const rop=Math.round(daily*(lead+buffer));
   // [v111] 발주 타이밍·권장 수량은 현재고 + 입고 대기 발주 기준
   const incList=pendingIncoming(s), incTotal=incList.reduce((t,e)=>t+(+e.qty||0),0);
-  const pos=stock+incTotal;
+  // [v125] 판매 흐름 표의 '영업 예정 수량'(앞으로 나갈 공구·특판)도 재고 탭 발주 판단에서 미리 뺀다 — 두 화면 같은 판단
+  const salesPlanQty=(typeof flowPlan==='function')?flowPlan(s).use:0;
+  const pos=stock+incTotal-salesPlanQty;
   const recDays=(pos-rop)/daily;
   const recDate=new Date(NOW.getTime()+recDays*86400000);
   const recDD=Math.ceil(recDays);
@@ -9600,7 +9618,7 @@ function calcStockCoreV47(s,stock,da){
   if(recDD<=0) status='now'; else if(recDD<=Math.max(0,+set.warn||0)) status='soon';
   return {daily,weekly,runout,runoutBase,runoutTrend,runoutInv,runoutMonths:runoutDays/30,recDate,recDD,
     orderQty,orderQtyOrderUnit,arrive,arriveByRec,months:coverMonths,coverMonths,orderMonths,stockAfterArrive,amt:orderQty*unitCost,status,rop,costRate,
-    invStockAtArrive,stockoutBeforeArrive,unitReady,needRaw,unit,stock,arrivalBaseStock,targetStock,bufferStock,arrProj,incProj,incTotal};
+    invStockAtArrive,stockoutBeforeArrive,unitReady,needRaw,unit,stock,arrivalBaseStock,targetStock,bufferStock,arrProj,incProj,incTotal,salesPlanQty};
 }
 function arrMD(d){ return `${d.getFullYear()!==NOW.getFullYear()?String(d.getFullYear()).slice(2)+'/':''}${d.getMonth()+1}/${d.getDate()}`; }
 // 예: 입고 시점(10/30) 예상 잔여 재고 약 4,440EA, 입고 후 약 10,440EA(약 2.0개월분) 확보
@@ -9951,6 +9969,28 @@ function flowRate(st,a,b,df){
   for(let i=lo;i<=b;i++){ sum+=st.tot[i]||0; n+=(i===df.from?df.frac:1); }
   return {avg:n>0?sum/n:0,n};
 }
+// [v125] 판매 속도 단일 기준 — 최근 12주(다 끝난 주) 주평균 출고(데일리 재고 감소, 공구·특판 포함). 판매 흐름 표·재고 탭 공통.
+//  + 같은 12주를 평소 주 평균(대량 출고 🔶 주 제외)과 공구 초과분으로 나눈 값(영업 논의용 표시)
+function flowRate12(st){
+  const R={r4:0,p4:0,r12:0,dataW:null,p4ok:false,baseW:0,promoN:0,promoX:0};
+  if(!st) return R;
+  const d=flowWeekCmp(st).done, df=flowDataFrom(st);
+  const a=flowRate(st,d-11,d,df), b=flowRate(st,d-3,d,df), c=flowRate(st,d-7,d-4,df);
+  R.r12=a.avg; R.r4=b.avg; R.p4=c.avg; R.dataW=a.n; R.p4ok=c.n>=3.5;
+  const sp=flowSpikes(st), lo=Math.max(0,d-11,df.from); let ns=0,nn=0;
+  for(let i=lo;i<=d;i++){ if(sp[i]) continue; ns+=st.tot[i]||0; nn+=(i===df.from?df.frac:1); }
+  R.baseW=nn>0?ns/nn:0;
+  for(let i=lo;i<=d;i++){ if(!sp[i]) continue; R.promoN++; R.promoX+=Math.max(0,(st.tot[i]||0)-R.baseW); }
+  return R;
+}
+// 품목 하나의 12주 속도 — 한 번의 렌더 안에서 여러 번 불려도 한 번만 계산(동기 실행 동안만 캐시)
+let _flow12Cache=null;
+function flowRate12Of(s){
+  if(!_flow12Cache){ _flow12Cache=new Map(); setTimeout(()=>{ _flow12Cache=null; },0); }
+  if(_flow12Cache.has(s.nm)) return _flow12Cache.get(s.nm);
+  const R=flowRate12(flowStockWeekly([s.nm]));
+  _flow12Cache.set(s.nm,R); return R;
+}
 function flowPlan(s){
   const p=s.salesPlan||{}, qty=Math.max(0,+p.qty||0), date=/^\d{4}-\d{2}-\d{2}$/.test(p.date||'')?p.date:'';
   const expired=!!(date&&date<fmtDate(NOW));
@@ -9959,17 +9999,11 @@ function flowPlan(s){
 const FLOW_JD_LABEL=['지금 발주','발주 임박','재고 많음','적정'];
 function flowJudge(s,st,salesCmp){
   const P=flowPlan(s), plan=P.use, memo=P.memo, stop=/단종/.test(memo);
-  let r4=0,p4=0,r12=0,dataW=null,p4ok=false, baseW=0,promoN=0,promoX=0;
-  if(st){ const d=flowWeekCmp(st).done, df=flowDataFrom(st);
-    const a=flowRate(st,d-11,d,df), b=flowRate(st,d-3,d,df), c=flowRate(st,d-7,d-4,df);
-    r12=a.avg; r4=b.avg; p4=c.avg; dataW=a.n; p4ok=c.n>=3.5;
-    // [v124] 영업 논의용 — 같은 12주를 평소 주(대량 출고 아닌 주) 평균과 공구·특판(🔶 주의 평소 초과분)으로 나눠 보여 준다. 판매 속도(r12)는 그대로 둘 다 포함.
-    const sp=flowSpikes(st), lo=Math.max(0,d-11,df.from); let ns=0,nn=0;
-    for(let i=lo;i<=d;i++){ if(sp[i]) continue; const w=(i===df.from?df.frac:1); ns+=st.tot[i]||0; nn+=w; }
-    baseW=nn>0?ns/nn:0;
-    for(let i=lo;i<=d;i++){ if(!sp[i]) continue; promoN++; promoX+=Math.max(0,(st.tot[i]||0)-baseW); } }
+  const R=flowRate12(st), {r4,p4,r12,dataW,p4ok,baseW,promoN,promoX}=R;
   const salesW=salesCmp&&salesCmp.avg>0?salesCmp.avg/FLOW_WPM:0;
-  const rateW=r12>0?r12:salesW, daily=rateW/7;
+  // [v125] 재고 기록이 없으면 재고 탭과 같은 대체 속도(월판매 평균 등)
+  let altW=0; if(!(r12>0)){ try{ altW=(demandAnalysis(s).daily||0)*7; }catch(e){ altW=salesW; } }
+  const rateW=r12>0?r12:altW, daily=rateW/7;
   const stock=invTotal(s), inc=incomingTotal(s), pos=stock+inc, eff=pos-plan;
   const set=DATA.stockset||{}, leadTot=Math.max(0,+s.lead||0)+orderPrepDays(), buffer=Math.max(0,+set.buffer||14);
   const tMon=s.targetMonths!=null?+s.targetMonths:(+set.target||3);
@@ -10277,7 +10311,8 @@ runoutBasisHtml=function(s,c){
     rows.push({k:'최근 2개월 상승 기준',daily:c.momentum.recent2Daily,run:c.momentum.recent2Daily>0&&c.stock!=null?new Date(NOW.getTime()+(c.stock/c.momentum.recent2Daily)*86400000):null,use:c.source==='momentum'||c.source==='momentum-ref'?'적용':'참고',note:c.momentum.eligible?`최근 2개월 평균 ${won(Math.round(c.momentum.recent2Avg))}${u} · 평균 대비 +${Math.round(c.momentum.uplift*100)}%`:`상승 보정 미적용`});
   }
   rows.push({k:'채널 3개월 추이',daily:c.chDaily,run:c.runoutTrend,use:'참고',note:(c.channel&&c.channel.has)?`${c.channel.prevPeriod} → ${c.channel.recentPeriod} · 최근 N개월 평균에 중복 가산 안 함`:'채널 데이터 없음'});
-  rows.push({k:'데일리 순재고 감소 기준',daily:c.invDaily||0,run:c.runoutInv,use:c.source==='daily'?'적용':(c.invDaily!=null?'참고':'-'),note:c.invDaily!=null?`유효 ${c.invValidCnt}건·${c.invSpanDays||0}일·순감소 ${won(Math.round(c.invNetDrop||0))}${u} (${tierLabel(c.invTier)})`:'데일리 이력 부족'});
+  rows.push({k:'데일리 순재고 감소 기준',daily:c.invDaily||0,run:c.runoutInv,use:c.source==='daily'?'적용':(c.invDaily!=null?'참고':'-'),note:c.invDaily!=null?`유효 ${c.invValidCnt}건·${c.invSpanDays||0}일·순감소 ${won(Math.round(c.invNetDrop||0))}${u} (${(c.source==='flow12'?'참고 · 발주 판단은 12주 평균':tierLabel(c.invTier))})`:'데일리 이력 부족'});
+  if(c.source==='flow12'&&c.flow12) rows.push({k:'최근 12주 주평균 출고',daily:c.daily,run:c.runout,use:'적용',note:`주 ${won(Math.round(c.flow12.r12))}${u} · 공구·특판 포함${c.flow12.promoN&&c.flow12.baseW>0?` (평소 주 ${won(Math.round(c.flow12.baseW))} + 공구 ${c.flow12.promoN}회)`:''} · 판매 흐름 표와 같은 기준`});
   if(c.status!=='unverified') rows.push({k:'발주 판단 적용 기준',daily:c.daily,run:c.runout,use:'최종',final:true,note:c.sourceLabel||'-'});
   const baseRun=c.runoutBase||c.runout;
   const trs=rows.map(r=>{
