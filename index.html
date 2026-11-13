@@ -2693,7 +2693,7 @@ body{padding-bottom:48px}
     <div class="efield"><label>월판매 평균 기간 (개월) — 최근 N개월 평균</label><input type="number" id="set_salesWindow" min="1" max="6" step="1" value="3"></div>
     <div class="efield"><label>발주 처리기간 (일) — 발주 오더 후 발주서가 제조사에 도달하기까지</label><input type="number" id="set_prep" min="0" value="7"></div>
     <div class="efield"><label>안전재고 (일) — 입고 시점에 남아 있어야 할 재고</label><input type="number" id="set_buffer" value="14"></div>
-    <div class="efield"><label>발주 임박 경고 기준 (일) — 권장일까지 N일 이내</label><input type="number" id="set_warn" value="14"></div>
+    <div class="efield"><label>발주 임박 경고 기준 (일) — 권장일까지 N일 이내 · 재고 탭·판매 흐름 공통</label><input type="number" id="set_warn" value="14"></div>
     <div class="efactions">
       <button class="tbtn accent" id="btnStockSetSave">적용</button>
       <button class="tbtn" id="btnStockSetCancel">취소</button>
@@ -9944,12 +9944,14 @@ function flowSpark(st,from,to){
 // [v121] 재고 판단 — 표 맨 앞 "판단" 칸 하나로 "지금 발주 / 발주 임박 / 재고 많음(영업 확대) / 적정"을 읽게.
 //  · 판매 속도 = 최근 3개월 주평균 출고(공구·특판 포함). 출고 기록이 없으면 매출 월평균(÷4.35)으로 대신한다.
 //    [v121] 재고 기록이 시작된 주부터만 평균 — 기록 전 주(0)가 섞여 신규 품목 속도가 몇 배 낮게 나왔다(8종 선물세트 주 399 → '재고 과다'로 오판).
-//  · 지금 발주(빨강): 보유 기간 < 발주 처리 + 리드타임 + 안전재고 / 발주 임박(주황): 그 시점이 4주 안 / 재고 많음(주황 테두리): 6개월 초과 / 적정(무색)
+//  · 지금 발주(빨강): 보유 기간 < 발주 처리 + 리드타임 + 안전재고 / 발주 임박(주황): 그 시점이 설정의 경고 기준일 안(v127) / 재고 많음(주황 테두리): 6개월 초과 / 적정(무색)
 //    [v121] 이전엔 발주 시점이 며칠 남은 품목도 추세가 오르지 않으면 '적정'으로 나왔다(용기세척제 스타터10정: 재고 탭 D-0).
 //  · 영업 예정(s.salesPlan={qty,date,memo}): 앞으로 추가로 나갈 공구·특판. 보유 재고에서 빼고 판단하고, 권장 발주에 더한다.
 //    [v121] 예정일이 지나면 계산에서 뺀다 — 출고되면 현재고가 이미 줄어 있으므로 그대로 두면 두 번 빠진다.
 //  · 권장 발주 = 목표 개월분 + 영업 예정 − 입고 시점 잔여, MOQ·배수 올림. 지금 발주·발주 임박 품목에만 표시(화면·엑셀 동일).
-const FLOW_OVER_WEEKS=26, FLOW_SOON_WEEKS=4, FLOW_NEW_WEEKS=4;
+const FLOW_OVER_WEEKS=26, FLOW_NEW_WEEKS=4;
+// [v127] '발주 임박' 기준 = 설정의 경고 기준일(재고 탭 상태와 같은 값 하나) — 이전엔 판매 흐름만 4주 고정이라 같은 품목이 화면마다 임박/정상으로 갈렸다
+const flowSoonDays=()=>{ const v=+((DATA.stockset||{}).warn); return Number.isFinite(v)&&v>=0?v:14; };
 function flowRoundOrder(s,need){
   if(!(need>0)) return 0;
   const moq=typeof moqInStockUnit==='function'?moqInStockUnit(s):0, mult=Math.max(1,+s.orderMultiple||1);
@@ -10018,8 +10020,8 @@ function flowJudge(s,st,salesCmp){
   let lv, detail='';
   if(stop){ lv=4; detail='단종 예정 · 판단 제외'; }
   else if(!(rateW>0)){ lv=4; detail='출고 없음'; }
-  else if(toOrderW<0){ lv=0; detail=coverW<leadTot/7?'입고 전에 재고가 떨어질 수 있음':''; }
-  else if(toOrderW<FLOW_SOON_WEEKS){ lv=1; detail=`${fmtMDfull(orderDate)}까지 발주`; }
+  else if(toOrderW<=0){ lv=0; detail=coverW<leadTot/7?'입고 전에 재고가 떨어질 수 있음':''; }
+  else if(Math.ceil(toOrderW*7)<=flowSoonDays()){ lv=1; detail=`${fmtMDfull(orderDate)}까지 발주`; }
   else if(coverW>FLOW_OVER_WEEKS){ lv=2; const over=Math.round(eff-daily*tMon*30); detail=`${tMon}개월분보다 약 ${won(over)}개 많음 → 영업 확대`; }
   else lv=3;
   const order=lv<=1?orderRaw:0;
@@ -10092,7 +10094,7 @@ function flowJudgeCard(items,one){
     ${one?'':`<div class="jChips">${chip(0,'지금 발주')}${chip(1,'발주 임박')}${chip(2,'재고 많음')}${chip(3,'적정')}</div>`}
     <div class="flowLegend jLeg">
       <div><span class="jb b0">지금 발주</span> 남은 재고가 입고까지 걸리는 기간(발주 처리 ${orderPrepDays()}일 + 품목 리드타임 + 안전재고 ${Math.max(0,+set.buffer||14)}일)보다 짧음 → 오늘 발주</div>
-      <div><span class="jb b1">발주 임박</span> 발주할 날이 ${FLOW_SOON_WEEKS}주 안 → '발주 시점' 날짜에 발주 &nbsp; <span class="jb b2">재고 많음</span> 6개월 넘게 버틸 재고 → 영업 확대 &nbsp; <span class="jb b3">적정</span> 할 일 없음</div>
+      <div><span class="jb b1">발주 임박</span> 발주할 날이 ${flowSoonDays()}일 안(설정의 경고 기준일 · 재고 탭과 같은 기준) → '발주 시점' 날짜에 발주 &nbsp; <span class="jb b2">재고 많음</span> 6개월 넘게 버틸 재고 → 영업 확대 &nbsp; <span class="jb b3">적정</span> 할 일 없음</div>
       <div><b>영업 여유</b> = 보유 재고 − 남겨 둘 몫(지금 발주해도 물건이 들어와 안전하게 돌기까지: 발주 처리 ${orderPrepDays()}일 + 리드타임 + 안전재고 ${Math.max(0,+set.buffer||14)}일 동안 나갈 양). 판매 속도는 평소 + 지난 12주 공구 빈도 → 그 위에 <b>더 받을 수 있는 공구·특판 수량</b>. 이만큼 넘게 팔면 바로 발주가 필요합니다. 공구 자제 = 지금 발주해도 입고까지(안전재고 포함) 모자람 · 더 팔기 = 6개월분 초과분</div>
       <div class="flowMut">영업 예정: 앞으로 나갈 공구·특판 수량과 예정일을 넣으면 재고에서 미리 빼고 판단합니다. 예정일이 지나면 자동으로 빠집니다(출고되면 현재고에 이미 반영됨). 메모에 '단종'을 쓰면 판단에서 뺍니다.
         판매 속도는 공구·특판이 섞인 최근 3개월 주평균이고, 신규 품목은 재고 기록이 시작된 주부터만 평균합니다.</div></div>
