@@ -562,6 +562,7 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .flowJd td.jr.push b{color:#a05a00}
 .flowJd tr.jl3 td.jr b{color:#1E2761}
 .flowJd td.jq{text-align:right}
+.flowJd .jcalc{display:block;font-size:10px;color:#9aa1b2;margin-top:2px;line-height:1.35}
 .flowLegend{font-size:11px;color:#4a5470;line-height:1.9;background:#f6f8fc;border-radius:6px;padding:6px 10px;margin:2px 0 6px}
 .flowLegend .lg{display:inline-block;padding:0 6px;border-radius:4px;font-size:10.5px;margin-left:8px}
 .flowLegend .lg:first-child{margin-left:0}
@@ -10004,6 +10005,14 @@ function flowJudge(s,st,salesCmp){
   else if(lv===1){ room={k:'tight',q:r10(roomQ),t:`${won(r10(roomQ))}개`,sub:'넘기면 바로 발주'}; }
   else if(lv===2){ const ex=r10(eff-rateW*FLOW_OVER_WEEKS); room={k:'push',q:ex,t:`${won(ex)}개 더 팔기`,sub:'6개월분 초과 → 공구·특판 제안'}; }
   else room={k:'ok',q:r10(roomQ),t:`${won(r10(roomQ))}개`,sub:'추가 공구 가능'};
+  // [v124b] 계산식 노출 — "현재고 2,168인데 왜 880?"(남겨 둘 몫을 먼저 뺀 값이라는 걸 칸 안에서 바로 읽게)
+  if(room.k&&rateW>0){
+    const posLab=`보유 ${won(Math.round(eff))}`+(inc||plan?` <span title="현재고 ${won(Math.round(stock))}${inc?` + 입고 대기 ${won(inc)}`:''}${plan?` − 영업 예정 ${won(plan)}`:''}">ⓘ</span>`:'');
+    const days=Math.round(needW*7), keep=r10(rateW*needW), wk=won(Math.round(rateW));
+    room.tip=`남겨 둘 몫 = 지금 발주해도 입고·안전 운영까지 ${days}일(발주 처리 ${orderPrepDays()}일 + 리드타임 ${Math.max(0,+s.lead||0)}일 + 안전재고 ${buffer}일) × 주 ${wk}개`;
+    if(room.k==='push') room.calc=`${posLab} − 6개월분 ${won(r10(rateW*FLOW_OVER_WEEKS))}`;
+    else if(room.k!=='hold'||!gapTo) room.calc=`${posLab} − 남겨 둘 몫 ${won(keep)}<br>(주 ${wk} × ${(needW).toFixed(1)}주)`;
+  }
   return {P,plan,memo,r4,p4,r12,dataW,salesW,rateW,stock,inc,pos,eff,coverW,needW,toOrderW,orderDate,isNew,trendUp,order,lv,label,detail,tags,txt,baseW,promoN,promoX,room};
 }
 const flowCoverTxt=w=>w==null?'-':w<0?'부족':`약 ${Math.round(w)}주 <span class="flowMut">(${(w*7/30.44).toFixed(1)}개월)</span>`;
@@ -10035,7 +10044,7 @@ function flowJudgeCard(items,one){
     return `<tr class="jl${j.lv}${nm===FLOW_SEL?' on':''}" onclick="flowSelect(this.dataset.nm)" data-nm="${q}">
       <td class="nm" title="${q}">${pEsc(nm.replace(/^터블\s+(트루클린\s+)?/,''))}</td>
       <td class="jd"><span class="jb b${j.lv}">${j.label}</span>${j.lv<4&&j.lv!==1&&j.detail?`<span class="jdet">${j.detail}</span>`:''}${tags?`<div>${tags}</div>`:''}</td>
-      <td class="jr ${j.room.k}">${j.room.k?`<b>${j.room.t}</b>`:'<span class="flowMut">-</span>'}${j.room.sub?`<span class="jdet">${j.room.sub}</span>`:''}</td>
+      <td class="jr ${j.room.k}"${j.room.tip?` title="${pEsc(j.room.tip)}"`:''}>${j.room.k?`<b>${j.room.t}</b>`:'<span class="flowMut">-</span>'}${j.room.sub?`<span class="jdet">${j.room.sub}</span>`:''}${j.room.calc?`<span class="jcalc">${j.room.calc}</span>`:''}</td>
       <td class="jw">${flowOrderWhen(j)}</td>
       <td class="jo">${j.order?`<b>${won(j.order)}</b>`:'<span class="flowMut">-</span>'}</td>
       <td>${flowCoverTxt(j.coverW)}${j.plan?`<br><span class="flowMut">영업 예정 ${won(j.plan)} 반영</span>`:''}</td>
@@ -10049,7 +10058,7 @@ function flowJudgeCard(items,one){
     <div class="flowLegend jLeg">
       <div><span class="jb b0">지금 발주</span> 남은 재고가 입고까지 걸리는 기간(발주 처리 ${orderPrepDays()}일 + 품목 리드타임 + 안전재고 ${Math.max(0,+set.buffer||14)}일)보다 짧음 → 오늘 발주</div>
       <div><span class="jb b1">발주 임박</span> 발주할 날이 ${FLOW_SOON_WEEKS}주 안 → '발주 시점' 날짜에 발주 &nbsp; <span class="jb b2">재고 많음</span> 6개월 넘게 버틸 재고 → 영업 확대 &nbsp; <span class="jb b3">적정</span> 할 일 없음</div>
-      <div><b>영업 여유</b> = 지금 속도(평소 + 지난 12주 공구 빈도)로 입고까지 버틸 양을 빼고 남는 재고 → 그 위에 <b>더 받을 수 있는 공구·특판 수량</b>. 이만큼 넘게 팔면 바로 발주가 필요합니다. 공구 자제 = 지금 발주해도 입고까지(안전재고 포함) 모자람 · 더 팔기 = 6개월분 초과분</div>
+      <div><b>영업 여유</b> = 보유 재고 − 남겨 둘 몫(지금 발주해도 물건이 들어와 안전하게 돌기까지: 발주 처리 ${orderPrepDays()}일 + 리드타임 + 안전재고 ${Math.max(0,+set.buffer||14)}일 동안 나갈 양). 판매 속도는 평소 + 지난 12주 공구 빈도 → 그 위에 <b>더 받을 수 있는 공구·특판 수량</b>. 이만큼 넘게 팔면 바로 발주가 필요합니다. 공구 자제 = 지금 발주해도 입고까지(안전재고 포함) 모자람 · 더 팔기 = 6개월분 초과분</div>
       <div class="flowMut">영업 예정: 앞으로 나갈 공구·특판 수량과 예정일을 넣으면 재고에서 미리 빼고 판단합니다. 예정일이 지나면 자동으로 빠집니다(출고되면 현재고에 이미 반영됨). 메모에 '단종'을 쓰면 판단에서 뺍니다.
         판매 속도는 공구·특판이 섞인 최근 3개월 주평균이고, 신규 품목은 재고 기록이 시작된 주부터만 평균합니다.</div></div>
     <div class="flowOvWrap"><table class="flowTbl flowOv flowJd"><thead><tr><th>품목</th><th>판단</th><th>영업 여유<br><span>추가 공구 가능 수량</span></th><th>발주 시점</th><th>권장 발주</th><th>보유 기간</th><th>주 출고<br><span>최근 12주 주평균</span></th><th>현재고<br><span>+입고 대기</span></th><th>영업 예정 수량<br><span>추가 공구·특판</span></th><th>예정일</th><th>메모</th></tr></thead>
