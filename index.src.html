@@ -10569,7 +10569,7 @@ function flowBoardHtml(){
       <tr class="sum"><td>전체</td>${sm.total.map(v=>`<td>${won(Math.round(v))}</td>`).join('')}<td><b>${won(Math.round(salesCmp.avg))}</b></td><td>100%</td><td class="${salesCmp.dir.c}">${salesCmp.dir.t}${flowPct(salesCmp.dir.p)}</td></tr></tbody></table></div></div>`;
   }
   const chCard=`<div class="flowCard"><div class="flowH">판매처별 월 출고 <span>${pEsc(selName)} · 매출 데이터 ${sm?`${flowMonLabel(sm.months[0])}~${flowMonLabel(sm.months[sm.months.length-1])}`:''} · 월말 일괄 기록이라 주 단위 판매처 구분은 불가</span></div>${chPart}</div>`;
-  return top+sumLine+chartCard+mx+dayCard+flowJudgeCard(one?items.filter(x=>x.s.nm===FLOW_SEL):grp?items.filter(x=>names.includes(x.s.nm)):items,one||!!grp)+chCard;
+  return top+sumLine+flowJudgeCard(one?items.filter(x=>x.s.nm===FLOW_SEL):grp?items.filter(x=>names.includes(x.s.nm)):items,one||!!grp)+chCard+chartCard+mx+dayCard;   // [v139] 재고 판단 → 월(판매처별) → 주 → 일 순서
 }
 function flowDrawSales(){
   const names=flowSelNames();   // [v130] 묶음 선택 포함
