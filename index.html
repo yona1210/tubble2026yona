@@ -10068,6 +10068,15 @@ function flowItemIntervals(h){
     if(prev){ const gap=Math.round((x.dateObj-prev.dateObj)/86400000); if(gap>0) iv.push({from:prev.dateObj,to:x.dateObj,gap,diff:prev.stock-x.stock}); }
     prev=x;
   });
+  // [v137] 기록 오르내림 상쇄 — 며칠 사이 같은 양만큼 올랐다 내리면(또는 내렸다 오르면) 입고·출고가 아니라 기록 차이(창고 한 곳이 빠졌다 들어감 등)로 본다.
+  //  예: 퍼퓸미모사 10/22~10/30 5,245→5,823→5,239→5,789→5,213 — 오를 때를 입고(+추정 판매), 내릴 때를 출고로 받아 주 280개가 495개로 부풀었다.
+  //  올랐다 내림: 크기 70~130%면 합침 / 내렸다 오름: 진짜 출고 뒤 입고일 수 있어 85~115%로 더 좁게. 두 구간 합 8일 이내만.
+  for(let changed=true;changed;){ changed=false;
+    for(let i=0;i<iv.length-1;i++){ const a=iv[i], b=iv[i+1]; if(a.to.getTime()!==b.from.getTime()||a.gap+b.gap>8) continue;
+      const up=a.diff<0&&b.diff>0, dn=a.diff>0&&b.diff<0; if(!up&&!dn) continue;
+      const r=Math.abs(b.diff)/Math.abs(a.diff), lo=up?0.7:0.85, hi=up?1.3:1.15;
+      if(Math.abs(a.diff)<30||r<lo||r>hi) continue;
+      iv.splice(i,2,{from:a.from,to:b.to,gap:a.gap+b.gap,diff:a.diff+b.diff,bounce:true}); changed=true; break; } }
   const dec=iv.filter(v=>v.diff>0).map(v=>v.diff/v.gap).sort((a,b)=>a-b);
   const med=dec.length?dec[Math.floor(dec.length/2)]:0;
   const usable=iv.filter(v=>v.diff>0&&(!med||v.diff/v.gap<=med*3));
