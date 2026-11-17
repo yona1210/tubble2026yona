@@ -3394,6 +3394,17 @@ function applyNewCatDefaultsV123(){
     const c=(n.indexOf('캡슐')>=0&&n.indexOf('7종')>=0)?'선물세트':n.indexOf('변기')>=0?'변기클리너':n.indexOf('건조기시트')>=0?'건조기시트':n.indexOf('선물세트')>=0?'선물세트':null; if(c) s.cat=c; });
 }
 applyNewCatDefaultsV123();
+// [v138] 단종 예정 품목(2026-11-17 사용자 확인) — 메모에 '단종 예정'을 한 번만 넣는다(이후 사용자가 지우면 그대로 둠).
+//  모닝머스크·코튼가든은 아쿠아블루로 수요 전환, 퍼퓸그라스 단종. 시트 불러오기·백업 복원 뒤에도 normalizeAfterLoad에서 다시 적용.
+const DISCONTINUED_V138=['캡슐세제 모닝머스크','캡슐세제 코튼가든','캡슐세제 퍼퓸그라스'];
+function applyDiscontinuedV138(){
+  if(!DATA||DATA._discV138) return;
+  let hit=0;
+  (DATA.stock||[]).forEach(s=>{ if(!s||DISCONTINUED_V138.indexOf(s.nm)<0) return; hit++;
+    const p=Object.assign({},s.salesPlan||{}); if(!/단종/.test(p.memo||'')){ p.memo=(p.memo?p.memo+' · ':'')+'단종 예정'; p.updated=fmtDate(NOW); s.salesPlan=p; } });
+  if(hit) DATA._discV138=true;
+}
+try{ applyDiscontinuedV138(); }catch(e){}
 // [v80] ERP 업로드로 갱신된 채널 월별 데이터 복원 (CHANNEL_DATA는 const라 DATA에 저장해 영속화)
 if(DATA.channelData && DATA.channelData.months && DATA.channelData.months.length){
   try{ CHANNEL_DATA.months=DATA.channelData.months; CHANNEL_DATA.channels=DATA.channelData.channels; CHANNEL_DATA.items=DATA.channelData.items; }catch(e){}
@@ -3595,6 +3606,7 @@ function normalizeAfterLoad(){
   normalizeUnitData(); normalizeInventoryData(); normalizeCostGroups();
   normalizeStockMeta(); normalizeDailyHistory(); syncAllInventory();
   if(typeof applyNewCatDefaultsV123==='function') applyNewCatDefaultsV123();
+  if(typeof applyDiscontinuedV138==='function') try{ applyDiscontinuedV138(); }catch(e){}
 }
 // [v32] 원가탭 창고 수정 시: inventory.warehouses → total 자동 합산 → 동기화 → 전탭 재렌더
 function findStockItem(nm){ const st=DATA.stock||[]; return st.find(s=>s.nm===nm) || (typeof costNormKey==='function' && nm ? st.find(s=>costNormKey(s.nm)===costNormKey(nm)) : undefined); }   // [v92] 원가 항목명과 브랜드 접두어만 다른 재고 품목도 찾는다
@@ -5634,7 +5646,8 @@ function openOrderReport(){
 
 const fmtMDfull=d=>d?`${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`:'-';
 
-function stockTimingTxt(c){  if(c.status==='unverified') return '재고 기준 확인 필요';
+function stockTimingTxt(c){  if(c.discontinued) return '단종 예정 · 발주 안 함';   // [v138]
+  if(c.status==='unverified') return '재고 기준 확인 필요';
   if(c.status==='na') return '판매 없음';
   if(c.status==='now') return '지금 발주';
   if(c.status==='soon') return `${c.recDD}일 내 발주`;
@@ -9960,7 +9973,10 @@ function calcStockCoreV47(s,stock,da){
   const arrProj={date:arriveByRec,remain:arrRemain,stockout:arrRemainRaw<0,qty:arrQty,after:arrAfter,months:arrAfter/daily/30};
   let status='ok';
   if(recDD<=0) status='now'; else if(recDD<=Math.max(0,+set.warn||0)) status='soon';
-  return {daily,weekly,runout,runoutBase,runoutTrend,runoutInv,runoutMonths:runoutDays/30,recDate,recDD,
+  // [v138] 단종 예정(판매 흐름 메모 '단종') — 재고 탭도 발주 대상에서 뺀다(판매 흐름 표와 같은 판단). 소진 예상은 그대로 보여 준다.
+  const discontinued=(typeof flowPlan==='function')&&/단종/.test(flowPlan(s).memo||'');
+  if(discontinued){ status='ok'; orderQty=0; orderQtyOrderUnit=0; }
+  return {discontinued,daily,weekly,runout,runoutBase,runoutTrend,runoutInv,runoutMonths:runoutDays/30,recDate,recDD,
     orderQty,orderQtyOrderUnit,arrive,arriveByRec,months:coverMonths,coverMonths,orderMonths,stockAfterArrive,amt:orderQty*unitCost,status,rop,costRate,
     invStockAtArrive,stockoutBeforeArrive,unitReady,needRaw,unit,stock,arrivalBaseStock,targetStock,bufferStock,arrProj,incProj,incTotal,salesPlanQty};
 }
