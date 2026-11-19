@@ -3279,7 +3279,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(al) al.onclick=()=>{ document.getElementById('confirmModal').classList.remove('open'); if(_cfResolve){_cfResolve('alt');_cfResolve=null;} };
 });
 const fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-const PD=s=>{if(!s||s==='-'||/예상|말|초|월/.test(s))return null;const m=String(s).match(/(\d{1,2})[.\/](\d{1,2})/);if(!m)return null;return new Date(2026,+m[1]-1,+m[2]);};
+// v140: 연도 없는 MM.DD는 올해 기준, 오늘보다 6개월 넘게 앞이면 내년으로 본다(01.08 = 다음 해 1월). YYYY.MM.DD는 그 연도 그대로.
+const PD=s=>{if(!s||s==='-'||/예상|말|초|월/.test(s))return null;const t=String(s);const y=t.match(/(20\d{2})[.\/-](\d{1,2})[.\/-](\d{1,2})/);if(y){const yy=+y[1];return new Date(yy,+y[2]-1,+y[3]);}const m=t.match(/(\d{1,2})[.\/](\d{1,2})/);if(!m)return null;let d=new Date(NOW.getFullYear(),+m[1]-1,+m[2]);if((NOW-d)/86400000>183)d=new Date(NOW.getFullYear()+1,+m[1]-1,+m[2]);return d;};
 const dday=d=>d?Math.ceil((d-NOW)/86400000):null;
 const won=n=>n==null?'-':Number(n).toLocaleString('ko-KR');
 // [v42] 금액을 만원 단위로 표기 (예: 54,400,000 → "5,440만", 123,000,000 → "1억 2,300만")
