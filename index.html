@@ -14215,6 +14215,28 @@ function openPlanningEdit(id){
   .repBatch .repBatchDel{border:none;background:#eef1f7;color:#7a8194;border-radius:50%;width:17px;height:17px;line-height:1;cursor:pointer;font-size:12px;padding:0}
   .repBatch .repBatchDel:hover{background:#ffd9d2;color:#C0392B}
   .repInfoBar{display:flex;align-items:center;flex-wrap:wrap;gap:6px 18px;background:#fff;border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:8px;padding:9px 14px;margin-bottom:10px;font-size:12.5px;color:#3a3d47}
+  /* v143 품목별 재구매 시그널 */
+  .rsTop{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .rsSum{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .rsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+  .rsCard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px 14px;min-width:0;display:flex;flex-direction:column;gap:7px}
+  .rsCard.warn{border-color:#f3dcb4;box-shadow:inset 3px 0 0 var(--amber)}
+  .rsHead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .rsName{font-size:14px;font-weight:800;color:var(--navy);word-break:keep-all}
+  .rsMs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .rsM{background:#f7f9fc;border-radius:8px;padding:6px 8px;min-width:0}
+  .rsM span{display:block;font-size:10.5px;color:#7a8194;font-weight:700}
+  .rsM b{display:block;font-size:14px;color:var(--navy);font-weight:800;white-space:nowrap}
+  .rsM b i{font-style:normal;color:#9aa1b2;font-weight:600;font-size:11px}
+  .rsM em{display:block;font-style:normal;font-size:10.5px;color:#7a8194}
+  .rsSpark{width:100%;height:38px;display:block}
+  .rsSparkL{display:flex;justify-content:space-between;font-size:10px;color:#9aa1b2;margin-top:-2px}
+  .rsSub{font-size:10.5px;font-weight:800;color:#7a8194;margin-top:2px}
+  .rsSig,.rsAct{margin:0;padding-left:16px;font-size:11.5px;line-height:1.55;color:#3a3d47;word-break:keep-all}
+  .rsSig li.w{color:#9a5b00}
+  .rsAct li{color:var(--navy)}
+  .rsThin{font-size:11px;color:#7a8194;margin-top:10px;line-height:1.6}
+  @media(max-width:520px){ .rsGrid{grid-template-columns:1fr} .rsM b{font-size:12.5px} }
   /* v141 주기·추세 인사이트 카드 */
   .repTIHead{font-size:14px;font-weight:800;color:var(--navy);margin:2px 0 8px}
   .repTIHead span{font-size:11.5px;font-weight:500;color:#7a8194;margin-left:6px}
@@ -14831,6 +14853,10 @@ function repurInsightsHtml(rd){
   if(ct) it.push({label:'신규 리텐션 추세(코호트)', level:ct.dir==='하락'?'bad':ct.dir==='상승'?'good':'info', finding:'<b>'+ct.first.rate.toFixed(0)+'% → '+ct.last.rate.toFixed(0)+'%</b> '+ct.dir, action:ct.dir==='하락'?'리텐션 좋은 채널로 획득 예산 재배분':''});
   if(cyc!=null){ var mc=rd.medCycle!=null?Math.round(rd.medCycle):Math.round(cyc), rem=Math.max(1,mc-7); it.push({label:'재구매 주기', level:'info', finding:'<b style="font-size:16px">중앙값 '+mc+'일</b> · 평균 '+Math.round(cyc)+'일', action:rem+'일차 전후 리마인드/쿠폰 발송 (자세한 타이밍은 주기·추세)'}); }
   if(sameShare!=null){ var loyal=sameShare>=55, expand=sameShare<=45; it.push({label:'재구매 성향', level:'info', finding:loyal?('동일품목 <b>'+sameShare.toFixed(0)+'%</b> · 충성형'):expand?('타품목 <b>'+(100-sameShare).toFixed(0)+'%</b> · 확장형'):'동일/타 반반', action:loyal?'정기구독·리필·묶음으로 자동화':expand?'번들·신제품 추천·크로스셀':'구독+크로스셀 병행'}); }
+  try{ var SG=repurItemSignals(rd,'family'), rvm=repurSigReview(), sgr=SG.items.filter(function(x){return x.sample&&x.buyers>=30;}).map(function(x){ return {x:x,r:repurSigRead(x,SG.base,rvm)}; });
+    var bad=sgr.filter(function(o){return o.r.st.c==='warn';}), up=sgr.filter(function(o){return o.r.st.l==='좋아짐';});
+    if(sgr.length) it.push({label:'품목별 재구매 시그널', level:bad.length?'warn':'info', finding:bad.length?('개선 필요·주의 <b>'+bad.map(function(o){return pEsc(o.x.nm);}).join('·')+'</b>'+(up.length?' · 좋아짐 '+up.map(function(o){return pEsc(o.x.nm);}).join('·'):'')):('좋아짐 '+up.length+'개 · 하락 품목 없음'),
+      action:'<a href="javascript:void 0" onclick="setRepurView(\'products\')">품목 탭</a>에서 품목별 원인·할 일 확인'}); }catch(e){}
   var valid=bp.filter(function(p){return p.buyers>=5;});
   if(valid.length>=2){ var hi=valid.slice().sort(function(a,b){return b.rate-a.rate;})[0], lo=valid.slice().sort(function(a,b){return a.rate-b.rate;})[0];
     it.push({label:'품목 재구매 엔진', level:'good', finding:'<b>'+pEsc(clip(hi.nm))+'</b> '+hi.rate.toFixed(0)+'%', action:'진입상품·구독 상품으로 전면 배치'});
@@ -14937,6 +14963,130 @@ function repurTrendViewHtml(rd){
     +how('<b>읽는 법</b> 선 = 재구매율(%), 막대 = 그 달 재구매 고객 수(명). 신규가 몰린 달은 재구매 고객이 그대로여도 비율이 떨어지므로 <b>막대(명)와 같이</b> 보세요.')
     +'<div>'+chartBox('repMonthly',240)+'</div></div>';
 }
+// v143: 품목별 재구매 시그널 — 품목군 단위로 '첫 구매 60일 내 같은 품목 재구매율', 재구매 주기, 신규 유입을 최근 vs 이전으로 비교 → 상태·시그널·할 일
+var _repurSigCache=null, repurSigLevel='family', repurSigSel=null;
+function repurFamilyOf(nm){ var c=(typeof reviewCategory==='function')?reviewCategory(nm):'기타'; return c==='기타'?String(nm):c; }
+function repurItemSignals(rd, level){
+  level=level||'family';
+  var acc=rd.acc||[], prods=rd.prods||[], nameMap=rd.nameMap||{}, nameRules=rd.nameRules||[];
+  var key=level+'|'+acc.length+'|'+JSON.stringify(nameMap).length+'|'+JSON.stringify(nameRules);
+  if(_repurSigCache && _repurSigCache.acc===acc && _repurSigCache.key===key) return _repurSigCache.out;
+  var resolveNm=function(raw){ var ex=nameMap[raw]; if(ex&&String(ex).trim()) return String(ex).trim(); var nr=repurNorm(raw);
+    for(var i=0;i<nameRules.length;i++){ var kw=repurNorm(nameRules[i].kw||''); if(kw&&nr.indexOf(kw)>=0){ var to=String(nameRules[i].to||'').trim(); if(to) return to; } } return raw; };
+  var gName=[], gIdx={}, gid=[];
+  prods.forEach(function(raw,pi){ var d=resolveNm(raw); if(level==='family') d=repurFamilyOf(d); if(gIdx[d]==null){ gIdx[d]=gName.length; gName.push(d); } gid[pi]=gIdx[d]; });
+  var buys={}, maxDay=null;
+  acc.forEach(function(L){ var dn=repurDayNum(L[2]||''), p=L[3]; if(dn==null||p==null||p<0||gid[p]==null) return; if(maxDay==null||dn>maxDay) maxDay=dn;
+    var cb=buys[L[0]]||(buys[L[0]]={}), s=cb[gid[p]]||(cb[gid[p]]={}); s[dn]=1; });
+  if(maxDay==null) return {items:[]};
+  var W=60, ymOf=function(dn){ return new Date(dn*86400000).toISOString().slice(0,7); };
+  var shift=function(ym,k){ var y=+ym.slice(0,4), m=+ym.slice(5,7)+k; while(m<1){m+=12;y--;} while(m>12){m-=12;y++;} return y+'-'+String(m).padStart(2,'0'); };
+  var lastYM=ymOf(maxDay), obsEnd=ymOf(maxDay-W), rTo=shift(obsEnd,-1), rFrom=shift(rTo,-2), pTo=shift(rFrom,-1), pFrom=shift(pTo,-2);
+  var G={};
+  Object.keys(buys).forEach(function(c){ var cb=buys[c]; Object.keys(cb).forEach(function(g){
+    var days=Object.keys(cb[g]).map(Number).sort(function(a,b){return a-b;}), f=days[0], fm=ymOf(f);
+    var o=G[g]||(G[g]={coh:{},gaps:[],buyers:0}); o.buyers++;
+    var ch=o.coh[fm]||(o.coh[fm]={n:0,obs:0,rep:0}); ch.n++;
+    if(f+W<=maxDay){ ch.obs++; if(days.length>=2 && days[1]-f<=W) ch.rep++; }
+    for(var i=1;i<days.length;i++) o.gaps.push({d:days[i], g:days[i]-days[i-1]});
+  }); });
+  var med=function(a){ if(!a.length) return null; var s=a.slice().sort(function(x,y){return x-y;}); return s[Math.floor(s.length/2)]; };
+  var allObs=0, allRep=0;
+  var items=Object.keys(G).map(function(g){ var o=G[g];
+    var win=[]; for(var m=shift(lastYM,-11); m<=lastYM; m=shift(m,1)) win.push(m);   // 대량 유입 달 판정: 최근 12개월 중 다른 달 평균의 2배 이상 & 200명 이상
+    var sz=win.map(function(m){ return o.coh[m]?o.coh[m].n:0; });
+    var spikes=win.filter(function(m,i){ var a=i>0?sz[i-1]:null, b=i<sz.length-1?sz[i+1]:null, nb=[a,b].filter(function(v){return v!=null;}); if(!nb.length) return false; var avg=nb.reduce(function(s,v){return s+v;},0)/nb.length; return sz[i]>=200 && sz[i]>=avg*2; });   // 앞뒤 달보다 2배 이상 튄 달만(성장으로 계속 늘어나는 달은 제외)
+    var sum=function(f,t,skip){ var n=0,ob=0,r=0; Object.keys(o.coh).forEach(function(m){ if(m>=f&&m<=t&&!(skip&&spikes.indexOf(m)>=0)){ var c=o.coh[m]; n+=c.n; ob+=c.obs; r+=c.rep; } }); return {n:n,obs:ob,rep:r,rate:ob?r/ob*100:null}; };
+    var all=sum('0000','9999',false); allObs+=all.obs; allRep+=all.rep;
+    var recX=sum(rFrom,rTo,true), preX=sum(pFrom,pTo,true), useX=spikes.some(function(m){return m>=pFrom&&m<=rTo;}) && recX.obs>=40 && preX.obs>=40;
+    var rec=useX?recX:sum(rFrom,rTo,false), pre=useX?preX:sum(pFrom,pTo,false);
+    var spIn=spikes.filter(function(m){return m>=pFrom&&m<=rTo;}), sp=null; if(spIn.length){ var so=0,sr=0; spIn.forEach(function(m){ var c=o.coh[m]; so+=c.obs; sr+=c.rep; }); var nm=sum(pFrom,rTo,true); sp={months:spIn, n:spIn.reduce(function(a,m){return a+o.coh[m].n;},0), rate:so?sr/so*100:null, normal:nm.rate}; }
+    var g6=o.gaps.filter(function(x){return x.d>maxDay-182;}).map(function(x){return x.g;}), gP=o.gaps.filter(function(x){return x.d<=maxDay-182&&x.d>maxDay-365;}).map(function(x){return x.g;});
+    var mN=function(k0,k1){ var a=[]; for(var k=k0;k<=k1;k++){ var c=o.coh[shift(lastYM,k)]; a.push(c?c.n:0); } return med(a); };
+    var newRec=mN(-3,-1), newPre=mN(-6,-4);   // 신규 구매자: 3개월 월 중앙값 비교(공구 한 달에 흔들리지 않게)
+    var series=[]; for(var mm=shift(lastYM,-12); mm<=obsEnd; mm=shift(mm,1)){ var c=o.coh[mm]; series.push({ym:mm, n:c?c.n:0, rate:(c&&c.obs>=20)?c.rep/c.obs*100:null}); }
+    return {nm:gName[g], buyers:o.buyers, all:all, rec:rec, pre:pre, exSpike:useX, spike:sp, cycAll:med(o.gaps.map(function(x){return x.g;})), cycRec:med(g6), cycPre:med(gP), cycRecN:g6.length, cycPreN:gP.length, newRec:newRec, newPre:newPre, series:series};
+  });
+  var base=allObs?allRep/allObs*100:0;
+  items.forEach(function(x){ var r=x.rec, p=x.pre;
+    x.sample=(r.obs>=40 && p.obs>=40 && x.buyers>=100);
+    x.diff=x.sample?r.rate-p.rate:null;
+    x.trend=!x.sample?'표본 부족':(x.diff>=1.5 && r.rate>=p.rate*1.2)?'상승':(x.diff<=-1.5 && r.rate<=p.rate*0.8)?'하락':'유지';
+    x.cycChg=(x.cycRecN>=20&&x.cycPreN>=20&&x.cycPre>0)?(x.cycRec-x.cycPre)/x.cycPre*100:null;
+    x.cycSig=x.cycChg==null?'':x.cycChg<=-15?'단축':x.cycChg>=15?'연장':'유지';
+    x.newChg=(x.newPre>=30&&x.newRec>=30)?(x.newRec-x.newPre)/x.newPre*100:null;
+    x.level=(x.all.rate==null||x.all.obs<100)?null:(x.all.rate>=base*1.3?'높음':x.all.rate<=base*0.7?'낮음':'보통');
+  });
+  items.sort(function(a,b){return b.buyers-a.buyers;});
+  var out={items:items, base:base, W:W, rWin:[rFrom,rTo], pWin:[pFrom,pTo], lastYM:lastYM, level:level};
+  _repurSigCache={acc:acc, key:key, out:out};
+  return out;
+}
+function setRepurSigLevel(l){ repurSigLevel=l; renderRepurchase(); }
+function repurSigReview(){   // 리뷰 탭 품목 판정(1~3점 비중·주의) 연결 — 리뷰 데이터가 없으면 null
+  try{ var rv=DATA.reviewData; if(!rv||!rv.total||typeof reviewInsightStats!=='function') return null; var st=reviewInsightStats(rv), m={};
+    reviewItemAgg(st.list).forEach(function(g){ var ins=reviewItemInsightText(g); m[g.name]={cnt:g.cnt, lowPct:ins.lowPct, ratio:ins.ratio, flag:ins.flag, topic:ins.concernTop?ins.concernTop[0]:null}; }); return m; }catch(e){ return null; }
+}
+function repurSigRead(x, base, rv){
+  var f1=function(v){ return v==null?'-':(Math.round(v*10)/10).toFixed(1); }, nf=function(n){ return Math.round(n).toLocaleString('ko-KR'); };
+  var sig=[], act=[], cyc=x.cycRec||x.cycAll, remind=cyc?Math.max(7,cyc-5):null;
+  var r=(rv&&rv[repurFamilyOf(x.nm)])||null; if(r&&r.cnt<100) r=null;
+  if(x.sample){ var arrow=x.trend==='상승'?'오름':x.trend==='하락'?'내림':'비슷';
+    sig.push({t:(x.trend==='하락'?'warn':''), h:'60일 재구매 <b>'+f1(x.pre.rate)+'% → '+f1(x.rec.rate)+'%</b> ('+(x.diff>=0?'+':'')+f1(x.diff)+'%p, '+arrow+')'+(x.exSpike?' · 대량 유입 달 제외한 평소 고객 기준':'')}); }
+  if(x.spike && x.spike.rate!=null && x.spike.normal!=null){ var hi=x.spike.rate>=x.spike.normal*1.3, lo=x.spike.rate<=x.spike.normal*0.7;
+    sig.push({t:lo?'warn':'', h:x.spike.months.map(function(m){return m.slice(2).replace('-','.');}).join('·')+' 대량 유입 '+nf(x.spike.n)+'명의 60일 재구매 <b>'+f1(x.spike.rate)+'%</b> (평소 '+f1(x.spike.normal)+'%)'});
+    if(hi) act.push('대량 유입(공구·행사) 고객이 평소보다 잘 돌아옴 → <b>같은 채널 행사 재진행</b> 검토');
+    else if(lo) act.push('대량 유입 고객의 재구매가 낮음 → 행사 고객에게 첫 구매 후 <b>'+(remind||30)+'일차 리마인드·재구매 쿠폰</b>'); }
+  if(x.cycSig==='단축'){ sig.push({t:'', h:'재구매 주기 <b>'+x.cycPre+'일 → '+x.cycRec+'일</b>로 짧아짐'}); act.push('리마인드를 <b>'+remind+'일차</b>로 앞당기고 대용량·묶음 제안'); }
+  else if(x.cycSig==='연장'){ sig.push({t:'warn', h:'재구매 주기 <b>'+x.cycPre+'일 → '+x.cycRec+'일</b>로 길어짐'}); act.push('리마인드를 <b>'+remind+'일차</b>로 늦추고, 사용량이 줄었는지·대용량 구매가 늘었는지 확인'); }
+  if(x.newChg!=null && x.newChg<=-30){ sig.push({t:'warn', h:'월 신규 구매자 <b>'+nf(x.newPre)+'명 → '+nf(x.newRec)+'명</b> ('+Math.round(x.newChg)+'%, 3개월 중앙값)'}); act.push('유입 감소 → 광고·검색 노출·가격 경쟁 점검'); }
+  else if(x.newChg!=null && x.newChg>=50){ sig.push({t:'', h:'월 신규 구매자 <b>'+nf(x.newPre)+'명 → '+nf(x.newRec)+'명</b> (+'+Math.round(x.newChg)+'%, 3개월 중앙값)'}); if(x.trend==='하락') act.push('유입은 늘었는데 재구매는 줄어듦 → 최근 늘어난 유입 경로(행사·제휴)의 고객 질 확인'); }
+  if(r){ if(r.flag){ sig.push({t:'warn', h:'리뷰 1~3점 <b>'+f1(r.lowPct)+'%</b> (평균의 '+r.ratio.toFixed(1)+'배)'+(r.topic?' · 불만 '+r.topic:'')});
+      act.unshift(x.trend==='하락'?'재구매 하락과 리뷰 불만이 겹침 → <b>'+(r.topic||'낮은 평점')+' 불만 원문</b>부터 확인 (품질 원인 가능성)':'리뷰 탭에서 '+(r.topic||'낮은 평점')+' 불만 원문 확인'); }
+    else if(x.trend==='하락'){ sig.push({t:'', h:'리뷰 1~3점 '+f1(r.lowPct)+'% · 평균 수준'}); } }
+  if(x.level==='높음'){ sig.push({t:'', h:'전체 60일 재구매 <b>'+f1(x.all.rate)+'%</b> · 평균 '+f1(base)+'%보다 높은 재구매 품목'}); if(x.trend!=='하락') act.push('<b>정기배송·구독·묶음 할인</b> 우선 대상'); }
+  else if(x.level==='낮음'){ sig.push({t:'', h:'전체 60일 재구매 '+f1(x.all.rate)+'% · 평균 '+f1(base)+'%보다 낮음 (원래 자주 다시 사는 품목 아님)'}); act.push('같은 품목 재구매보다 <b>다른 품목으로 넘기는 교차판매</b>(함께 구매 추천·묶음) 설계'); }
+  if(x.trend==='하락' && !(r&&r.flag) && !(x.spike&&x.spike.rate!=null&&x.spike.rate<=x.spike.normal*0.7)) act.unshift('최근 바뀐 것(가격·용량·옵션·상세페이지·노출) 점검 + 경쟁 상품 가격 확인'+(r?' — 리뷰 불만은 평균 수준이라 품질보다 가격·경쟁 쪽 가능성':''));
+  if(x.trend==='상승') act.unshift('무엇이 좋아졌는지(행사·리뉴얼·채널) 기록 → 같은 방식을 다른 품목에 적용');
+  var st=(x.trend==='하락'||(r&&r.flag))?{l:x.trend==='하락'?'개선 필요':'주의',c:'warn',o:0}:x.trend==='상승'?{l:'좋아짐',c:'good',o:1}:x.trend==='유지'?{l:'유지',c:'calm',o:2}:{l:'표본 부족',c:'calm',o:3};
+  if(!act.length) act.push(remind?'현재 흐름 유지 · 첫 구매 후 '+remind+'일차 리마인드 운영':'현재 흐름 유지');
+  return {sig:sig, act:act.slice(0,3), st:st};
+}
+function repurSigSpark(series){
+  var pts=series.filter(function(s){return s.rate!=null;}); if(pts.length<3) return '';
+  var W=220,H=38, mx=Math.max.apply(null,pts.map(function(p){return p.rate;}))||1, n=series.length;
+  var xy=series.map(function(s,i){ return s.rate==null?null:[Math.round(i/(n-1)*W), Math.round(H-3-(s.rate/mx)*(H-8))]; });
+  var d='', pen=false; xy.forEach(function(p){ if(!p){ pen=false; return; } d+=(pen?'L':'M')+p[0]+' '+p[1]+' '; pen=true; });
+  var dots=xy.map(function(p,i){ return p?'<circle cx="'+p[0]+'" cy="'+p[1]+'" r="2" fill="#3f57ef"><title>'+series[i].ym+' '+series[i].rate.toFixed(1)+'% ('+series[i].n+'명)</title></circle>':''; }).join('');
+  return '<svg class="rsSpark" viewBox="-3 0 '+(W+6)+' '+H+'" preserveAspectRatio="none"><path d="'+d+'" fill="none" stroke="#3f57ef" stroke-width="1.6" vector-effect="non-scaling-stroke"/>'+dots+'</svg><div class="rsSparkL"><span>'+series[0].ym.slice(2).replace('-','.')+'</span><span>첫 구매 월별 60일 재구매율</span><span>'+series[n-1].ym.slice(2).replace('-','.')+'</span></div>';
+}
+function repurSignalHtml(rd){
+  var S=repurItemSignals(rd, repurSigLevel), rv=repurSigReview(), f1=function(v){ return v==null?'-':(Math.round(v*10)/10).toFixed(1); };
+  var rows=S.items.filter(function(x){return x.buyers>=30;}).map(function(x){ return {x:x, r:repurSigRead(x,S.base,rv)}; });
+  var main=rows.filter(function(o){return o.x.sample;}).sort(function(a,b){ return (a.r.st.o-b.r.st.o)||(b.x.buyers-a.x.buyers); });
+  var thin=rows.filter(function(o){return !o.x.sample;});
+  if(repurSigLevel!=='family') main=main.slice(0,12);
+  var cnt=function(l){ return main.filter(function(o){return o.r.st.l===l;}).length; };
+  var cards=main.map(function(o){ var x=o.x, r=o.r;
+    var m=function(lab,a,b,unit,sub){ return '<div class="rsM"><span>'+lab+'</span><b>'+a+'<i> → </i>'+b+unit+'</b>'+(sub?'<em>'+sub+'</em>':'')+'</div>'; };
+    var nChg=x.newChg==null?'':((x.newChg>=0?'+':'')+Math.round(x.newChg)+'%');
+    return '<div class="rsCard'+(r.st.c==='warn'?' warn':'')+'"><div class="rsHead"><div class="rsName">'+pEsc(x.nm)+'</div><span class="riSignal '+r.st.c+'">'+r.st.l+'</span></div>'
+      +'<div class="rsMs">'+m('60일 재구매',f1(x.pre.rate),f1(x.rec.rate),'%',(x.diff>=0?'+':'')+f1(x.diff)+'%p')
+      +m('재구매 주기',(x.cycPre!=null&&x.cycPreN>=20)?x.cycPre:'-',(x.cycRec!=null&&x.cycRecN>=20)?x.cycRec:'-','일','중앙값')
+      +m('월 신규 구매자',(x.newPre||0).toLocaleString('ko-KR'),(x.newRec||0).toLocaleString('ko-KR'),'명',nChg?nChg+' · 중앙값':'')+'</div>'
+      +repurSigSpark(x.series)
+      +'<div class="rsSub">시그널</div><ul class="rsSig">'+r.sig.map(function(s){return '<li'+(s.t==='warn'?' class="w"':'')+'>'+s.h+'</li>';}).join('')+'</ul>'
+      +'<div class="rsSub">할 일</div><ul class="rsAct">'+r.act.map(function(a){return '<li>'+a+'</li>';}).join('')+'</ul></div>';
+  }).join('');
+  var clip=function(s){ return (typeof clipLabel==='function')?clipLabel(s,14):s; };
+  var thinHtml=thin.length?'<div class="rsThin"><b>표본 부족</b> (최근·이전 각 40명 이상 관측 필요) · '+thin.slice(0,12).map(function(o){ return pEsc(clip(o.x.nm))+' '+o.x.buyers.toLocaleString('ko-KR')+'명'; }).join(' · ')+(thin.length>12?' 외 '+(thin.length-12)+'개':'')+'</div>':'';
+  var seg='<div class="salesViewSeg" style="margin:0"><button class="svTab'+(repurSigLevel==='family'?' on':'')+'" onclick="setRepurSigLevel(\'family\')">품목군</button><button class="svTab'+(repurSigLevel!=='family'?' on':'')+'" onclick="setRepurSigLevel(\'sku\')">상세 품목</button></div>';
+  var p=function(a){ return a[0].slice(2).replace('-','.')+'~'+a[1].slice(2).replace('-','.'); };
+  return '<div class="salesSec"><div class="rsTop"><div class="repTIHead" style="margin:0">품목별 재구매 시그널 <span>오르는지 내리는지 → 상태 → 할 일</span></div>'+seg+'</div>'
+    +'<div class="rsSum"><span class="riSignal warn">개선 필요·주의 '+(cnt('개선 필요')+cnt('주의'))+'</span><span class="riSignal good">좋아짐 '+cnt('좋아짐')+'</span><span class="riSignal calm">유지 '+cnt('유지')+'</span></div>'
+    +'<div class="repHow"><b>읽는 법</b> 60일 재구매 = 그 품목을 처음 산 고객이 <b>60일 안에 같은 품목</b>을 다시 산 비율. 이전('+p(S.pWin)+' 첫 구매) → 최근('+p(S.rWin)+' 첫 구매)을 비교합니다. 공구처럼 한 달에 신규가 몰린 달은 평소 고객 추세를 왜곡해서 빼고 비교하고, 따로 시그널로 보여 줍니다. 재구매 주기는 6~12개월 전 → 최근 6개월 재구매 간격 중앙값, 월 신규 구매자는 직전 3개월 → 최근 3개월의 월 중앙값. 전체 평균 60일 재구매 '+f1(S.base)+'%.</div>'
+    +'<div class="rsGrid">'+(cards||'<div class="salesEmpty">비교할 표본이 충분한 품목이 없습니다.</div>')+'</div>'+thinHtml+'</div>';
+}
 // [품목] 기간필터 + 품목별 재구매율 막대 + 상세표 + 함께구매(크로스셀)
 function repurProductsViewHtml(rd){
   var rates=repurAllPeriodRates(rd);
@@ -14950,7 +15100,7 @@ function repurProductsViewHtml(rd){
     +'<span class="riNote">이 기간 내 주문만으로 계산 · 2회 이상 = 그 기간 안에서 재구매</span></div>';
   var note='<div style="font-size:11.5px;color:#7a8194;margin-bottom:2px">기간 기준: <b>'+(repurProdPeriod?('최신일로부터 최근 '+repurWinLabel(repurProdPeriod)+' 주문만'):'전체 누적 기간')+'</b> 으로 품목 재구매·크로스셀 재계산'+warn+'</div>';
   var filterSec='<div class="salesSec"><h4>품목 기간 필터 <span class="secSub">버튼의 % = 그 기간 전체 재구매율 · 선택 기간으로 아래 지표 재계산</span></h4>'+seg+note+summ+'</div>';
-  return filterSec
+  return repurSignalHtml(rd) + filterSec
     + '<div class="salesSec"><h4>품목별 동일상품 재구매율 <span class="secSub">구매고객 상위 10 · 그 품목을 다시 산 비율</span></h4><div>'+chartBox('repProd',300)+'</div></div>'
     + repurProdTableHtml(rd) + repurCrossSellHtml(rd);
 }
