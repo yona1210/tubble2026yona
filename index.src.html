@@ -1382,7 +1382,7 @@ tr.main.arch:hover{opacity:1}
 /* [v75] 품목별 주요 리뷰 · 인사이트 카드 */
 .riGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
 .riCard{background:#fff;border:1px solid #e7eaf2;border-radius:8px;padding:12px 13px;display:flex;flex-direction:column;gap:8px;min-width:0;cursor:pointer}
-.riCard.warn{border-color:#f0d2cd;box-shadow:inset 3px 0 0 #D64541}
+.riCard.warn{border-color:#f3dcb4;box-shadow:inset 3px 0 0 var(--amber)}
 .riCard:hover{border-color:#cfd8f0;background:#fbfcff}
 .riCardHead{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .riCardName{font-size:13px;font-weight:800;color:var(--navy);line-height:1.35;word-break:keep-all}
@@ -1395,9 +1395,17 @@ tr.main.arch:hover{opacity:1}
 .riInsight .rec{font-weight:700}
 .riChips{display:flex;flex-wrap:wrap;gap:5px}
 .riChip{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#eef1fc;color:#3f57ef}
-.riChip.neg{background:#fbeeed;color:#C0392B}
+.riChip.neg{background:#fdf3e2;color:#9a5b00}
 .riSignal{font-size:10px;font-weight:850;padding:3px 8px;border-radius:999px;background:#eef1fc;color:#3f57ef;white-space:nowrap}
-.riSignal.warn{background:#fbeeed;color:#C0392B}
+.riSignal.warn{background:#fdf3e2;color:#9a5b00}
+.riSignal.good{background:#eef1fc;color:#3f57ef}
+.riSignal.calm{background:#f1f2f5;color:#6b7280}
+.riLine{font-size:12px;color:#3a3d47;line-height:1.55}
+.riCmp{font-size:11px;color:#8a90a0;margin-left:4px}
+.riTagRow{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-top:6px}
+.riTagL{font-size:10.5px;font-weight:700;color:#7a8194;min-width:26px}
+.riRec{font-size:11.5px;font-weight:700;color:var(--navy);margin-top:8px}
+.riRec.warn{color:#9a5b00}
 .riTopbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
 .riModeSeg{display:inline-flex;gap:3px;padding:3px;background:#f1f3f8;border:1px solid #e1e6f0;border-radius:8px}
 .riModeSeg button{border:0;background:transparent;color:#687086;font-size:11px;font-weight:800;padding:6px 10px;border-radius:6px;cursor:pointer;font-family:inherit}
@@ -12109,10 +12117,15 @@ function reviewCategory(nm){
   if(n.includes('캡슐')) return '캡슐세제';
   if(n.includes('탈취')) return '탈취제';
   if(n.includes('주방')) return '주방세제';
-  if(n.includes('욕실')) return '욕실클리너';
+  if(n.includes('욕실')||n.includes('화장실 클리너')) return '욕실클리너';
   if(n.includes('식기세척')) return '식기세척기세제';
   if(n.includes('세탁조')) return '세탁조클리너';
   if(n.includes('이염방지')) return '이염방지시트세제';
+  // v142: '기타'에 섞여 있던 신규 품목
+  if(n.includes('얼룩')) return '얼룩제거제';
+  if(n.includes('변기')) return '변기클리너';
+  if(n.includes('건조기시트')) return '건조기시트';
+  if(n.includes('선물세트')) return '선물세트';
   return '기타';
 }
 function reviewSenti(p){ return p>=5?'만족':(p<=2?'불만':'보통'); }
@@ -12333,6 +12346,9 @@ function reviewInsightStats(rd){
     });
   });
   const sortMap=map=>Object.entries(map).sort((a,b)=>b[1].total-a[1].total);
+  // v142: 품목 판정의 기준선 — 전체 1~3점 비중(품목이 이보다 1.5배 이상 높을 때만 '주의')
+  window._rvLowBase=list.length?(neutral+negative)/list.length:0;
+  window._rvLastYM=monthRows.length?monthRows[monthRows.length-1].m:'';
   return {from,to,total:list.length,avg,positive,neutral,negative,photo,monthRows,byCat:sortMap(byCat),byGood:sortMap(byGood),byBad:sortMap(byBad),byKind:sortMap(byKind),list};
 }
 
@@ -12346,33 +12362,50 @@ function reviewInsightRate(n,total){
   return Math.max(0.1, Math.round(p*10)/10);
 }
 
+// v142: 상단 요약 → '이번에 볼 것' 인사이트 카드 (사실 + 할 일). 색은 주의(주황)만, 나머지는 무색
 function reviewInsightDashboardHtml(rd){
   const st=reviewInsightStats(rd);
-  const topGood=st.byGood[0], topBad=st.byBad[0], topCat=st.byCat[0];
+  if(!st.total) return '';
+  const f1=v=>(Math.round(v*10)/10).toFixed(1), nf=n=>salesWon(n);
   const range=(st.from||st.to)?`${st.from||'처음'} ~ ${st.to||'최근'}`:'전체 기간';
-  const positivePct=reviewInsightRate(st.positive,st.total), negativePct=reviewInsightRate(st.negative,st.total);
-  const neutralPct=reviewInsightRate(st.neutral,st.total);
-  const topicBars=(arr,color,empty)=>arr.slice(0,8).map(([k,v])=>{
-    const pct=reviewInsightRate(v.total,st.total);
-    return `<div class="salesBar"><span class="nm">${k}</span><span class="track"><i style="width:${Math.max(3,pct)}%;background:${color}"></i></span><span class="val">${salesWon(v.total)}건</span><span class="pct">${pct}%</span></div>`;
-  }).join('') || `<div class="salesEmpty">${empty}</div>`;
-  return `<div class="complaintHero">
-    <div class="complaintHead">
-      <div>
-        <div class="complaintTitle">고객 리뷰 핵심 요약</div>
-        <div class="complaintNote" style="margin-top:6px">기간: ${range} · 전체 리뷰에서 만족 요인과 개선 신호를 함께 봅니다.</div>
-      </div>
-      <div>
-        <div class="complaintLegend"><span><i style="background:#1E9E63"></i>긍정 4~5점</span><span><i style="background:#E59A1C"></i>중립 3점</span><span><i style="background:#D64541"></i>부정 1~2점</span></div>
-        <div class="reviewSentimentBar"><i class="pos" style="width:${positivePct}%"></i><i class="neu" style="width:${neutralPct}%"></i><i class="neg" style="width:${negativePct}%"></i></div>
-      </div>
-    </div>
-    <div class="reviewInsightLine">
-      <div class="ri"><b>좋은 반응</b>${topGood?`${topGood[0]} · ${salesWon(topGood[1].total)}건 언급`:'데이터 없음'}</div>
-      <div class="ri"><b>개선 신호</b>${topBad?`${topBad[0]} · ${salesWon(topBad[1].total)}건 언급`:'데이터 없음'}</div>
-      <div class="ri"><b>주목 품목</b>${topCat?`${topCat[0]} · 평균 ${(topCat[1].sum/topCat[1].total).toFixed(2)}점`:'데이터 없음'}</div>
-    </div>
-  </div>`;
+  const lowAll=st.neutral+st.negative, basePct=st.total?lowAll/st.total*100:0;
+  const cards=[];
+  // ① 1~2점 추세: 최근 3개월 vs 직전 3개월
+  const mr=st.monthRows;
+  if(mr.length>=4){
+    const r3=mr.slice(-3), p3=mr.slice(-6,-3), sum=(a,k)=>a.reduce((s,x)=>s+x[k],0);
+    const rN=sum(r3,'negative'), rT=sum(r3,'total'), pN=sum(p3,'negative'), pT=sum(p3,'total');
+    const rP=rT?rN/rT*100:0, pP=pT?pN/pT*100:0, up=rN>=10 && rP>=pP*1.5;
+    cards.push({tag:'1~2점 리뷰 추세', big:`${nf(rN)}건 · ${f1(rP)}%`, level:up?'warn':'',
+      fact:`${r3[0].m}~${r3[r3.length-1].m} 리뷰 ${nf(rT)}건 중 · 직전 3개월은 ${nf(pN)}건(${f1(pP)}%)`+(up?` → <b>${(pP>0?rP/pP:0).toFixed(1)}배</b>로 늘어남`:''),
+      act:up?'최근 1~2점 리뷰 원문부터 확인 — 아래 <b>주의 품목</b>에서 품목별로 봅니다':'평소 수준 · 월 1회 원문 확인'});
+  }
+  // ② 불만 1순위 주제와 그 주제가 많은 품목
+  const bad=st.byBad.filter(([k])=>k!=='기타/미분류');
+  if(bad.length){
+    const [topic,v]=bad[0], byItem={};
+    st.list.forEach(r=>{ if(Number(r.rate)<=3 && (r.topics||[]).includes(topic)) byItem[r.cat||'기타']=(byItem[r.cat||'기타']||0)+1; });
+    const items=Object.entries(byItem).sort((a,b)=>b[1]-a[1]).slice(0,2);
+    cards.push({tag:'불만 1순위 주제', big:reviewEsc(topic), level:'',
+      fact:`1~3점 리뷰 ${nf(lowAll)}건 중 <b>${nf(v.total)}건</b>(${f1(lowAll?v.total/lowAll*100:0)}%)에서 언급`+(items.length?` · ${items.map(([k,n])=>`${reviewEsc(k)} ${nf(n)}건`).join(', ')}`:''),
+      act:`${items.length?reviewEsc(items[0][0])+'의 ':''}${reviewEsc(topic)} 불만 원문 확인 → 사용법 안내·상세페이지 보강 검토`});
+  }
+  // ③ 주의 품목 (리뷰 100건 이상 품목 중 평균 대비 1~3점 비중 1.5배 이상, 또는 최근 3개월 1~2점이 10건 이상·2배 이상 증가)
+  const items=reviewItemAgg(st.list).map(g=>({g,ins:reviewItemInsightText(g)}));
+  const warn=items.filter(x=>x.ins.flag).sort((a,b)=>b.ins.ratio-a.ins.ratio);
+  cards.push({tag:'주의 품목', big:warn.length?`${warn.length}개`:'없음', level:warn.length?'warn':'',
+    fact:warn.length?warn.slice(0,4).map(x=>`<b>${reviewEsc(x.g.name)}</b> ${f1(x.ins.lowPct)}%${x.ins.rising?' (최근 증가)':''}`).join(' · ')+`<br>전체 평균 1~3점 비중 ${f1(basePct)}%`:`리뷰 100건 이상 품목 모두 1~3점 비중이 평균(${f1(basePct)}%)의 1.5배 미만`,
+    act:warn.length?'품목 카드에서 <b>확인할 리뷰</b> 원문을 보고 원인(품질·사용법·배송) 구분':'품목별 점검 불필요 — 강점 활용에 집중'});
+  // ④ 강점 1순위 → 셀링포인트
+  const good=st.byGood.filter(([k])=>k!=='기타/미분류');
+  if(good.length){
+    const [g1,v1]=good[0], g2=good[1];
+    cards.push({tag:'고객이 꼽은 강점', big:reviewEsc(g1), level:'key',
+      fact:`4~5점 리뷰 ${nf(st.positive)}건 중 <b>${nf(v1.total)}건</b>(${f1(st.positive?v1.total/st.positive*100:0)}%)에서 언급`+(g2?` · 다음 ${reviewEsc(g2[0])} ${nf(g2[1].total)}건`:''),
+      act:`상세페이지·광고 첫 문구를 <b>${reviewEsc(g1)}</b> 중심으로 · 포토리뷰 ${reviewInsightRate(st.photo,st.total)}% 중 ${reviewEsc(g1)} 사진을 대표로`});
+  }
+  const body=cards.map(x=>`<div class="repTI${x.level==='key'?' key':''}${x.level==='warn'?' warn':''}"><div class="repTITag">${x.tag}</div><div class="repTIBig">${x.big}</div><div class="repTIFact">${x.fact}</div><div class="repTIAct"><b>→ 할 일</b> ${x.act}</div></div>`).join('');
+  return `<div class="salesSec"><div class="repTIHead">이번에 볼 것 <span>${range} · 리뷰 ${nf(st.total)}건 · 평균 ★${st.avg.toFixed(2)}</span></div><div class="repTIGrid">${body}</div></div>`;
 }
 // [v74] 주제 분석 — 좋은 반응 / 개선 신호 TOP (개요·추이 다음 단계로 분리 배치)
 function reviewTopicTopHtml(rd){
@@ -12389,10 +12422,13 @@ function reviewTopicTopHtml(rd){
 }
 
 // [v76] 리뷰 HTML escape
-function reviewEsc(s){ return String(s||'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
+// v142: 수집 원문에 남은 HTML 엔티티(&hellip; 등)를 먼저 풀고 이스케이프 — 화면에 '&hellip;'가 그대로 보이던 문제
+function reviewDecode(s){ const E={hellip:'…',amp:'&',lt:'<',gt:'>',quot:'"',apos:"'",nbsp:' ',middot:'·',lsquo:'‘',rsquo:'’',ldquo:'“',rdquo:'”',ndash:'–',mdash:'—'};
+  return String(s||'').replace(/&(#x?[0-9a-f]+|[a-z]+);/gi,(m,k)=>{ if(k[0]==='#'){ const c=k[1]==='x'||k[1]==='X'?parseInt(k.slice(2),16):parseInt(k.slice(1),10); return isFinite(c)&&c>0?String.fromCodePoint(c):m; } return E[k.toLowerCase()]!=null?E[k.toLowerCase()]:m; }); }
+function reviewEsc(s){ return reviewDecode(s).replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m])); }
 function reviewAttr(s){ return reviewEsc(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function reviewShort(s,n=82){
-  s=String(s||'').replace(/\s+/g,' ').trim();
+  s=reviewDecode(s).replace(/\s+/g,' ').trim();
   return s.length>n?s.slice(0,n-1)+'…':s;
 }
 // [v76] 품목(터블 제품군)별 집계 — 건수·평점분포·감성·주제·감정·리뷰목록
@@ -12411,42 +12447,41 @@ function reviewItemAgg(list){
   });
   return Object.values(G).sort((a,b)=>b.cnt-a.cnt);
 }
-// [v76] 한 품목에 대한 종합 인사이트 문장 (실제 집계만 사용)
+// v142: 품목 판정 — 절대 건수(대형 품목은 늘 3건 이상)가 아니라 전체 평균 대비 1~3점 비중, 최근 3개월 악화 여부로 판단
+function reviewYMShift(ym,k){ if(!ym) return ''; let y=+ym.slice(0,4), m=+ym.slice(5,7)+k; while(m<1){m+=12;y--;} while(m>12){m-=12;y++;} return y+'-'+String(m).padStart(2,'0'); }
 function reviewItemInsightText(g){
-  const topN=(o,n)=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,n);
-  const avg=g.cnt?g.sum/g.cnt:0;
-  const negPct=g.cnt?Math.round(g.neg/g.cnt*100):0;
+  const topN=(o,n)=>Object.entries(o).filter(([t])=>t!=='기타/미분류').sort((a,b)=>b[1]-a[1]).slice(0,n);
+  const avg=g.cnt?g.sum/g.cnt:0, low=g.neu+g.neg, lowPct=g.cnt?low/g.cnt*100:0;
+  const base=(window._rvLowBase||0)*100, ratio=base>0?lowPct/base:1;
   const strengths=topN(g.posTopic,2).map(([t])=>t);
-  const concerns=topN(g.negTopic,3);
-  const concernTop=concerns.find(([t])=>t!==strengths[0])||concerns[0];
-  const strongDislike=(g.emo['강한 불만']||0);
-  const flag=!!concernTop && (negPct>=10 || (concernTop[1]||0)>=3);
-  const strengthTxt=strengths.length?strengths.join('·')+' 호평':'전반적 호평';
-  let html;
-  if(flag){
-    const sev=strongDislike>=1?`강한 불만 ${strongDislike}건 포함`:'개선 신호';
-    html=`평균 <b>${avg.toFixed(2)}점</b> · 긍정 ${Math.round(g.pos/g.cnt*100)}%. <b>강점</b> ${strengthTxt}. <b>주의</b> ${concernTop[0]} 관련 ${sev}(${concernTop[1]}건). <span class="rec" style="color:#C0392B">→ ${concernTop[0]} 개선 우선 검토</span>`;
-  } else if(strengths.length){
-    html=`평균 <b>${avg.toFixed(2)}점</b> · 긍정 ${Math.round(g.pos/g.cnt*100)}%. <b>강점</b> ${strengthTxt}(${salesWon(g.pos)}건). 부정 신호 미미(${reviewInsightRate(g.neg,g.cnt)}%). <span class="rec" style="color:#1E9E63">→ ${strengths[0]} 강점을 셀링포인트로</span>`;
-  } else {
-    html=`리뷰 ${salesWon(g.cnt)}건 · 평균 <b>${avg.toFixed(2)}점</b>. 주제 키워드가 적어 표본 보강 필요.`;
-  }
-  return {html, strengths, concernTop, flag};
+  const concernTop=topN(g.negTopic,1)[0]||null;
+  const from=reviewYMShift(window._rvLastYM||'',-2);
+  const rec=g.list.filter(r=>r.ym&&r.ym>=from), old=g.list.filter(r=>r.ym&&r.ym<from);
+  const recNeg=rec.filter(r=>r.rate<=2).length, oldNeg=old.filter(r=>r.rate<=2).length;
+  const recNegPct=rec.length?recNeg/rec.length*100:0, oldNegPct=old.length?oldNeg/old.length*100:0;
+  const rising=recNeg>=10 && rec.length>=100 && recNegPct>=Math.max(oldNegPct*2,1);
+  const high=g.cnt>=100 && low>=5 && ratio>=1.5;
+  const flag=high||rising;
+  const strong=!flag && avg>=4.85 && ratio<=1 && g.cnt>=100;
+  const f1=v=>v.toFixed(1);
+  const lines=[`1~3점 비중 <b>${f1(lowPct)}%</b> <span class="riCmp">전체 평균 ${f1(base)}%${base>0?` · ${ratio.toFixed(1)}배`:''}</span>`];
+  if(rising) lines.push(`최근 3개월 1~2점 <b>${recNeg}건(${f1(recNegPct)}%)</b> <span class="riCmp">이전 ${f1(oldNegPct)}%</span>`);
+  const tags=`<div class="riTagRow"><span class="riTagL">강점</span>${strengths.length?strengths.map(t=>`<span class="riChip">${reviewEsc(t)}</span>`).join(''):'<span class="riCmp">키워드 부족</span>'}</div>`
+    +(concernTop?`<div class="riTagRow"><span class="riTagL">불만</span><span class="riChip neg">${reviewEsc(concernTop[0])} ${concernTop[1]}건</span></div>`:'');
+  let recTxt;
+  if(flag) recTxt=`→ ${concernTop?concernTop[0]+' 불만':'낮은 평점'} 리뷰 원문 확인`+(rising?' (최근 늘어남)':'');
+  else if(strong) recTxt=`→ ${strengths[0]||'만족 포인트'}를 상세페이지 셀링포인트로`;
+  else recTxt='→ 현재 수준 유지 · 월 1회 확인';
+  const html=lines.map(l=>`<div class="riLine">${l}</div>`).join('')+tags+`<div class="riRec${flag?' warn':''}">${recTxt}</div>`;
+  return {html, strengths, concernTop, flag, strong, rising, high, lowPct, ratio};
 }
 function reviewItemActionText(g,ins){
-  const avg=g.cnt?g.sum/g.cnt:0;
-  const negPct=g.cnt?Math.round(g.neg/g.cnt*100):0;
-  const posPct=g.cnt?Math.round(g.pos/g.cnt*100):0;
-  if(ins.flag) return {label:'개선 우선', cls:'warn', text:`${ins.concernTop[0]} 언급을 먼저 확인`};
-  if(avg>=4.35 && posPct>=80) return {label:'강점 확대', cls:'', text:`${ins.strengths[0]||'만족 포인트'}를 상세페이지에 전면 배치`};
-  if(negPct>=8) return {label:'주의 관찰', cls:'warn', text:'낮은 평점 리뷰를 주 1회 확인'};
-  return {label:'안정 유지', cls:'', text:'현재 강점을 유지하며 표본 확대'};
+  if(ins.flag) return {label:ins.rising&&!ins.high?'최근 악화':'주의', cls:'warn', text:ins.rising?'최근 3개월 1~2점 증가':'평균보다 낮은 평점 비중 높음'};
+  if(ins.strong) return {label:'강점', cls:'good', text:`${ins.strengths[0]||'만족 포인트'} 호평`};
+  return {label:'안정', cls:'calm', text:'평균 수준'};
 }
 function reviewItemFocusScore(g,ins){
-  const avg=g.cnt?g.sum/g.cnt:0;
-  const negPct=g.cnt?g.neg/g.cnt*100:0;
-  const posPct=g.cnt?g.pos/g.cnt*100:0;
-  return (ins.flag?90:0)+(negPct>=8?35:0)+(avg>=4.35&&posPct>=80?25:0)+Math.min(28,g.cnt/8);
+  return (ins.flag?100:0)+(ins.rising?30:0)+Math.min(40,(ins.ratio||0)*15)+Math.min(28,g.cnt/500);
 }
 function reviewItemOverviewHtml(rd){
   const cs=reviewInsightStats(rd);
@@ -12463,15 +12498,15 @@ function reviewItemOverviewHtml(rd){
     return {g,ins,act,avg,posPct,negPct,focus:reviewItemFocusScore(g,ins)};
   });
   const MODES=[
-    ['focus','우선 볼 품목'],
-    ['risk','개선 신호'],
+    ['focus','우선 볼 순'],
+    ['risk','주의 품목'],
     ['strong','강점 품목'],
     ['volume','리뷰 많은 순']
   ];
   if(!MODES.some(([m])=>m===reviewItemMode)) reviewItemMode='focus';
   let shown=enriched.slice();
-  if(reviewItemMode==='risk') shown=shown.filter(x=>x.ins.flag||x.negPct>=8).sort((a,b)=>(b.negPct-a.negPct)||b.focus-a.focus);
-  else if(reviewItemMode==='strong') shown=shown.filter(x=>x.avg>=4.2&&x.posPct>=75).sort((a,b)=>(b.posPct-a.posPct)||b.g.cnt-a.g.cnt);
+  if(reviewItemMode==='risk') shown=shown.filter(x=>x.ins.flag).sort((a,b)=>b.focus-a.focus);
+  else if(reviewItemMode==='strong') shown=shown.filter(x=>x.ins.strong).sort((a,b)=>(b.avg-a.avg)||b.g.cnt-a.g.cnt);
   else if(reviewItemMode==='volume') shown=shown.sort((a,b)=>b.g.cnt-a.g.cnt);
   else shown=shown.sort((a,b)=>b.focus-a.focus);
   const cards=shown.slice(0,6).map(({g,ins,act,avg,posPct,negPct})=>{
@@ -12479,7 +12514,6 @@ function reviewItemOverviewHtml(rd){
     const share=(g.cnt/total*100).toFixed(1);
     const good=g.list.filter(r=>r.rate>=4&&r.body).sort((a,b)=>sc(b)-sc(a))[0];
     const bad=g.list.filter(r=>r.rate<=3&&r.body).sort((a,b)=>(a.rate-b.rate)||((b.body||'').length-(a.body||'').length))[0];
-    const chips=ins.strengths.slice(0,2).map(t=>`<span class="riChip">${reviewEsc(t)}</span>`).join('')+(ins.concernTop?`<span class="riChip neg">${reviewEsc(ins.concernTop[0])}</span>`:'');
     return `<div class="riCard${ins.flag?' warn':''}" data-rireviewitem="${reviewAttr(g.name)}" title="클릭하면 아래 품목 세부 분석으로 연결됩니다">
       <div class="riCardHead">
         <div class="riCardName">${reviewEsc(g.name)}</div>
@@ -12488,12 +12522,9 @@ function reviewItemOverviewHtml(rd){
       <div class="riMetrics">
         <div class="riMetric"><b>★${avg.toFixed(2)}</b><span>평균 평점</span></div>
         <div class="riMetric"><b>${salesWon(g.cnt)}</b><span>리뷰 수</span></div>
-        <div class="riMetric"><b>${share}%</b><span>전체 비중</span></div>
+        <div class="riMetric"><b>${ins.lowPct.toFixed(1)}%</b><span>1~3점 비중</span></div>
       </div>
-      <div class="riSenti" title="긍정·중립·부정 비중">
-        <i style="width:${posPct}%;background:#1E9E63"></i><i style="width:${neuPct}%;background:#E59A1C"></i><i style="width:${negPct}%;background:#D64541"></i>
-      </div>
-      <div class="riInsight">${ins.html}<div class="riChips" style="margin-top:7px">${chips}</div></div>
+      <div class="riInsight">${ins.html}</div>
       <div class="riQuoteGrid">
         <div class="riQuote"><span class="qtag">대표 호평</span><span class="qtxt">${good?reviewEsc(reviewShort(good.body,74)):'표본 없음'}</span></div>
         <div class="riQuote neg"><span class="qtag">확인할 리뷰</span><span class="qtxt">${bad?reviewEsc(reviewShort(bad.body,74)):'낮은 평점 없음'}</span></div>
@@ -12505,7 +12536,7 @@ function reviewItemOverviewHtml(rd){
   const emptyCards=cards || `<div class="salesEmpty">선택한 조건에 맞는 품목이 없습니다. 다른 보기로 전환해 보세요.</div>`;
   const rows=enriched.map(({g,ins,act,avg,posPct,negPct})=>{
     const top=ins.strengths.concat(ins.concernTop?[ins.concernTop[0]]:[]).slice(0,3).map(reviewEsc).join(' · ')||'-';
-    return `<tr data-rireviewitem="${reviewAttr(g.name)}"><td style="text-align:left">${reviewEsc(g.name)}</td><td class="r"><b>${salesWon(g.cnt)}</b></td><td class="r">★${avg.toFixed(2)}</td><td class="r" style="color:#1E9E63">${posPct}%</td><td class="r" style="color:#C0392B">${negPct}%</td><td>${act.label}</td><td style="text-align:left">${top}</td></tr>`;
+    return `<tr data-rireviewitem="${reviewAttr(g.name)}"><td style="text-align:left">${reviewEsc(g.name)}</td><td class="r"><b>${salesWon(g.cnt)}</b></td><td class="r">★${avg.toFixed(2)}</td><td class="r">${ins.lowPct.toFixed(1)}%</td><td><span class="riSignal ${act.cls}">${act.label}</span></td><td style="text-align:left">${top}</td></tr>`;
   }).join('');
   return `<div class="salesSec">
     <h4>품목별 리뷰 인사이트 <span class="secSub">강점·주의 신호·대표 리뷰를 품목별로 요약</span></h4>
@@ -12516,7 +12547,7 @@ function reviewItemOverviewHtml(rd){
     <div class="riGrid">${emptyCards}</div>
     <details class="reviewCompactFold">
       <summary>전체 품목 요약표 보기</summary>
-      <div class="reviewCompactBody"><div class="salesTblWrap"><table class="salesTbl riClickTbl"><thead><tr><th style="text-align:left">품목</th><th class="r">리뷰 수</th><th class="r">평균</th><th class="r">긍정</th><th class="r">부정</th><th>상태</th><th style="text-align:left">주요 신호</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+      <div class="reviewCompactBody"><div class="salesTblWrap"><table class="salesTbl riClickTbl"><thead><tr><th style="text-align:left">품목</th><th class="r">리뷰 수</th><th class="r">평균</th><th class="r">1~3점 비중</th><th>상태</th><th style="text-align:left">주요 신호</th></tr></thead><tbody>${rows}</tbody></table></div></div>
     </details>
   </div>`;
 }
@@ -12612,7 +12643,7 @@ function reviewItemDrilldownHtml(rd){
     return `<div class="riStarRow"><span class="riStarLab"><b>${s}점</b></span><span class="riStarTrack"><i style="width:${Math.max(1,pct)}%;background:${col}"></i></span><span class="riStarVal">${salesWon(n)}건 · ${pct.toFixed(1)}%</span></div>`;
   }).join('');
   const ins=reviewItemInsightText(g);
-  const chipHtml=ins.strengths.map(t=>`<span class="riChip">${t}</span>`).join('')+(ins.concernTop?`<span class="riChip neg">⚠ ${ins.concernTop[0]}</span>`:'');
+  const chipHtml='';
   // 주요 리뷰: 베스트·포토·구체성 우선 긍정 3
   const sc=r=>(r.best?100:0)+(r.photo?12:0)+Math.min(25,(r.body||'').length/8);
   const mainRevs=g.list.filter(r=>r.rate>=4&&r.body).sort((a,b)=>sc(b)-sc(a)).slice(0,3);
@@ -12626,7 +12657,7 @@ function reviewItemDrilldownHtml(rd){
   return `<div class="salesSec" id="reviewItemDetail"><h4>품목 세부 분석 <span class="secSub">품목을 선택하면 평점 분포·주요 리뷰·종합 인사이트를 봅니다</span></h4>
     <div class="riSelBar">${chips}</div>
     <div class="riDetailHead"><span class="riDetailName">${reviewEsc(g.name)}</span><span class="riDetailMeta"><span class="riStar">★${(g.sum/g.cnt).toFixed(2)}</span> · ${salesWon(g.cnt)}건 · 전체의 ${total?(g.cnt/total*100).toFixed(1):'0'}%</span></div>
-    <div class="riInsight" style="margin-bottom:12px">💡 <b>종합 인사이트</b> — ${ins.html}${chipHtml?`<div class="riChips" style="margin-top:7px">${chipHtml}</div>`:''}</div>
+    <div class="riInsight" style="margin-bottom:12px"><div class="riSubH" style="margin-bottom:4px">종합 판단 <span class="riSignal ${reviewItemActionText(g,ins).cls}">${reviewItemActionText(g,ins).label}</span></div>${ins.html}${chipHtml?`<div class="riChips" style="margin-top:7px">${chipHtml}</div>`:''}</div>
     <div class="riDetailGrid">
       <div class="riCol">
         <div class="riSubH">평점 분포 <span style="font-weight:600;color:#9aa1b2">${g.cnt}건 기준</span></div>
@@ -12637,7 +12668,7 @@ function reviewItemDrilldownHtml(rd){
         <div class="riRevs">${mainHtml}</div>
       </div>
     </div>
-    <div class="riSubH" style="margin-top:12px">안 좋은 리뷰 <span style="font-weight:600;color:#C0392B">낮은 평점 ${salesWon(g.neg)}건 중 대표</span></div>
+    <div class="riSubH" style="margin-top:12px">안 좋은 리뷰 <span style="font-weight:600;color:#9a4b00">1~2점 ${salesWon(g.neg)}건 · 3점 ${salesWon(g.neu)}건 중 대표</span></div>
     <div class="riRevs">${badHtml}</div>
   </div>`;
 }
@@ -12672,7 +12703,14 @@ function renderReview(){
   const meta=document.getElementById('reviewMeta');
   const kpis=document.getElementById('reviewKpis');
   const body=document.getElementById('reviewBody');
-  const rd=DATA.reviewData;
+  let rd=DATA.reviewData;
+  // v142: 신규 품목(얼룩제거제·변기클리너·건조기시트·선물세트)이 '기타'로 저장돼 있던 기존 데이터 1회 재분류
+  if(rd && Array.isArray(rd.allList) && rd.allList.length && rd._catV142!==1){
+    try{ rd.allList.forEach(r=>{ r.cat=reviewCategory(r.nm||''); });
+      const keep={uploadedAt:rd.uploadedAt, fileName:rd.fileName};
+      DATA.reviewData=Object.assign(aggregateReviewRecs(rd.allList, keep.fileName), {uploadedAt:keep.uploadedAt, _catV142:1});
+      rd=DATA.reviewData; }catch(e){}
+  }
   if(!rd || !rd.total){
     if(meta) meta.textContent='업로드된 리뷰 데이터 없음 — 스마트스토어 리뷰 엑셀을 올리세요';
     if(kpis){ kpis.classList.remove('reviewKpiCompact'); kpis.innerHTML=''; }
@@ -12690,7 +12728,7 @@ function renderReview(){
   if(kpis){ kpis.classList.add('reviewKpiCompact','salesKpisHero'); kpis.innerHTML=`
     <div class="salesKpi accent hero"><div class="heroMain"><div class="v">${salesWon(cs.total)}</div><div class="l">기간 내 리뷰</div><div class="sub">${cs.from||'-'}~${cs.to||'-'} · 평균 ${cs.avg?cs.avg.toFixed(2):'-'}점</div></div><div class="heroSpark"><canvas id="reviewSparkKpi"></canvas></div></div>
     <div class="salesKpi goal"><span class="kpiIco">${kpiIcon('up')}</span><div class="l">긍정 리뷰 비중</div><div class="semiGauge">${semiGaugeSvg(positivePct,'#1E9E63')}</div><div class="sub">4~5점 ${salesWon(cs.positive)}건</div></div>
-    <div class="salesKpi"><span class="kpiIco">${kpiIcon('warn')}</span><div class="v" style="color:#D64541">${negativePct}%</div><div class="l">낮은 평점 비중</div><div class="sub">1~2점 ${salesWon(cs.negative)}건 · 중립 ${salesWon(cs.neutral)}건</div></div>
+    <div class="salesKpi"><span class="kpiIco">${kpiIcon('warn')}</span><div class="v">${negativePct}%</div><div class="l">낮은 평점 비중</div><div class="sub">1~2점 ${salesWon(cs.negative)}건 · 중립 ${salesWon(cs.neutral)}건</div></div>
     <div class="salesKpi"><span class="kpiIco">${kpiIcon('star')}</span><div class="v">${cs.avg?cs.avg.toFixed(2):'-'}</div><div class="l">평균 평점</div><div class="sub">5점 만점 · 긍정 ${positivePct}%</div></div>
     <div class="salesKpi"><span class="kpiIco">${kpiIcon('cam')}</span><div class="v">${photoPct}%</div><div class="l">포토리뷰 비중</div><div class="sub">전체 ${salesWon(cs.total)}건 중</div></div>`;
     drawKpiSpark('reviewSparkKpi', (rd.months||[]).slice(-12).map(m=>rd.month[m]?rd.month[m].cnt:0), '#1E9E63');
