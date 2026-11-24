@@ -3711,8 +3711,9 @@ function mktLiveTub(){
     const cy=salesCurYear(sd); const by={}, catAmt={}; let total=0;
     // 저장된 카테고리 집계는 예전 분류일 수 있어(매출 탭을 열어야 재집계) 품목 원자료에서 현재 규칙으로 직접 분류
     Object.keys(sd.item).forEach(nm=>{ const a=salesYearAmt(sd.item[nm],cy); if(!a) return; total+=a; const c=salesCategory(nm); catAmt[c]=(catAmt[c]||0)+a; });
-    const walk=n=>{ if(n.c){ n.c.forEach(walk); return; } if(!n.m||!n.t) return;
-      const a=n.t.reduce((s,c)=>s+(catAmt[c]||0),0); by[n.m]=(by[n.m]||0)+a/1e8; };
+    const walk=n=>{ if(n.c){ n.c.forEach(walk); return; } if(!(n.m||n.u)||!n.t) return;
+      const a=n.t.reduce((s,c)=>s+(catAmt[c]||0),0);
+      [...new Set([n.m,n.u].filter(Boolean))].forEach(k=>{ by[k]=(by[k]||0)+a/1e8; }); };   // [v145] 예전 이름·새 조사 이름 둘 다(행은 둘 중 하나만 존재)
     COUPANG_CATS.forEach(walk);
     const ms=sd.months.filter(m=>m.slice(0,4)===cy);
     return {cy,by,total:total/1e8,from:ms.length?+ms[0].slice(5):0,to:ms.length?+ms[ms.length-1].slice(5):0};
@@ -7162,7 +7163,7 @@ function categoryStructureHtml(){
   const top5=(typeof MKT==='function'?MKT().top5:null)||{};
   const cats=Object.keys(top5);
   if(!cats.length) return '';
-  const catSize={}; cats.forEach(c=>{ catSize[c]=(top5[c]||[]).reduce((a,x)=>a+(x.yearRev||0),0); });
+  const catSize={}; cats.forEach(c=>{ catSize[c]=(top5[c]||[]).slice(0,5).reduce((a,x)=>a+(x.yearRev||0),0); });
   const tree={};
   cats.forEach(c=>{ const h=catHier(c), v=catSize[c]||0;
     if(!tree[h.big])tree[h.big]={total:0,roles:{}};
@@ -7214,28 +7215,34 @@ window.tmZoomTo=function(big){ tmZoom=(tmZoom===big)?null:big; if(typeof renderM
 const COUPANG_CATS=[
   {n:'세탁세제',c:[
     // [v136] 쿠팡에선 세탁세제 바로 아래 평평하게 나열 — 읽기 쉽게 '본세제'·'보조·특수'로 묶음(vg=가상 묶음). 시장 8,500억은 본세제 묶음 전체에.
-    {n:'세탁 본세제',vg:true,mkm:'세탁세제 (실내건조 중심)',c:[{n:'액체세제',m:'액체세제'},{n:'분말세제',m:'분말세제'},
-      {n:'캡슐세제',m:'세탁세제 (실내건조 중심)',mktOff:true,t:['캡슐세제'],note:'시장 8,500억은 본세제 전체(액체·분말·캡슐·시트) — 묶음에 표시'},
-      {n:'시트세제',m:'이염방지 시트',basis:'이염방지 시트 기준',t:['이염방지시트세제'],note:'터블 이염방지 시트세제 · 시장·경쟁 숫자는 이염방지 시트 기준'}]},
-    {n:'섬유유연제',c:[{n:'액체섬유유연제',m:'섬유유연제'},{n:'시트섬유유연제',m:'드라이시트/건조기시트',t:['건조기시트']}]},
-    {n:'울세제/홈드라이세제',c:[{n:'울세제',m:'울세제'},{n:'홈드라이세제',m:'홈드라이세제'}]},
-    {n:'세탁 보조·특수',vg:true,c:[{n:'섬유향균제',m:'섬유 향균제'},{n:'향기지속제',m:'향기지속제'},{n:'표백제',m:'표백제'},{n:'세탁비누',m:'세탁비누'},
-      {n:'얼룩/찌든때 제거제',m:'얼룩제거제',t:['얼룩제거제']},{n:'운동화/가죽크리너',m:'운동화/가죽크리너'},{n:'유아세제/섬유유연제',m:'유아세제'}]},
+    // [v145] u = 쿠팡 카테고리 조사(2026.11, 51개) 업로드의 카테고리명. 업로드 행이 있으면 u, 없으면 예전 이름 m으로 연결.
+    {n:'세탁 본세제',vg:true,mkm:'세탁세제 (실내건조 중심)',c:[{n:'액체세제',m:'액체세제',u:'세탁세제 (액체세제)'},{n:'분말세제',m:'분말세제',u:'세탁세제 (분말세제)'},
+      {n:'캡슐세제',m:'세탁세제 (실내건조 중심)',u:'세탁세제 (캡슐세제)',mktOff:true,t:['캡슐세제'],note:'시장 8,500억은 본세제 전체(액체·분말·캡슐·시트) — 묶음에 표시'},
+      {n:'시트세제',m:'이염방지 시트',u:'세탁세제 (시트세제)',basis:'이염방지 시트 기준',t:['이염방지시트세제'],note:'터블 이염방지 시트세제 · 시장·경쟁 숫자는 이염방지 시트 기준',uNote:'터블 이염방지 시트세제'}]},
+    {n:'섬유유연제',c:[{n:'액체섬유유연제',m:'섬유유연제',u:'섬유유연제(액체섬유유연제)'},{n:'시트섬유유연제',m:'드라이시트/건조기시트',u:'섬유유연제(시트섬유유연제)',t:['건조기시트']}]},
+    {n:'울세제/홈드라이세제',c:[{n:'울세제',m:'울세제',u:'울세제'},{n:'홈드라이세제',m:'홈드라이세제',u:'홈드라이세제'}]},
+    {n:'세탁 보조·특수',vg:true,c:[{n:'섬유향균제',m:'섬유 향균제',u:'섬유항균제'},{n:'향기지속제',m:'향기지속제',u:'향기지속제'},{n:'표백제',m:'표백제',u:'표백제'},{n:'세탁비누',m:'세탁비누',u:'세탁비누'},
+      {n:'얼룩/찌든때 제거제',m:'얼룩제거제',u:'얼룩제거제',t:['얼룩제거제']},{n:'운동화/가죽크리너',m:'운동화/가죽크리너',u:'운동화/가죽클리너'}]},
+    {n:'유아 세탁',c:[{n:'유아세제',m:'유아세제',u:'유아세제'},{n:'유아세탁비누',u:'유아세탁비누'},{n:'유아섬유유연제',u:'유아섬유유연제'}]},
     {n:'세제선물세트',t:['선물세트']}]},
   {n:'청소/주방세제',c:[
-    {n:'친환경/천연세제',c:[{n:'구연산'},{n:'베이킹소다'},{n:'과탄산소다'}]},
-    {n:'청소세제',c:[{n:'욕실세정제',m:'욕실세정제 (일반)',t:['욕실클리너']},{n:'락스/살균소독제'},{n:'변기세정제',m:'변기세정제',t:['변기클리너']},
-      {n:'기름때세정제',m:'주방후드/오븐'},{n:'씽크대세정제'},{n:'배수구세정제',m:'배수구 세정제'},{n:'다목적세제',m:'다목적 세정제',t:['세정티슈']},
-      {n:'곰팡이세정제',m:'곰팡이 제거제'},{n:'에어컨세정제',m:'가전전용 클리너'},{n:'세탁조세정제',m:'세탁조클리너',t:['세탁조클리너']},
-      {n:'유리세정제',m:'유리세정제'},{n:'광택왁스/크리너'}]},
-    {n:'주방세제',c:[{n:'일반주방세제',m:'주방세제',t:['주방세제']},{n:'천연주방세제'},{n:'텀블러클리너',m:'용기세척제 (텀블러)',t:['다목적용기세척제']},
-      {n:'야채/과일세정제'},{n:'식기세척기용세제',m:'식기세척기세제',t:['식기세척기세제']},{n:'행주/도마세제'},{n:'기름때 제거제',m:'기름때 제거제'},{n:'유아 주방세제'}]},
+    {n:'친환경/천연세제',c:[{n:'구연산',u:'친환경/천연세제(구연산)'},{n:'베이킹소다',u:'친환경/천연세제(베이킹소다)'},{n:'과탄산소다',u:'친환경/천연세제(과탄산소다)'}]},
+    {n:'청소세제',c:[{n:'욕실세정제',m:'욕실세정제 (일반)',u:'욕실세정제',t:['욕실클리너']},{n:'락스/살균소독제',u:'락스/살균소독제'},{n:'변기세정제',m:'변기세정제',u:'변기세정제',t:['변기클리너']},
+      {n:'기름때세정제',m:'주방후드/오븐',u:'기름때세정제'},{n:'씽크대세정제',u:'싱크대세정제'},{n:'배수구세정제',m:'배수구 세정제',u:'배수구세정제'},{n:'다목적세제',m:'다목적 세정제'},
+      {n:'곰팡이세정제',m:'곰팡이 제거제',u:'곰팡이세정제'},{n:'에어컨세정제',m:'가전전용 클리너',u:'에어컨세정제'},{n:'세탁조세정제',m:'세탁조클리너',u:'세탁조클리너',t:['세탁조클리너']},
+      {n:'유리세정제',m:'유리세정제',u:'유리세정제'},{n:'광택왁스/크리너',u:'광택왁스/크리너'}]},
+    {n:'주방세제',c:[{n:'일반주방세제',m:'주방세제',u:'일반주방세제',t:['주방세제']},{n:'천연주방세제',u:'천연성분주방세제'},{n:'텀블러클리너',m:'용기세척제 (텀블러)',u:'텀블러클리너',t:['다목적용기세척제']},
+      {n:'야채/과일세정제',u:'야채과일세정제'},{n:'식기세척기용세제',m:'식기세척기세제',u:'식기세척기용세제',t:['식기세척기세제']},{n:'행주/도마세제'},{n:'기름때 제거제',m:'기름때 제거제'},{n:'유아 주방세제',u:'유아 주방세제'}]},
+    {n:'청소포/티슈',c:[{n:'물걸레 청소포',u:'물걸레 청소포'},{n:'세정티슈(파우치형)',u:'세정티슈(파우치형)',t:['세정티슈']},{n:'세정티슈(통형)',u:'세정티슈(통형)'},
+      {n:'정전기 청소포',u:'정전기 청소포'},{n:'유리거울 세정티슈',u:'유리거울 세정티슈'}]},
     {n:'세제선물세트'}]},
   {n:'탈취/방향/살충',c:[
-    {n:'탈취제',c:[{n:'섬유탈취제'},{n:'실내용탈취제',m:'탈취제 (공간 겔)',t:['탈취제']},{n:'차량용탈취제'},{n:'화장실탈취제'},{n:'냉장고탈취제'},
-      {n:'옷장/서랍/신발장탈취제'},{n:'신발탈취제'},{n:'새집증후군제거',c:[{n:'피톤치드'},{n:'새집증후군제거제'},{n:'살균소독제'}]}]},
-    {n:'제습제'}]}
+    {n:'탈취제',c:[{n:'섬유탈취제',u:'섬유탈취제'},{n:'실내용탈취제',m:'탈취제 (공간 겔)',u:'실내용탈취제',t:['탈취제']},{n:'차량용탈취제',u:'차량용탈취제'},{n:'화장실탈취제',u:'화장실탈취제'},{n:'냉장고탈취제',u:'냉장고탈취제'},
+      {n:'옷장/서랍/신발장탈취제'},{n:'신발탈취제',u:'신발탈취제'},{n:'새집증후군제거',c:[{n:'피톤치드',u:'피톤치드 탈취제'},{n:'새집증후군제거제'},{n:'살균소독제',u:'살균소독제'}]}]},
+    {n:'제습제',u:'제습제'}]}
 ];
+// [v145] 품목 노드 → 경쟁 매트릭스 행 이름: 새 조사(u) 행이 있으면 그것, 없으면 예전 이름(m)
+function ccKey(n,mx){ return (n.u&&mx&&mx[n.u])?n.u:(n.m||null); }
 // ===== [v134] 시장 전략 개편 — 한눈에 / 카테고리별 / 근거 자료 =====
 //  레퍼런스(큰 숫자 카드 + 섹션 요약줄 + 상태 pill): 첫 화면은 결론만, 카테고리는 표 하나(행을 펼치면 경쟁 Top5), 원자료는 근거 자료로.
 //  판정: 지킬 곳(점유 1%↑ 또는 선도) / 약한 곳(약세 또는 쿠팡 Top5 대비 3% 미만) / 키울 곳(그 외 진출) / 노릴 곳(미진출·시장 200억↑ 또는 Top5 20억↑) / 참고
@@ -7253,13 +7260,17 @@ function msRows(){
   const stockBy={}; (DATA.stock||[]).filter(s=>!s.archived&&!s._pendingDel).forEach(s=>{ const k=salesCategory(s.nm); (stockBy[k]=stockBy[k]||[]).push(s.nm); });
   const rows=[];
   const walk=(n,path)=>{ if(n.c){ n.c.forEach(ch=>walk(ch,path.concat(n.n))); return; }
-    const r=n.m?mx[n.m]:null, rev=(n.t||[]).reduce((a,c)=>a+(ca[c]||0),0)/1e8, items=[].concat(...(n.t||[]).map(c=>stockBy[c]||[]));
-    const mkt=!n.mktOff&&r&&r.mktSize>0?+r.mktSize:null, top5=r&&r.top5Sum>0?+r.top5Sum:null, share=mkt&&rev>0?rev/mkt*100:null, comp=r?String(r.comp||''):'';   // [v136] mktOff: 시장 규모가 상위 묶음 전체 값인 품목(캡슐)
+    const key=ccKey(n,mx), viaU=!!(n.u&&key===n.u);
+    const r=key?mx[key]:null, rev=(n.t||[]).reduce((a,c)=>a+(ca[c]||0),0)/1e8, items=[].concat(...(n.t||[]).map(c=>stockBy[c]||[]));
+    // [v145] 시장 규모가 상위 분류 전체 값(세탁세제 8,500억 등)이면 품목 칸엔 안 붙이고 묶음에서 한 번만 센다(mktP)
+    const mktP=r&&r.mktShared&&r.mktSize>0?{p:r.mktParent,v:+r.mktSize}:null;
+    const mkt=!n.mktOff&&!mktP&&r&&r.mktSize>0?+r.mktSize:null, top5=r&&r.top5Sum>0?+r.top5Sum:null, share=mkt&&rev>0?rev/mkt*100:null, comp=r?String(r.comp||''):'';   // [v136] mktOff: 시장 규모가 상위 묶음 전체 값인 품목(캡슐)
     const isIn=rev>0||items.length>0; let v;
     if(isIn){ if(/선도/.test(comp)||(share!=null&&share>=1)) v='keep'; else if(/약세/.test(comp)||(top5>=20&&rev<top5*0.03)) v='weak'; else v='grow'; }
     else v=((mkt||0)>=200||(top5||0)>=20)?'opp':'ref';
-    rows.push({id:'c'+rows.length,n:n.n,group:path[0],sub:path.slice(1).join(' › '),note:n.note||'',basis:n.basis||'',rev,items,mkt,top5,share,comp,
-      top1:r&&r.top1&&r.top1!=='-'?r.top1:'',top1Rev:r&&r.yearRev>0?+r.yearRev:null,v,t5:(n.m&&t5[n.m])||[]});
+    const note=viaU?(n.uNote!=null?n.uNote:(n.mktOff?n.note:'')):(n.note||'');
+    rows.push({id:'c'+rows.length,n:n.n,group:path[0],sub:path.slice(1).join(' › '),note:(mktP&&!note?`시장 규모는 상위 '${mktP.p}' 전체 ${msEok(mktP.v)} — 묶음에 표시`:note),basis:viaU?'':(n.basis||''),rev,items,mkt,mktP,top5,share,comp,
+      top1:r&&r.top1&&r.top1!=='-'?r.top1:'',top1Rev:r&&r.yearRev>0?+r.yearRev:null,v,t5:(key&&t5[key])||[]});
   };
   COUPANG_CATS.forEach(g=>walk(g,[]));
   return {rows,L,M};
@@ -7314,7 +7325,7 @@ function msCatsHtml(){
         <td class="r">${r.share!=null?msPct(r.share):'<span class="msDim">-</span>'}</td><td class="r">${r.mkt?msEok(r.mkt):'<span class="msDim">-</span>'}</td>
         <td class="r">${r.top5?msEok(r.top5):'<span class="msDim">-</span>'}</td>
         <td class="l">${r.top1?`${pEsc(r.top1)}${r.top1Rev?` <span class="msDim">${msEok(r.top1Rev)}</span>`:''}`:'<span class="msDim">-</span>'}</td></tr>`+t5; }).join(''); }).join('');
-  return `<div class="msCard"><div class="msCardH"><h3>카테고리별 위치</h3><span class="msSum">쿠팡 세부 카테고리 ${rows.length}개 · 행을 누르면 터블 품목과 쿠팡 경쟁 Top5</span>
+  return `<div class="msCard"><div class="msCardH"><h3>카테고리별 위치</h3><span class="msSum">쿠팡 세부 카테고리 ${rows.length}개 · 행을 누르면 터블 품목과 쿠팡 경쟁 상위 10개</span>
       <input id="msQ" class="msSearch" placeholder="카테고리·브랜드 검색" value="${pEsc(msQ)}" oninput="msSearch(this.value)"></div>
     <div class="msFilt">${pills}</div>
     <div style="overflow-x:auto"><table class="msTbl"><thead><tr><th class="l">카테고리</th><th>판정</th><th class="r">터블 매출</th><th class="r">점유율</th><th class="r">시장 규모</th><th class="r">쿠팡 Top5</th><th class="l">쿠팡 1위</th></tr></thead>
@@ -7334,8 +7345,9 @@ function msMapHtml(){
       ${r.rev>0?`<em>터블 ${msEok(r.rev)}</em>`:''}</div>`;
   const mxOf=c=>(M.matrix||[]).find(x=>x&&x.cat===c);
   const flat=n=>n.c?[].concat(...n.c.map(flat)):[rows[k++]];
-  const stat=rs=>{ const mk=rs.reduce((a,r)=>a+(r.mkt||0),0), rev=rs.reduce((a,r)=>a+r.rev,0), nin=rs.filter(r=>r.v!=='opp'&&r.v!=='ref').length;
-    return {mk,rev,nin,n:rs.length,unk:rs.filter(r=>!r.mkt).length}; };
+  const stat=rs=>{ const sp={}; rs.forEach(r=>{ if(r.mktP) sp[r.mktP.p]=r.mktP.v; });   // [v145] 상위 공유 시장 규모는 한 번만
+    const mk=rs.reduce((a,r)=>a+(r.mkt||0),0)+Object.values(sp).reduce((a,v)=>a+v,0), rev=rs.reduce((a,r)=>a+r.rev,0), nin=rs.filter(r=>r.v!=='opp'&&r.v!=='ref').length;
+    return {mk,rev,nin,n:rs.length,unk:rs.filter(r=>!r.mkt&&!r.mktP).length}; };
   const groups=COUPANG_CATS.map(g=>{
     const blocks=[], base=[];
     g.c.forEach(ch=>{ if(!ch.c){ base.push(rows[k++]); return; }
@@ -7346,7 +7358,7 @@ function msMapHtml(){
       blocks.push({t:ch.n,rs:own,parts,vg:!!ch.vg,mk:mr&&mr.mktSize>0?+mr.mktSize:null}); });
     if(base.length) blocks.push({t:'기타',rs:base,parts:[],base:true});   // [v136] 낱개 품목은 맨 뒤 '기타'
     const all=[].concat(...blocks.map(b=>b.rs.concat(...b.parts.map(p=>p.rs)))), S0=stat(all);
-    const S=Object.assign({},S0,{mk:blocks.reduce((a,b)=>a+(b.mk!=null?b.mk:stat(b.rs.concat(...b.parts.map(p=>p.rs))).mk),0)});
+    const S=Object.assign({},S0,{mk:blocks.filter(b=>b.mk!=null).reduce((a,b)=>a+b.mk,0)+stat([].concat(...blocks.filter(b=>b.mk==null).map(b=>b.rs.concat(...b.parts.map(p=>p.rs))))).mk});
     const bHtml=blocks.map(b=>{ const bs=stat(b.rs.concat(...b.parts.map(p=>p.rs))); const mk=b.mk!=null?b.mk:bs.mk;
       return `<div class="mpB${b.base?' base':''}"><div class="mpBH"><b>${pEsc(b.t)}${b.vg?` <i class="mpVg" title="쿠팡에선 '${pEsc(g.n)}' 바로 아래 품목들 — 보기 쉽게 묶은 것">묶음</i>`:''}</b><span>${bs.n}개${bs.nin?` · 진출 ${bs.nin}`:''}${mk?` · 시장 ${msEok(mk)}`:''}${bs.rev>0?` · 터블 ${msEok(bs.rev)}`:''}</span></div>
         <div class="mpTs">${b.rs.map(tile).join('')}</div>
@@ -7356,7 +7368,7 @@ function msMapHtml(){
       <div class="mpBs">${bHtml}</div></div>`;
   }).join('');
   const leg=['keep','grow','weak','opp','ref'].map(v=>`<span class="mpL ${v}"><i></i>${MS_V[v].t}</span>`).join('');
-  return `<div class="msHead"><h2>세제 시장 지도</h2><p>쿠팡 기준 세제 시장을 대분류 → 중분류 → 품목으로 펼쳤습니다. 타일을 누르면 카테고리별 상세(경쟁 Top5)로 이동합니다.</p></div>
+  return `<div class="msHead"><h2>세제 시장 지도</h2><p>쿠팡 기준 세제 시장을 대분류 → 중분류 → 품목으로 펼쳤습니다. 타일을 누르면 카테고리별 상세(경쟁 상위 10개)로 이동합니다.</p></div>
     <div class="mpLeg">${leg}<span class="mpLn">타일 숫자 = 시장 규모(로드맵) · 없으면 쿠팡 Top5 · '터블' = 올해 누적 매출</span></div>
     ${groups}
     <div class="msSrc">${msSrcChips(M,L)}</div>`;
@@ -7368,7 +7380,7 @@ function msRefHtml(){
     <div class="msSrc" style="margin-bottom:12px">${msSrcChips(M,L)}</div>
     ${sec('세부 시장 규모','로드맵 23개 카테고리 · 범위·신뢰도·출처',mktStructureHtml(),false)}
     ${sec('경쟁 매트릭스 원본','쿠팡 조사 카테고리별 경쟁력·Top5·기회 점수',mktMatrixHtml(),false)}
-    ${sec('쿠팡 경쟁사 Top5 전체','카테고리별 상위 제품',mktTop5Html(),false)}
+    ${sec('쿠팡 경쟁사 상위 제품 전체','카테고리별 최대 10위',mktTop5Html(),false)}
     ${sec('전략 로드맵','방향·라인업 갭·추진 일정',mktStrategyHtml(),false)}
     ${sec('2025 터블 실매출 (ERP)','로드맵 작성 당시 카테고리별 매출',mktSalesHtml(),false)}
     ${sec('참고·주석','출처와 산정 방식',mktNotesHtml(),false)}`;
@@ -7386,8 +7398,8 @@ function catMapHtml(){
   const calc=(node,depth,path)=>{
     node.depth=depth; node.path=path;
     if(node.c){ node.c.forEach(ch=>calc(ch,depth+1,path.concat(node.n))); node.amt=node.c.reduce((a,ch)=>a+(ch.amt||0),0); node.items=[].concat(...node.c.map(ch=>ch.items||[])); return; }
-    const r=node.m?mx[node.m]:null; if(node.m) used.add(node.m);
-    node.mkt=r&&r.mktSize>0?r.mktSize:null; node.top5=r&&r.top5Sum>0?r.top5Sum:null; node.comp=r?r.comp:'';
+    const key=ccKey(node,mx), r=key?mx[key]:null; if(key) used.add(key);
+    node.mkt=r&&r.mktSize>0&&!r.mktShared?r.mktSize:null;   // [v145] 상위 공유 시장 규모는 품목 칸에 반복하지 않음 node.top5=r&&r.top5Sum>0?r.top5Sum:null; node.comp=r?r.comp:'';
     node.amt=(node.t||[]).reduce((a,c)=>a+catAmt(c),0); node.items=[].concat(...(node.t||[]).map(c=>stockBy[c]||[]));
     node.in=node.amt>0||node.items.length>0; leaves.push(node);
   };
@@ -7720,6 +7732,7 @@ function parseCollectionWorkbook(file, wb){
     if(hit){ tubAssign[hit]=Math.round(((tubAssign[hit]||0)+s.rev)*100)/100; usedSales.add(i); }
   });
   const subShare={}; cats.forEach(c=>{ const s=subOf(c); if(s) subShare[s.name]=(subShare[s.name]||0)+1; });
+  const U2M={}; (function w(n){ if(n.c) n.c.forEach(w); else if(n.u&&n.m) U2M[n.u]=n.m; })({c:COUPANG_CATS});
   cats.forEach(cat=>{
     const g=grouped[cat]; g.rows.sort((a,b)=>a.rank-b.rank);
     productCount+=g.rows.length;
@@ -7730,13 +7743,13 @@ function parseCollectionWorkbook(file, wb){
     const tubRev=(tubAssign[cat]!=null)?tubAssign[cat]:null;  // 터블 실매출(억) — 세부 카테고리 한 곳에만
     const parentSub=subOf(cat), sharedMkt=parentSub&&subShare[parentSub.name]>1;
     const denom=mktSize||collectedSum||0;       // 점유율 분모(시장규모 우선, 없으면 수집합)
-    top5[cat]=t5.map(x=>({rank:x.rank,brand:x.brand,product:x.product,monthQty:x.monthQty,price:x.price,yearRev:x.yearRev,
+    top5[cat]=g.rows.slice(0,10).map(/* [v145] 목록은 10위까지 저장·표시(합계 지표 top5Sum은 기존대로 상위 5개) */ x=>({rank:x.rank,brand:x.brand,product:x.product,monthQty:x.monthQty,price:x.price,yearRev:x.yearRev,
       share:(x.yearRev!=null&&denom>0)?r2(x.yearRev/denom*100):null}));
     const top1=g.rows[0]||{};
-    const ex=curMatrix.find(m=>matchKey(m.cat)===g.key);
+    const ex=curMatrix.find(m=>m.cat===cat)||(U2M[cat]&&curMatrix.find(m=>m.cat===U2M[cat]))||(!sharedMkt&&curMatrix.find(m=>matchKey(m.cat)===g.key));   // [v145] 경쟁력(선도·약세) 이어받기: 같은 이름 → 지도 연결(u→m) → 이름 유사(상위 공유 아닐 때만)
     let mult='-';
     if(tubRev!=null&&tubRev>0&&top1.yearRev){ const ratio=top1.yearRev/tubRev; mult=ratio>=1?`${ratio.toFixed(1)}배`:`1/${(1/ratio).toFixed(1)}배`; }
-    matrix.push({cat, comp:(ex&&ex.comp)||'', mktSize,
+    matrix.push({cat, comp:(ex&&ex.comp)||'', mktSize, mktShared:!!sharedMkt, mktParent:sharedMkt?parentSub.name:'',
       top5Sum:r1(top5Sum), top5Share:(mktSize?r1(top5Sum/mktSize*100):null),
       top1:top1.brand||'-', yearRev:top1.yearRev,
       tubRev:(tubRev!=null?tubRev:'-'), tubShare:(mktSize&&tubRev!=null?r2(tubRev/mktSize*100):null),
@@ -7777,7 +7790,7 @@ function renderMarketPreview(pv){
     body.innerHTML=`<div class="previewNote" style="margin-bottom:10px">「${pv.sheetName}」 시트에서 <b>${pv.cats.length}개</b> 카테고리 · <b>${pv.productCount}개</b> 제품을 읽었습니다.<br>적용 시 <b>경쟁 매트릭스</b>와 <b>Top5</b>가 모두 교체됩니다. <b>전체 시장규모 = 로드맵 기준</b>, 쿠팡 Top5 합산(한달판매×판가×12)·점유율·터블 점유율은 자동 산출.</div>
       <div style="font-size:12px;font-weight:800;color:var(--navy);margin:4px 0 6px">① 경쟁 매트릭스 (${pv.matrix.length}개 카테고리)</div>
       <div class="previewScroll" style="margin-bottom:14px"><table class="mTbl"><thead><tr><th class="l">카테고리</th><th class="c">경쟁력</th><th class="r">전체 시장규모</th><th class="r">쿠팡 Top5</th><th class="r">Top5 점유율</th><th class="l">쿠팡 1위</th><th class="r">터블 매출</th><th class="r">터블 점유율</th></tr></thead><tbody>${mtxRows}</tbody></table></div>
-      <div style="font-size:12px;font-weight:800;color:var(--navy);margin:4px 0 6px">② Top5 경쟁사</div>${cards}`;
+      <div style="font-size:12px;font-weight:800;color:var(--navy);margin:4px 0 6px">② 경쟁사 상위 제품 (카테고리별 최대 10위)</div>${cards}`;
   } else if(pv.kind==='matrix'){
     document.getElementById('marketPreviewTitle').firstChild.textContent='경쟁 매트릭스 업로드 미리보기 ';
     const cur=MKT().matrix;
