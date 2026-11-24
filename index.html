@@ -7674,7 +7674,7 @@ function parseCollectionWorkbook(file, wb){
     const head=arr[hi].map(x=>String(x).replace(/\r?\n/g,' ').trim());
     const col=pats=>head.findIndex(h=>pats.some(p=>new RegExp(p,'i').test(h)));
     const ci={cat:col(['카테고리']),rank:col(['순위']),product:col(['제품명','상품명']),brand:col(['브랜드']),
-      price:col(['쿠팡.*판가']),priceRef:col(['기존.*가격','참고']),monthQty:col(['한달.*판매','판매건']),
+      price:col(['쿠팡.*판가']),priceRef:col(['기존.*가격','참고']),monthQty:col(['한달.*판매','판매건','한달.*구매','예상.*구매']),
       review:col(['쿠팡.*리뷰']),rating:col(['쿠팡.*평점']),rocket:col(['로켓']),naverQty:col(['네이버.*구매건','6개월.*구매'])};
     // 수집 시그니처: 쿠팡 판가 또는 한달 판매 컬럼이 있어야 함(안내·요약 시트는 자동 제외)
     if(ci.cat<0 || ci.brand<0 || (ci.price<0 && ci.monthQty<0)) continue;
@@ -7702,14 +7702,33 @@ function parseCollectionWorkbook(file, wb){
   const curMatrix=(typeof MKT==='function'?MKT().matrix:[])||[];
   const r1=x=>Math.round(x*10)/10, r2=x=>Math.round(x*100)/100;
   const top5={}, matrix=[]; let productCount=0;
+  // [v144] 세부 카테고리(세탁세제 액체/분말/캡슐/시트 등) 대응: 터블 매출은 실제 품목이 속한 세부 카테고리 '한 곳'에만 붙인다.
+  //   (예전 방식은 괄호를 지워 비교해서 '세탁세제 (캡슐)' 매출이 액체·분말·시트에도 똑같이 붙었음)
+  const subList=(typeof MARKET_DATA!=='undefined'&&MARKET_DATA.subCat)?MARKET_DATA.subCat:[];
+  const nLoose=s=>String(s||'').replace(/\s|\(.*?\)|·/g,'');
+  const nTight=s=>String(s||'').replace(/^[A-Za-z]\d+\s*/,'').replace(/[\s·()]/g,'');
+  const MKT_ALIAS={'식기세척기용세제':'식기세척기세제','텀블러클리너':'용기세척제','기름때세정제':'기름때제거제','곰팡이세정제':'곰팡이제거제'};
+  const subOf=cat=>{ let k=nLoose(cat); if(!k) return null; k=MKT_ALIAS[k]||k; return subList.find(s=>{ const sn=nLoose(s.name); return sn&&(sn.includes(k)||k.includes(sn)); })||null; };
+  const TUB_ALIAS={'세탁세제캡슐':'세탁세제캡슐세제','텀블러세정제':'텀블러클리너','식기세척기세제':'식기세척기용세제',
+    '주방세제':'일반주방세제','탈취제겔':'실내용탈취제','세정티슈':'세정티슈파우치형'};
+  const tubAssign={}, usedSales=new Set();
+  ((typeof MARKET_DATA!=='undefined'&&MARKET_DATA.sales)?MARKET_DATA.sales:[]).forEach((s,i)=>{
+    const k=nTight(s.cat), want=TUB_ALIAS[k]||k;
+    let hit=cats.find(c=>nTight(c)===want)||cats.find(c=>nTight(c)===k);
+    if(!hit){ const cand=cats.filter(c=>{ const ck=nLoose(c), sk=nLoose(s.cat); return ck&&sk&&(ck.includes(sk)||sk.includes(ck)); }); if(cand.length===1) hit=cand[0]; }
+    if(!hit && k.includes('텀블러')) hit=cats.find(c=>/용기세척|텀블러/.test(c));
+    if(hit){ tubAssign[hit]=Math.round(((tubAssign[hit]||0)+s.rev)*100)/100; usedSales.add(i); }
+  });
+  const subShare={}; cats.forEach(c=>{ const s=subOf(c); if(s) subShare[s.name]=(subShare[s.name]||0)+1; });
   cats.forEach(cat=>{
     const g=grouped[cat]; g.rows.sort((a,b)=>a.rank-b.rank);
     productCount+=g.rows.length;
     const t5=g.rows.slice(0,5);
     const top5Sum=t5.reduce((a,x)=>a+(x.yearRev||0),0);
     const collectedSum=g.rows.reduce((a,x)=>a+(x.yearRev||0),0);
-    const mktSize=findMarketSize(cat);          // 전체 국내 시장규모(억)
-    const tubRev=findTubbleSales(cat);          // 터블 실매출(억)
+    const mktSize=(subOf(cat)||{}).mid??null;   // 전체 국내 시장규모(억) — 로드맵 분류(+이름 별칭)
+    const tubRev=(tubAssign[cat]!=null)?tubAssign[cat]:null;  // 터블 실매출(억) — 세부 카테고리 한 곳에만
+    const parentSub=subOf(cat), sharedMkt=parentSub&&subShare[parentSub.name]>1;
     const denom=mktSize||collectedSum||0;       // 점유율 분모(시장규모 우선, 없으면 수집합)
     top5[cat]=t5.map(x=>({rank:x.rank,brand:x.brand,product:x.product,monthQty:x.monthQty,price:x.price,yearRev:x.yearRev,
       share:(x.yearRev!=null&&denom>0)?r2(x.yearRev/denom*100):null}));
@@ -7722,14 +7741,20 @@ function parseCollectionWorkbook(file, wb){
       top1:top1.brand||'-', yearRev:top1.yearRev,
       tubRev:(tubRev!=null?tubRev:'-'), tubShare:(mktSize&&tubRev!=null?r2(tubRev/mktSize*100):null),
       collectedSum:r1(collectedSum), mult,
-      note:`수집 ${g.rows.length}개 · 1위 ${top1.brand||'-'} ${top1.yearRev!=null?top1.yearRev+'억':''} · 쿠팡Top5 ${r1(top5Sum)}억`});
+      note:`수집 ${g.rows.length}개 · 1위 ${top1.brand||'-'} ${top1.yearRev!=null?top1.yearRev+'억':''} · 쿠팡Top5 ${r1(top5Sum)}억${sharedMkt?` · 시장규모는 상위 '${parentSub.name}' 전체 기준`:''}`});
   });
   // 수집 안 된 나머지 로드맵 카테고리도 '전체 시장 조망'으로 추가 (Top5 비움, 시장규모·터블 매출만)
+  // 세부 카테고리로 이미 수집된 로드맵 분류(예: 세탁세제 → 액체/캡슐…)는 중복으로 넣지 않는다
   const have=new Set(matrix.map(m=>matchKey(m.cat)));
-  ((typeof MARKET_DATA!=='undefined'&&MARKET_DATA.subCat)?MARKET_DATA.subCat:[]).forEach(s=>{
-    const k=matchKey(s.name); if(have.has(k)) return;
+  const coveredSub=new Set(Object.keys(subShare));
+  subList.forEach(s=>{
+    const k=matchKey(s.name); if(have.has(k)||coveredSub.has(s.name)) return;
     const mktSize=(s.mid!=null)?s.mid:null;
-    const tubRev=findTubbleSales(s.name);
+    let tubRev=null;
+    ((typeof MARKET_DATA!=='undefined'&&MARKET_DATA.sales)?MARKET_DATA.sales:[]).forEach((x,i)=>{
+      if(usedSales.has(i)) return; const a=nLoose(x.cat), b=nLoose(s.name);
+      if(a&&b&&(a.includes(b)||b.includes(a)||(a.includes('텀블러')&&b.includes('용기세척')))){ tubRev=Math.round(((tubRev||0)+x.rev)*100)/100; usedSales.add(i); }
+    });
     matrix.push({cat:s.name, comp:'', mktSize, top5Sum:null, top5Share:null, top1:'-', yearRev:null,
       tubRev:(tubRev!=null?tubRev:'-'), tubShare:(mktSize&&tubRev!=null?r2(tubRev/mktSize*100):null),
       collectedSum:0, mult:'-', note:'전체 시장 조망 (경쟁사 수집 전)'});
