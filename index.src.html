@@ -7345,7 +7345,7 @@ function msMapHtml(){
       ${r.rev>0?`<em>터블 ${msEok(r.rev)}</em>`:''}</div>`;
   const mxOf=c=>(M.matrix||[]).find(x=>x&&x.cat===c);
   const flat=n=>n.c?[].concat(...n.c.map(flat)):[rows[k++]];
-  const stat=rs=>{ const sp={}; rs.forEach(r=>{ if(r.mktP) sp[r.mktP.p]=r.mktP.v; });   // [v145] 상위 공유 시장 규모는 한 번만
+  const stat=(rs,seen)=>{ const sp={}; rs.forEach(r=>{ if(r.mktP&&!(seen&&seen.has(r.mktP.p))) sp[r.mktP.p]=r.mktP.v; }); if(seen) Object.keys(sp).forEach(p=>seen.add(p));   // seen: 앞 묶음에서 이미 센 상위 시장(유아섬유유연제 ↔ 섬유유연제)   // [v145] 상위 공유 시장 규모는 한 번만
     const mk=rs.reduce((a,r)=>a+(r.mkt||0),0)+Object.values(sp).reduce((a,v)=>a+v,0), rev=rs.reduce((a,r)=>a+r.rev,0), nin=rs.filter(r=>r.v!=='opp'&&r.v!=='ref').length;
     return {mk,rev,nin,n:rs.length,unk:rs.filter(r=>!r.mkt&&!r.mktP).length}; };
   const groups=COUPANG_CATS.map(g=>{
@@ -7359,7 +7359,7 @@ function msMapHtml(){
     if(base.length) blocks.push({t:'기타',rs:base,parts:[],base:true});   // [v136] 낱개 품목은 맨 뒤 '기타'
     const all=[].concat(...blocks.map(b=>b.rs.concat(...b.parts.map(p=>p.rs)))), S0=stat(all);
     const S=Object.assign({},S0,{mk:blocks.filter(b=>b.mk!=null).reduce((a,b)=>a+b.mk,0)+stat([].concat(...blocks.filter(b=>b.mk==null).map(b=>b.rs.concat(...b.parts.map(p=>p.rs))))).mk});
-    const bHtml=blocks.map(b=>{ const bs=stat(b.rs.concat(...b.parts.map(p=>p.rs))); const mk=b.mk!=null?b.mk:bs.mk;
+    const seenP=new Set(); const bHtml=blocks.map(b=>{ const bs=stat(b.rs.concat(...b.parts.map(p=>p.rs)),seenP); const mk=b.mk!=null?b.mk:bs.mk;
       return `<div class="mpB${b.base?' base':''}"><div class="mpBH"><b>${pEsc(b.t)}${b.vg?` <i class="mpVg" title="쿠팡에선 '${pEsc(g.n)}' 바로 아래 품목들 — 보기 쉽게 묶은 것">묶음</i>`:''}</b><span>${bs.n}개${bs.nin?` · 진출 ${bs.nin}`:''}${mk?` · 시장 ${msEok(mk)}`:''}${bs.rev>0?` · 터블 ${msEok(bs.rev)}`:''}</span></div>
         <div class="mpTs">${b.rs.map(tile).join('')}</div>
         ${b.parts.map(p=>`<div class="mpSub">${pEsc(p.t)}</div><div class="mpTs">${p.rs.map(tile).join('')}</div>`).join('')}</div>`; }).join('');
