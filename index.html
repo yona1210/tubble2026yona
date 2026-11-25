@@ -2219,6 +2219,74 @@ body{padding-bottom:48px}
 .homeCard.alert{background:#fffafa;border-color:#f0d6d4}.homeCard.alert .hcVal{color:var(--red)}
 .homeCard.warn .hcVal{color:#c47d12}
 .homeCard.good .hcVal{color:#0f7a40}
+/* ============================================================
+   v151 대시보드 테마 — 레퍼런스(밝은 사이드바·소프트 배경·둥근 흰 카드·색 원형 아이콘 KPI) 공통 적용
+   마크업·JS 무수정, 이 레이어만 덮어씀. 색 의미 규칙 유지: 빨강=오늘 조치, 주황=주의, 그 외 아이콘색은 장식(파랑 계열)
+   ============================================================ */
+:root{
+  --dash-bg1:#f5f7ff; --dash-bg2:#eef1fb;
+  --dash-card:#ffffff; --dash-radius:18px;
+  --dash-shadow:0 1px 2px rgba(30,40,90,.04),0 8px 24px rgba(60,80,160,.07);
+  --dash-shadow-hover:0 2px 4px rgba(30,40,90,.05),0 14px 32px rgba(60,80,160,.11);
+  --dash-ink:#141a33; --dash-mut:#7a8194; --dash-line:#edf0f7;
+  --ico-blue:#3b6cff; --ico-teal:#14b8a6; --ico-purple:#8b5cf6; --ico-indigo:#5b6cf0; --ico-red:#ef4444; --ico-amber:#f59e0b;
+}
+body{
+  background:
+    radial-gradient(1200px 520px at 85% -10%, rgba(139,92,246,.10), transparent 60%),
+    radial-gradient(900px 480px at 10% 0%, rgba(59,108,255,.10), transparent 60%),
+    linear-gradient(180deg,var(--dash-bg1) 0%,var(--dash-bg2) 100%) fixed;
+}
+html{background:var(--dash-bg2)}body{min-height:100vh}
+/* 사이드바: 밝게 */
+.sidebar{background:#fff;box-shadow:1px 0 0 #e8ebf5,8px 0 30px rgba(60,80,160,.05)}
+.sidebar .brand{border-bottom-color:#eef0f6}
+.brandText .brandName{color:var(--dash-ink)}
+.brandText .brandSub{color:#9aa1b2}
+.tabbtn{color:#5b6278;font-weight:600}
+.tabbtn svg{opacity:.75}
+.tabbtn:hover{background:#f3f5fc;color:var(--dash-ink)}
+.tabbtn.on{background:linear-gradient(90deg,#eaf0ff,#f1f4ff);color:#2f55ff;font-weight:800;box-shadow:none}
+.tabbtn.on svg{color:#2f55ff;opacity:1}
+.sideFoot{border-top-color:#eef0f6}
+.sideFootLabel,.sideFootDesc{color:#9aa1b2}
+@media(max-width:820px){ .sidebar .brand{border-right-color:#eef0f6} .tabbtn.on{box-shadow:inset 0 -2px 0 #2f55ff} }
+/* 상단 제목 */
+.topbar{background:transparent;border-bottom:none;box-shadow:none;padding:6px 2px 4px}
+.topbarTitle{color:var(--dash-ink);font-size:24px}
+.asof{background:#fff;border:none;border-radius:14px;box-shadow:var(--dash-shadow)}
+/* 카드 공통 */
+.toolbar,.kpi,.salesKpi,.msKpi,.mKpi,.gKpi,.bundleKpi,.homeCard,.msCard,.msDec,.mCard,.mcard,.salesSec,.chartbox,
+.riCard,.ciCard,.issuePanel,.bundlePanel,.flowBoard,.mpG,.costdetail,.mfrFinBox,.complaintHero,.basisExplain{
+  background:var(--dash-card);border:none!important;border-radius:var(--dash-radius);box-shadow:var(--dash-shadow)
+}
+.toolbar{border-radius:16px}
+.homeCard:hover,.kpi[data-f]:hover,.msDec:hover{box-shadow:var(--dash-shadow-hover)}
+/* KPI 카드 — 왼쪽 위 색 원형 아이콘 + 큰 숫자 (아이콘은 decorateKpis()가 없는 카드에 넣음) */
+.kpi,.salesKpi,.msKpi,.mKpi,.gKpi,.bundleKpi{position:relative;padding:16px 18px 15px}
+.kpi.dkHasIco,.salesKpi.dkHasIco,.msKpi.dkHasIco,.mKpi.dkHasIco,.gKpi.dkHasIco,.bundleKpi.dkHasIco{padding-left:72px;min-height:78px}
+.kpiIco{position:absolute!important;left:16px!important;top:16px!important;right:auto!important;width:42px!important;height:42px!important;border-radius:50%;
+  display:flex!important;align-items:center;justify-content:center;opacity:1!important;color:#fff!important;background:var(--ico-blue);box-shadow:0 6px 14px rgba(59,108,255,.28)}
+.kpiIco svg{width:20px!important;height:20px!important;stroke-width:2.1}
+.kpiIco[data-tone="1"]{background:var(--ico-teal);box-shadow:0 6px 14px rgba(20,184,166,.26)}
+.kpiIco[data-tone="2"]{background:var(--ico-purple);box-shadow:0 6px 14px rgba(139,92,246,.26)}
+.kpiIco[data-tone="3"]{background:var(--ico-indigo);box-shadow:0 6px 14px rgba(91,108,240,.26)}
+.kpiIco[data-tone="r"]{background:var(--ico-red);box-shadow:0 6px 14px rgba(239,68,68,.26)}
+.kpiIco[data-tone="w"]{background:var(--ico-amber);box-shadow:0 6px 14px rgba(245,158,11,.26)}
+.salesKpi.hero .kpiIco,.msKpi.hero .kpiIco{display:none!important}
+.salesKpi.hero,.msKpi.hero{padding-left:18px}
+/* 칸이 좁은 .kpi(재고·출시·제조사 등 5~6칸)는 아이콘을 위에 쌓음 — 옆에 두면 문구가 줄바꿈됨 */.kpi.dkHasIco{padding-left:18px;padding-top:68px;min-height:0}.kpi .kpiIco{width:38px!important;height:38px!important}.kpi .kpiIco svg{width:18px!important;height:18px!important}
+/* 홈 카드 아이콘도 같은 원형으로 */
+.homeCard .hcIco{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--ico-blue);color:#fff;box-shadow:0 6px 14px rgba(59,108,255,.28)}
+.homeCard .hcIco svg{width:20px;height:20px;stroke-width:2.1}
+.homeCard .hcIco[data-tone="1"]{background:var(--ico-teal)}.homeCard .hcIco[data-tone="2"]{background:var(--ico-purple)}.homeCard .hcIco[data-tone="3"]{background:var(--ico-indigo)}
+.homeCard.alert .hcIco{background:var(--ico-red)}.homeCard.warn .hcIco{background:var(--ico-amber)}
+/* 표 */
+.msTbl thead th,.mTbl thead th,.tbl thead th{background:#f7f8fd}
+/* 버튼·필 */
+.tbtn{border-radius:10px}
+.tbtn.accent{background:linear-gradient(135deg,#3b6cff,#5b4cf0);border-color:transparent;box-shadow:0 6px 16px rgba(59,108,255,.25)}
+.mktTab,#tab-market .mktTab{border-radius:999px}
 </style>
 <script id="chartjs-inline">
 /*!
@@ -11210,6 +11278,59 @@ function kpiIcon(n){ const I={
   star:'<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
   cam:'<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="3.5"/>' };
   return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">'+(I[n]||'')+'</svg>'; }
+// [v151] 대시보드 테마 — KPI 카드에 색 원형 아이콘 자동 부착(탭별 렌더 코드 무수정).
+//  아이콘 = 카드 문구로 고름, 색 = 카드 상태(경보·지금 → 빨강, 주의·임박 → 주황) 아니면 위치별 장식색(파랑·청록·보라·남색)
+const DK_EXTRA_ICONS={
+  coin:'<circle cx="12" cy="12" r="9"/><path d="M14.8 9.2A3 3 0 0 0 12 8c-1.7 0-3 .9-3 2s1.3 1.7 3 2 3 .9 3 2-1.3 2-3 2a3 3 0 0 1-2.8-1.2"/><line x1="12" y1="6" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="18"/>',
+  factory:'<path d="M2 20h20"/><path d="M4 20V10l5 3V10l5 3V6h6v14"/><line x1="17" y1="9" x2="17" y2="9.01"/>',
+  bulb:'<path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V16h8v-1.3A7 7 0 0 0 12 2z"/>',
+  users:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  repeat:'<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+  chart:'<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>'
+};
+function dkIcon(n){ return DK_EXTRA_ICONS[n]?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">'+DK_EXTRA_ICONS[n]+'</svg>':kpiIcon(n); }
+function dkPick(t){
+  t=String(t||'');
+  if(/경보|위험|지연|정체|품절|낮은 평점/.test(t)) return 'warn';
+  if(/리뷰|평점|긍정/.test(t)) return 'star';
+  if(/재구매|고객|회원/.test(t)) return 'repeat';
+  if(/제조사|협력|후불|선금/.test(t)) return 'factory';
+  if(/기획|아이디어/.test(t)) return 'bulb';
+  if(/원가|매입|단가|판가/.test(t)) return 'coin';
+  if(/점유|목표|달성|비중|기회/.test(t)) return 'target';
+  if(/발주|재고|출고|입고|수량|품목 수|소진/.test(t)) return 'box';
+  if(/출시|일정|임박|D-|기간|개월/.test(t)) return 'cal';
+  if(/매출|판매액|억|금액|시장/.test(t)) return 'trend';
+  if(/주의|대기/.test(t)) return 'clock';
+  return 'chart';
+}
+function dkTone(el,i){
+  const c=' '+el.className+' ';
+  if(/ (alert|danger|red|now|crit) /.test(c)) return 'r';
+  if(/ (warn|warnlv|amber|soon|caution) /.test(c)) return 'w';
+  return String(i%4);
+}
+function decorateKpis(root){
+  (root||document).querySelectorAll('.kpi,.salesKpi,.msKpi,.mKpi,.gKpi,.bundleKpi').forEach(el=>{
+    if(el.classList.contains('hero')) return;
+    const sibs=el.parentElement?[...el.parentElement.children]:[el], i=Math.max(0,sibs.indexOf(el));
+    let ico=el.querySelector(':scope > .kpiIco');
+    if(!ico){ const lab=(el.querySelector('.l,.msK,.lbl,.label')||el).textContent;
+      ico=document.createElement('span'); ico.className='kpiIco'; ico.innerHTML=dkIcon(dkPick(lab)); el.insertBefore(ico,el.firstChild); }
+    const tone=dkTone(el,i); if(ico.dataset.tone!==tone) ico.dataset.tone=tone;
+    el.classList.add('dkHasIco');
+  });
+  (root||document).querySelectorAll('.homeCard .hcIco').forEach((ic,i)=>{
+    if(ic.dataset.dk) return; const card=ic.closest('.homeCard'); const lab=card?(card.querySelector('.hcLabel')||card).textContent:'';
+    ic.innerHTML=dkIcon(dkPick(lab)); ic.dataset.dk='1'; ic.dataset.tone=String(i%4);
+  });
+}
+(function(){ let q=false; const run=()=>{ q=false; try{ decorateKpis(document); }catch(e){} };
+  const mo=new MutationObserver(()=>{ if(!q){ q=true; requestAnimationFrame(run); } });
+  const start=()=>{ run(); mo.observe(document.body,{childList:true,subtree:true}); };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
+})();
 // [v78] 반원 게이지 SVG (KPI goal 카드용) — %를 호 + 중앙 숫자로
 function semiGaugeSvg(pct, color){
   pct=Math.max(0,Math.min(100,Number(pct)||0));
