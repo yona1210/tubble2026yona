@@ -610,6 +610,13 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .msNote{font-size:11.5px;color:#9aa1b2;margin-top:10px;line-height:1.6}
 .msEmpty{font-size:12px;color:#b0b6c4;padding:8px 0;text-align:center}
 .msSrc{display:flex;flex-wrap:wrap;gap:6px}.msSrc span{font-size:11px;color:#7a8194;background:#f1f3f7;border-radius:999px;padding:3px 10px}
+/* [v150] 품목별 규모 비교 */
+.szTbl td{padding:7px 10px;text-align:left}.szTbl th small{display:inline;margin-left:4px;font-size:10.5px;color:#a3a9b8;font-weight:400}
+.szTbl tr.szR{cursor:pointer}.szTbl tr.szR:hover td{background:#f8f9fc}
+.szB{display:flex;align-items:center;gap:6px;min-width:120px}.szB i{display:block;height:9px;border-radius:5px;flex:0 0 auto}
+.szB.m i{background:#9aa6c4}.szB.c i{background:#f0a23b}.szB.t i{background:#3355FF}.szB span{font-size:12px;font-weight:700;color:#141a33;white-space:nowrap}
+.szShared{font-size:11px;color:#9aa1b2}.szPct{font-size:11px;color:#8a90a2}
+.szTbl tfoot td{background:#141a33;color:#fff;font-weight:800;padding:10px}.szTbl tfoot small{color:#c9cfe0;font-weight:500;margin-left:6px;font-size:11px}
 /* [v148] 쿠팡 품목별 시장 */.cimFixed{background:#f4f6fb;border-radius:12px;padding:10px 14px;font-size:12.5px;color:#4a5470;margin-bottom:14px;line-height:1.5}.cimTubB{display:inline-block;background:#3355FF;color:#fff;border-radius:999px;padding:1px 8px;font-size:10.5px;font-weight:700;vertical-align:middle}.cimTubTxt{color:#3355FF;font-weight:800}.msTbl tr.cimTubRow td{background:#f3f6ff}.msT5 tr.cimTub td{background:#eaf0ff;color:#1f3bd6;font-weight:700}.cimX{display:flex;flex-direction:column;gap:14px}.cimX .msT5 td.l{white-space:normal;min-width:90px}.cimX .msT5 td{white-space:nowrap}.cimX .cimPn{min-width:280px;white-space:normal!important}.cimXh{font-size:12px;font-weight:800;color:#141a33;margin:0 0 6px}.cimRef td{font-size:12px;vertical-align:top}
 .msRef{background:#fff;border-radius:14px;box-shadow:0 0 0 1px #edf0f5;margin-bottom:10px}
 .msRef summary{cursor:pointer;padding:14px 18px;display:flex;align-items:baseline;gap:10px;list-style:none}.msRef summary::-webkit-details-marker{display:none}
@@ -7221,7 +7228,7 @@ const COUPANG_CATS=[
     {n:'세탁세제',mkm:'세탁세제 (실내건조 중심)',c:[{n:'액체세제',m:'액체세제',u:'세탁세제 (액체세제)'},{n:'분말세제',m:'분말세제',u:'세탁세제 (분말세제)'},
       {n:'캡슐세제',m:'세탁세제 (실내건조 중심)',u:'세탁세제 (캡슐세제)',mktOff:true,t:['캡슐세제'],note:'시장 8,500억은 세탁세제 전체(액체·분말·캡슐·시트) — 묶음에 표시'},
       {n:'시트세제',m:'이염방지 시트',u:'세탁세제 (시트세제)',basis:'이염방지 시트 기준',t:['이염방지시트세제'],note:'터블 이염방지 시트세제 · 시장·경쟁 숫자는 이염방지 시트 기준',uNote:'터블 이염방지 시트세제'}]},
-    {n:'섬유유연제',c:[{n:'액체섬유유연제',m:'섬유유연제',u:'섬유유연제(액체섬유유연제)'},{n:'시트섬유유연제',m:'드라이시트/건조기시트',u:'섬유유연제(시트섬유유연제)',t:['건조기시트']}]},
+    {n:'섬유유연제',c:[{n:'액체섬유유연제',m:'섬유유연제',u:'섬유유연제(액체섬유유연제)'},{n:'시트섬유유연제',m:'드라이시트/건조기시트',u:'섬유유연제(시트섬유유연제)',mk:'드라이시트/건조기시트',t:['건조기시트']}]},
     {n:'세탁 보조·특수',vg:true,c:[{n:'울세제',m:'울세제',u:'울세제'},{n:'홈드라이세제',m:'홈드라이세제',u:'홈드라이세제'},{n:'섬유항균제',m:'섬유 향균제',u:'섬유항균제'},{n:'향기지속제',m:'향기지속제',u:'향기지속제'},
       {n:'표백제',m:'표백제',u:'표백제'},{n:'세탁비누',m:'세탁비누',u:'세탁비누'},{n:'얼룩제거제',m:'얼룩제거제',u:'얼룩제거제',t:['얼룩제거제']},{n:'운동화/가죽클리너',m:'운동화/가죽크리너',u:'운동화/가죽클리너'}]},
     {n:'유아 세탁',c:[{n:'유아세제',m:'유아세제',u:'유아세제'},{n:'유아세탁비누',u:'유아세탁비누'},{n:'유아섬유유연제',u:'유아섬유유연제'}]}]},
@@ -7230,7 +7237,7 @@ const COUPANG_CATS=[
   {n:'청소',c:[
     {n:'청소세제',c:[{n:'욕실세정제',m:'욕실세정제 (일반)',u:'욕실세정제',t:['욕실클리너']},{n:'락스/살균소독제',u:'락스/살균소독제'},{n:'변기세정제',m:'변기세정제',u:'변기세정제',t:['변기클리너']},
       {n:'기름때세정제',m:'기름때 제거제',u:'기름때세정제'},{n:'싱크대세정제',u:'싱크대세정제'},{n:'배수구세정제',m:'배수구 세정제',u:'배수구세정제'},
-      {n:'곰팡이세정제',m:'곰팡이 제거제',u:'곰팡이세정제'},{n:'에어컨세정제',m:'가전전용 클리너',u:'에어컨세정제'},{n:'세탁조클리너',m:'세탁조클리너',u:'세탁조클리너',t:['세탁조클리너']},
+      {n:'곰팡이세정제',m:'곰팡이 제거제',u:'곰팡이세정제'},{n:'에어컨세정제',m:'가전전용 클리너',u:'에어컨세정제',mk:'가전전용 클리너'},{n:'세탁조클리너',m:'세탁조클리너',u:'세탁조클리너',t:['세탁조클리너']},
       {n:'유리세정제',m:'유리세정제',u:'유리세정제'},{n:'광택왁스/크리너',u:'광택왁스/크리너'}]},
     {n:'청소포/티슈',c:[{n:'물걸레 청소포',u:'물걸레 청소포'},{n:'세정티슈(파우치형)',u:'세정티슈(파우치형)',t:['세정티슈']},{n:'세정티슈(통형)',u:'세정티슈(통형)'},
       {n:'정전기 청소포',u:'정전기 청소포'},{n:'유리거울 세정티슈',u:'유리거울 세정티슈'}]}]},
@@ -7243,7 +7250,12 @@ const COUPANG_CATS=[
   {n:'살균',c:[{n:'살균소독제',u:'살균소독제'}]},
   {n:'제습',c:[{n:'제습제',u:'제습제'}]},
   {n:'기타',c:[{n:'세제선물세트',t:['선물세트'],nj:true,note:'터블 선물세트 — 조사 파일에 해당 분류 없음 · 판정 제외'},
-    {n:'다목적세제',m:'다목적 세정제',note:'로드맵 시장 규모만 있음(조사 파일에 없음)'}]}
+    {n:'다목적세제',m:'다목적 세정제',mk:'다목적 세정제',note:'로드맵 시장 규모만 있음(조사 파일에 없음)'},
+    // [v150] 쿠팡 조사에 없는 로드맵 세부 시장 — 넣어야 지도 합계가 국내 시장 2.33조와 맞는다
+    {n:'바닥세정제',mk:'바닥세정제',note:'쿠팡 조사 없음 · 로드맵 시장만'},{n:'주방후드/오븐',mk:'주방후드/오븐',note:'쿠팡 조사 없음 · 로드맵 시장만'},
+    {n:'이염방지시트',mk:'이염방지시트',note:'쿠팡 조사 없음 · 로드맵 시장만 (터블 이염방지 시트세제 매출은 세탁 › 시트세제)'},
+    {n:'배수구 클리너 (욕실)',mk:'배수구 클리너 (욕실)',note:'쿠팡 조사 없음 · 로드맵 시장만'},{n:'물때 제거제',mk:'물때 제거제',note:'쿠팡 조사 없음 · 로드맵 시장만'},
+    {n:'배송비 등 (품목 아님)',t:['기타'],nj:true,note:'매출 데이터의 커머스(사입_배송비) 등 품목 분류 밖 매출 — 판정 제외'}]}
 ];
 // [v145] 품목 노드 → 경쟁 매트릭스 행 이름: 새 조사(u) 행이 있으면 그것, 없으면 예전 이름(m)
 function ccKey(n,mx){ return (n.u&&mx&&mx[n.u])?n.u:(n.m||null); }
@@ -7270,17 +7282,19 @@ function msRows(){
     const key=ccKey(n,mx), viaU=!!(n.u&&key===n.u);
     const r=key?mx[key]:null, rev=(n.t||[]).reduce((a,c)=>a+(ca[c]||0),0)/1e8, items=[].concat(...(n.t||[]).map(c=>stockBy[c]||[]));
     // [v145] 시장 규모가 상위 분류 전체 값(세탁세제 8,500억 등)이면 품목 칸엔 안 붙이고 묶음에서 한 번만 센다(mktP)
-    const mktP=r&&r.mktShared&&r.mktSize>0?{p:r.mktParent,v:+r.mktSize}:null;
+    // [v150] mk = 로드맵 세부 시장 이름에 직접 연결(시트섬유유연제→드라이시트/건조기시트, 쿠팡 조사 없는 로드맵 시장 등)
+    const mkSub=n.mk?(MARKET_DATA.subCat||[]).find(x=>x.name===n.mk):null;
+    const mktP=!mkSub&&r&&r.mktShared&&r.mktSize>0?{p:r.mktParent,v:+r.mktSize}:null;
     // [v147] 터블 매출은 올해 누적(예: 1~10월)이라 연간 시장·쿠팡 연 추정과 비교할 땐 12개월로 환산(revY)
     const revY=rev*MS_ANN(L);
-    const mkt=!n.mktOff&&!mktP&&r&&r.mktSize>0?+r.mktSize:null, top5=r&&r.top5Sum>0?+r.top5Sum:null, share=mkt&&revY>0?revY/mkt*100:null, comp=r?String(r.comp||''):'';   // [v136] mktOff: 시장 규모가 상위 묶음 전체 값인 품목(캡슐)
+    const mkt=mkSub?+mkSub.mid:(!n.mktOff&&!mktP&&r&&r.mktSize>0?+r.mktSize:null), top5=r&&r.top5Sum>0?+r.top5Sum:null, share=mkt&&revY>0?revY/mkt*100:null, comp=r?String(r.comp||''):'';   // [v136] mktOff: 시장 규모가 상위 묶음 전체 값인 품목(캡슐)
     const shareP=!share&&mktP&&revY>0?revY/mktP.v*100:null;   // [v147] 상위 분류 전체 대비 점유(세탁세제 8,500억 대비 등) — 표시용
     const isIn=rev>0||items.length>0; let v;
     if(n.nj) v='ref';   // [v147] 판정 제외(선물세트 등 시장 카테고리가 아닌 터블 묶음 상품)
     else if(isIn){ if(/선도/.test(comp)||(share!=null&&share>=1)) v='keep'; else if(/약세/.test(comp)||(top5>=20&&revY<top5*0.03)) v='weak'; else v='grow'; }
     else v=((mkt||0)>=200||(top5||0)>=MS_OPP_T5)?'opp':'ref';
     const note=viaU?(n.uNote!=null?n.uNote:(n.mktOff?n.note:'')):(n.note||'');
-    rows.push({id:'c'+rows.length,n:n.n,group:path[0],sub:path.slice(1).join(' › '),note:(mktP&&!note?`시장 규모는 상위 '${mktP.p}' 전체 ${msEok(mktP.v)} — 묶음에 표시`:note),basis:viaU?'':(n.basis||''),rev,revY,items,mkt,mktP,top5,share,shareP,comp,nj:!!n.nj,
+    rows.push({id:'c'+rows.length,n:n.n,group:path[0],sub:path.slice(1).join(' › '),note:(mktP&&!note?`시장 규모는 상위 '${mktP.p}' 전체 ${msEok(mktP.v)} — 묶음에 표시`:note),basis:viaU?'':(n.basis||''),rev,revY,items,mkt,mktP,top5,share,shareP,comp,nj:!!n.nj,u:n.u||'',mkName:mkSub?mkSub.name:'',
       top1:r&&r.top1&&r.top1!=='-'?r.top1:'',top1Rev:r&&r.yearRev>0?+r.yearRev:null,v,t5:(key&&t5[key])||[]});
   };
   COUPANG_CATS.forEach(g=>walk(g,[]));
@@ -7347,6 +7361,35 @@ function msCatsHtml(){
 }
 // [v135] 시장 지도 — 대분류 → 중분류 → 품목을 카드·타일로 펼쳐 '세제 시장 전체가 어떻게 생겼나'를 한 화면에.
 //  타일 = 쿠팡 세부 카테고리. 색 = 판정(진출 여부 포함), 숫자 = 시장 규모(없으면 쿠팡 Top5), 터블 매출이 있으면 함께.
+// [v150] 품목별 규모 비교 — 품목 한 줄에 시장 규모(로드맵) · 쿠팡 추정 판매액 · 쿠팡 1위 · 터블 매출을 같은 '연간' 기준으로.
+//  쿠팡 = 시장 조사 '3. 상품 원자료' 조사 상품(최대 10개) 월 추정 × 12. 상위 공유 시장(세탁세제 8,500억 등)은 대분류 소계에서 한 번만 센다.
+function msSizeHtml(rows,L){
+  const D=DATA.coupangItemMarket, cimBy={}; ((D&&D.items)||[]).forEach(x=>{ cimBy[x.item]=x; });
+  const ann=MS_ANN(L);
+  const it=rows.map(r=>{ const c=r.u?cimBy[r.u]:null; return Object.assign({},r,{cpY:c?c.amt*12/1e8:null,b1:c&&c.brands[0]?c.brands[0][0]:'',b1s:c&&c.brands[0]&&c.amt>0?c.brands[0][1]/c.amt:null}); });
+  const mxM=Math.max(1,...it.map(r=>r.mkt||0)), mxC=Math.max(1,...it.map(r=>r.cpY||0)), mxT=Math.max(1,...it.map(r=>r.revY||0));
+  const bar=(v,mx,cls)=>v>0?`<div class="szB ${cls}"><i style="width:${Math.max(2,v/mx*90).toFixed(1)}px"></i><span>${msEok(v)}</span></div>`:'<span class="msDim">-</span>';
+  const mktSum=rs=>{ const sp={}; let s=0; rs.forEach(r=>{ if(r.mkt) s+=r.mkt; else if(r.mktP) sp[r.mktP.p]=r.mktP.v; }); return s+Object.values(sp).reduce((a,v)=>a+v,0); };
+  const sum=(rs,k)=>rs.reduce((a,r)=>a+(r[k]||0),0);
+  const groups=[...new Set(it.map(r=>r.group))];
+  const body=groups.map(g=>{ const rs=it.filter(r=>r.group===g);
+    const head=`<tr class="msG"><td>${pEsc(g)} <span>${rs.length}개</span></td><td class="r">${mktSum(rs)?msEok(mktSum(rs)):'-'}</td><td class="r">${sum(rs,'cpY')?msEok(sum(rs,'cpY')):'-'}</td><td></td><td class="r">${sum(rs,'revY')?msEok(sum(rs,'revY')):'-'}</td></tr>`;
+    return head+rs.map(r=>`<tr class="szR" onclick="msGo('${r.id}')">
+      <td class="l"><b>${pEsc(r.n)}</b>${r.sub?`<small>${pEsc(r.sub)}</small>`:''}</td>
+      <td>${r.mkt?bar(r.mkt,mxM,'m'):r.mktP?`<span class="szShared">${pEsc(String(r.mktP.p).replace(/\s*\(.*\)/,''))} ${msEok(r.mktP.v)}에 포함</span>`:'<span class="msDim">미조사</span>'}</td>
+      <td>${bar(r.cpY,mxC,'c')}</td>
+      <td class="l">${r.b1?`${pEsc(r.b1)} <span class="szPct">${(r.b1s*100).toFixed(0)}%</span>`:'<span class="msDim">-</span>'}</td>
+      <td>${bar(r.revY,mxT,'t')}</td></tr>`).join('');
+  }).join('');
+  const tM=mktSum(it), tC=sum(it,'cpY'), tT=sum(it,'revY'), sumKo=(MARKET_DATA.subCat||[]).reduce((a,x)=>a+(+x.mid||0),0);   // '2.33조'는 반올림 표기 → 로드맵 세부 시장 합(23,326억)과 비교
+  const foot=`<tr class="szTot"><td class="l">전체 합계</td><td class="r">${msEok(tM)}${sumKo?` <small>${Math.round(tM)===Math.round(sumKo)?'= 국내 시장 '+MARKET_DATA.summary.market:'(국내 시장 '+MARKET_DATA.summary.market+' 대비 '+msEok(sumKo-tM)+' 차이)'}</small>`:''}</td><td class="r">${msEok(tC)}</td><td></td><td class="r">${msEok(tT)}${L?` <small>${L.from}~${L.to}월 ${msEok(L.total)} 환산</small>`:''}</td></tr>`;
+  return `<div class="msCard"><div class="msCardH"><h3>품목별 규모 비교</h3><span class="msSum">모두 연간 기준 · 행을 누르면 카테고리별 상세</span></div>
+    <div style="overflow-x:auto"><table class="msTbl szTbl"><thead><tr><th class="l">품목</th><th class="l">시장 규모 <small>로드맵 · 연</small></th><th class="l">쿠팡 추정 판매액 <small>조사 상품 최대 10개 · 연</small></th><th class="l">쿠팡 1위 <small>비중</small></th><th class="l">터블 매출 <small>12개월 환산</small></th></tr></thead>
+    <tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>
+    <div class="msNote">시장 규모 = 2026.04 로드맵 추정(국내 전체). 세탁세제·섬유유연제·주방세제·탈취제처럼 세부 품목이 상위 시장을 함께 쓰면 품목 칸엔 막대 없이 표시하고 대분류 소계에서 한 번만 더합니다.
+      쿠팡 추정 판매액 = 시장 조사 상품의 '한 달 구매자 수 표시 × 판가' × 12 — 쿠팡 상위 상품만이라 시장 전체가 아닙니다. 터블 매출 = 매출 데이터 올해 누적을 12개월로 환산.
+      막대 길이는 열마다 따로(같은 열 안에서만 비교).</div></div>`;
+}
 function msMapHtml(){
   const {rows,L,M}=msRows(); let k=0;
   const tile=r=>`<div class="mpT ${r.v}" onclick="msGo('${r.id}')" title="${pEsc(r.n)} · ${MS_V[r.v].t}">
@@ -7382,6 +7425,7 @@ function msMapHtml(){
   return `<div class="msHead"><h2>세제 시장 지도</h2><p>쿠팡 기준 세제 시장을 대분류 → 중분류 → 품목으로 펼쳤습니다. 타일을 누르면 카테고리별 상세(경쟁 상위 10개)로 이동합니다.</p></div>
     <div class="mpLeg">${leg}<span class="mpLn">타일 숫자 = 시장 규모(로드맵) · 없으면 쿠팡 Top5 · '터블' = 올해 누적 매출</span></div>
     ${groups}
+    ${msSizeHtml(rows,L)}
     <div class="msSrc">${msSrcChips(M,L)}</div>`;
 }
 function msRefHtml(){
@@ -7410,7 +7454,9 @@ function catMapHtml(){
     node.depth=depth; node.path=path;
     if(node.c){ node.c.forEach(ch=>calc(ch,depth+1,path.concat(node.n))); node.amt=node.c.reduce((a,ch)=>a+(ch.amt||0),0); node.items=[].concat(...node.c.map(ch=>ch.items||[])); return; }
     const key=ccKey(node,mx), r=key?mx[key]:null; if(key) used.add(key);
-    node.mkt=r&&r.mktSize>0&&!r.mktShared?r.mktSize:null;   // [v145] 상위 공유 시장 규모는 품목 칸에 반복하지 않음 node.top5=r&&r.top5Sum>0?r.top5Sum:null; node.comp=r?r.comp:'';
+    const mkSub=node.mk?(MARKET_DATA.subCat||[]).find(x=>x.name===node.mk):null;   // [v150] 로드맵 시장에 직접 연결(mk)
+    node.mkt=mkSub?mkSub.mid:(r&&r.mktSize>0&&!r.mktShared?r.mktSize:null);   // [v145] 상위 공유 시장 규모는 품목 칸에 반복하지 않음
+    node.top5=r&&r.top5Sum>0?r.top5Sum:null; node.comp=r?r.comp:'';   // [v150] v145 주석이 이 줄을 가려 Top5·경쟁력이 빠졌던 것 복구
     node.amt=(node.t||[]).reduce((a,c)=>a+catAmt(c),0); node.items=[].concat(...(node.t||[]).map(c=>stockBy[c]||[]));
     node.in=node.amt>0||node.items.length>0; leaves.push(node);
   };
@@ -7819,8 +7865,10 @@ function parseCollectionWorkbook(file, wb){
   const subList=(typeof MARKET_DATA!=='undefined'&&MARKET_DATA.subCat)?MARKET_DATA.subCat:[];
   const nLoose=s=>String(s||'').replace(/\s|\(.*?\)|·/g,'');
   const nTight=s=>String(s||'').replace(/^[A-Za-z]\d+\s*/,'').replace(/[\s·()]/g,'');
-  const MKT_ALIAS={'식기세척기용세제':'식기세척기세제','텀블러클리너':'용기세척제','기름때세정제':'기름때제거제','곰팡이세정제':'곰팡이제거제'};
-  const subOf=cat=>{ let k=nLoose(cat); if(!k) return null; k=MKT_ALIAS[k]||k; return subList.find(s=>{ const sn=nLoose(s.name); return sn&&(sn.includes(k)||k.includes(sn)); })||null; };
+  const MKT_ALIAS={'식기세척기용세제':'식기세척기세제','텀블러클리너':'용기세척제','기름때세정제':'기름때제거제','곰팡이세정제':'곰팡이제거제','에어컨세정제':'가전전용클리너'};
+  const MKT_TIGHT={'섬유유연제시트섬유유연제':'드라이시트/건조기시트'};   // [v150] 괄호까지 봐야 구분되는 것
+  const subOf=cat=>{ const tk=MKT_TIGHT[nTight(cat)]; if(tk) return subList.find(s=>s.name===tk)||null;
+    let k=nLoose(cat); if(!k) return null; k=MKT_ALIAS[k]||k; return subList.find(s=>{ const sn=nLoose(s.name); return sn&&(sn.includes(k)||k.includes(sn)); })||null; };
   const TUB_ALIAS={'세탁세제캡슐':'세탁세제캡슐세제','텀블러세정제':'텀블러클리너','식기세척기세제':'식기세척기용세제',
     '주방세제':'일반주방세제','탈취제겔':'실내용탈취제','세정티슈':'세정티슈파우치형'};
   const tubAssign={}, usedSales=new Set();
