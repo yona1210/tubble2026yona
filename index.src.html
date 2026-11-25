@@ -648,6 +648,7 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .ovSpark{display:inline-flex;align-items:center;gap:5px}.ovSpark em{font-style:normal;font-size:10.5px;font-weight:700}.ovSpark em.up{color:#16a34a}.ovSpark em.dn{color:#64748b}
 .ovSec{font-size:15px;font-weight:800;color:#141a33;margin:6px 2px 10px}.ovSec span{font-size:11.5px;font-weight:500;color:#9aa1b2;margin-left:8px}
 .ovRowM{display:grid;grid-template-columns:1fr 1.25fr;gap:14px;margin-bottom:14px}
+.ovWash{font-size:11.5px;color:#4a5470;background:#f5f7ff;border-left:3px solid #2f6bff;border-radius:6px;padding:7px 10px;margin:4px 0 8px;line-height:1.55}.ovWash b{color:#141a33}
 .ovAside.est{background:#f5f7ff;border:1px dashed #c7d2fe}.ovAside small{color:#8a90a2}.ovCatEst{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 12px;margin-top:10px}.ovCatEst div{font-size:11.5px;color:#4a5470;display:flex;justify-content:space-between;gap:6px;border-bottom:1px solid #f1f3f8;padding:3px 0}.ovCatEst b{color:#4338ca}
 .ovWide .ovSz2{grid-template-columns:minmax(120px,190px) 1fr 66px 44px 190px}.ovEst{font-size:11.5px;font-weight:700;color:#141a33;border-radius:8px;padding:2px 8px;white-space:nowrap;text-align:right}.ovEst small{font-weight:500;color:#8a90a2;margin-left:3px}.ovEst.stat{border:1px solid #c7d2fe;background:#f5f7ff}.ovEst.conv{border:1px dashed #c4b5fd;background:#faf7ff}.ovEst.none{color:#b0b6c4;border:1px solid transparent}.ovEstT{color:#4338ca}
 /* [v166] 한눈에 흐름 배치 */
@@ -7527,7 +7528,7 @@ const MS_ORDER=['keep','grow','weak','opp','ref'];
 const msVerdictBadge=r=>r&&r.early?'<span class="msPill early">출시 초기</span>':msPill(r.v);
 // [v160] 통계청 계열(세탁용·주방용·기타 세제·실내용 가향제) — 품목이 속한 계열과 계열 값
 function msFamOf(r){ const f=MS_FAM.find(f=>f.ns.includes(r.n)); if(!f) return null; const ST=ovStat(DATA.coupangItemMarket);
-  const v={wash:ST.parts[0].v,kitchen:ST.parts[1].v,etc:ST.parts[2].v,aroma:ST.aroma}[f.k]; return {t:f.t,v}; }
+  const v={washDet:MS_WASH_DET.v,washEtc:Math.max(0,ST.parts[0].v-MS_WASH_DET.v),kitchen:ST.parts[1].v,etc:ST.parts[2].v,aroma:ST.aroma}[f.k]; return {t:f.t,v}; }
 // [v160] 쿠팡 1위 '브랜드'(품목 안 브랜드별 추정액 합 기준) + 비중, 조사 상품 5개 미만이면 표본 부족
 function msTopBrand(r){ const D=DATA.coupangItemMarket, c=D&&r.u?(D.items||[]).find(x=>x.item===r.u):null;
   if(!c||!c.brands||!c.brands[0]||!(c.amt>0)) return null; return {b:c.brands[0][0],s:c.brands[0][1]/c.amt,n:c.n,thin:c.n<5}; }
@@ -7542,14 +7543,18 @@ const msPill=v=>`<span class="msPill ${MS_V[v].cls}">${MS_V[v].t}</span>`;
 // ===== [v158] 품목별 시장 규모 추정 — 통계청 계열 배분 + 쿠팡 환산 (로드맵 미사용) =====
 //  계열 구분은 시장 조사 '4. 시장 규모 참고' 비고를 따름: 세탁용 = 캡슐·시트·얼룩제거제·세탁조클리너 관련, 주방용 = 주방세제·용기세척제·식세기세제 관련,
 //  기타 세제 = 욕실·변기 세정제 포함, 실내용 가향제 = 겔탈취제·방향제 포함(세제 합계와 별도).
+// [v168] 세탁세제 시장(사용자 자료: 통계청 광업·제조업조사 · NICE디앤비 재구성). 통계청 세탁용 합성세제 10,384억 = 세탁세제 7,948억 + 나머지(섬유유연제 등 — 사용자 판단으로 포함 가정)
+const MS_WASH_DET={v:7948,year:'2024년',src:'통계청 광업·제조업조사 · NICE디앤비 재구성',trend:[[2021,7100],[2022,7405],[2023,7672],[2024,7948],[2025,8234]],cagr:3.7,
+  nielsen:{year:'2023',src:'닐슨코리아',share:[['액체',49],['가루',27],['캡슐',18],['기타',6]]},search:{src:'네이버 데이터랩',capsule:62,liquid:-44,powder:-40,period:'22.12~23.12 vs 21.11~22.11'}};
 const MS_FAM=[
-  {k:'wash',t:'세탁용 합성세제',ns:['액체세제','분말세제','캡슐세제','시트세제','울세제','홈드라이세제','얼룩제거제','유아세제','세탁조클리너']},
-  {k:'kitchen',t:'주방용 합성세제',ns:['일반주방세제','천연성분주방세제','다목적 용기세척제','식기세척기용세제','유아 주방세제','야채과일세정제']},
-  {k:'etc',t:'기타 세제',ns:['욕실세정제','변기세정제','기름때세정제','싱크대세정제','배수구세정제','곰팡이세정제','에어컨세정제','유리세정제','광택왁스/크리너']},
-  {k:'aroma',t:'실내용 가향제',ns:['섬유탈취제','실내용탈취제','차량용탈취제','화장실탈취제','냉장고탈취제','신발탈취제','피톤치드 탈취제'],sep:true}
+  {k:'washDet',t:'세탁세제',sh:'세탁세제',ns:['액체세제','분말세제','캡슐세제','시트세제']},
+  {k:'washEtc',t:'세탁용 합성세제 중 세탁세제 외',sh:'세탁용 나머지',ns:['액체섬유유연제','시트섬유유연제','유아섬유유연제','울세제','홈드라이세제','얼룩제거제','유아세제','세탁조클리너']},
+  {k:'kitchen',t:'주방용 합성세제',sh:'주방용',ns:['일반주방세제','천연성분주방세제','다목적 용기세척제','식기세척기용세제','유아 주방세제','야채과일세정제']},
+  {k:'etc',t:'기타 세제',sh:'기타 세제',ns:['욕실세정제','변기세정제','기름때세정제','싱크대세정제','배수구세정제','곰팡이세정제','에어컨세정제','유리세정제','광택왁스/크리너']},
+  {k:'aroma',t:'실내용 가향제',sh:'가향제',ns:['섬유탈취제','실내용탈취제','차량용탈취제','화장실탈취제','냉장고탈취제','신발탈취제','피톤치드 탈취제'],sep:true}
 ];
 function msMarketEst(rows,cimBy){
-  const ST=ovStat(DATA.coupangItemMarket), statV={wash:ST.parts[0].v,kitchen:ST.parts[1].v,etc:ST.parts[2].v,aroma:ST.aroma};
+  const ST=ovStat(DATA.coupangItemMarket), statV={washDet:MS_WASH_DET.v,washEtc:Math.max(0,ST.parts[0].v-MS_WASH_DET.v),kitchen:ST.parts[1].v,etc:ST.parts[2].v,aroma:ST.aroma};
   const cp=r=>{ const c=r.u&&cimBy[r.u]; return c?c.amt*12/1e8:0; };
   const byId={}, fams=[];
   MS_FAM.forEach(f=>{ const mem=rows.filter(r=>!r.nj&&f.ns.includes(r.n)), s=mem.reduce((a,r)=>a+cp(r),0), V=statV[f.k];
@@ -7621,6 +7626,7 @@ function msRows(){
     if(v==='weak'&&!/약세/.test(r.comp)){ const bb=(r.t||[]).reduce((a,x)=>{ const o=b2b[x]; if(o){ a.b+=o.b; a.t+=o.t; } return a; },{b:0,t:0});
       if(bb.t>0&&bb.b/bb.t>=0.5){ v='grow'; vNote=`B2B 비중 ${(bb.b/bb.t*100).toFixed(0)}%(출고 수량) — 쿠팡 비교로 약한 곳 판정 안 함`; } }
     r.v=v; r.vNote=vNote;
+if(r.n==='캡슐세제'&&!r.vNote) r.vNote=`세탁세제 시장 연 ${MS_WASH_DET.cagr}% 성장 · 네이버 캡슐 검색 +${MS_WASH_DET.search.capsule}% — 가루보다 캡슐이 대세(사용자 조사)`;
   });
   // [v160] 출시 6개월 미만 터블 품목 → 판정 제외 + '출시 초기'. 첫 매출 월 = 행의 매출 카테고리(t) 상품 중 가장 이른 매출 월
   (function(){ const ms=sd.months||[]; if(!ms.length) return; const last=ms[ms.length-1], lastIdx=+last.slice(0,4)*12+(+last.slice(5,7));
@@ -7710,8 +7716,12 @@ function ovStat(D){
 function ovEstCell(x){
   if(!(x&&x.est>0)) return '<span class="ovEst none">추정 -</span>';
   return x.eb==='쿠팡 환산'?`<span class="ovEst conv" title="통계청 품목 없음 — 쿠팡 연 판매액 × 계열 배수(범위 ${msEok(x.lo)}~${msEok(x.hi)})">추정 ${msEok(x.est)} <small>${msEok(x.lo)}~${msEok(x.hi)}</small></span>`
-    :`<span class="ovEst stat" title="${pEsc(x.ef)}(통계청)을 계열 안 쿠팡 비율로 나눔">추정 ${msEok(x.est)} <small>${pEsc(String(x.ef).replace(' 합성세제','용').replace('용용','용'))}</small></span>`;
+    :`<span class="ovEst stat" title="${pEsc(x.ef)} 시장을 같은 계열 안 쿠팡 비율로 나눔">추정 ${msEok(x.est)} <small>${pEsc(((MS_FAM.find(f=>f.t===x.ef)||{}).sh)||x.ef)}</small></span>`;
 }
+// [v168] 세탁세제 칸 인사이트: 시장 규모·성장(통계청·NICE), 2023 닐슨 비율 vs 2026 쿠팡 비율, 네이버 검색 추세(사용자 조사 자료)
+function ovWashNote(){ const W=MS_WASH_DET, N=W.nielsen.share.map(x=>`${x[0]} ${x[1]}`).join(' · ');
+  return `<div class="ovWash"><b>세탁세제 시장 ${won(W.v)}억</b> (${W.year}, ${W.src}) · 연 ${W.cagr}% 성장(2021년 ${won(W.trend[0][1])}억 → 2025년 ${won(W.trend[4][1])}억)<br>
+    ${W.nielsen.year} ${W.nielsen.src}(전체 채널): ${N} → 2026.11 쿠팡 조사(온라인)는 캡슐 비중이 약 2배 · 네이버 검색 캡슐 +${W.search.capsule}%, 액체 ${W.search.liquid}%, 가루 ${W.search.powder}%(${W.search.period}) → <b>가루보다 캡슐이 대세</b></div>`; }
 function ovMktHtml(E,ST,cimBy,rows){
   // [v161] 오른쪽: 쿠팡 조사 상품 연 환산(품목별 최대 10개)과 카테고리 안 비중만 — 품목 시장 규모 추정은 쓰지 않음
   const it=rows.filter(r=>!r.nj&&r.u&&cimBy[r.u]).map(r=>({n:r.n,group:r.group,cp:cimBy[r.u].amt*12/1e8,nS:cimBy[r.u].n,est:r.est,lo:r.estLo,hi:r.estHi,eb:r.estBasis,ef:r.estFam}));
@@ -7726,14 +7736,14 @@ function ovMktHtml(E,ST,cimBy,rows){
   const TR=ovTree(rows).find(t=>t.g===ovGroupSel), blocks=TR?TR.blocks:[{t:ovGroupSel,rs:G.xs.map(x=>({n:x.n}))}];
   const bars=blocks.map(b=>{ const xs=b.rs.map(r=>byN[r.n]).filter(Boolean).sort((a,c)=>c.cp-a.cp); if(!xs.length) return ''; const bt=xs.reduce((a,x)=>a+x.cp,0);
     const stack=`<div class="ovStack sm">${xs.map((x,i)=>`<i style="width:${(x.cp/bt*100).toFixed(2)}%;background:${OV_TYPE_C[i%OV_TYPE_C.length]}" title="${pEsc(x.n)} ${msEok(x.cp)} (${(x.cp/bt*100).toFixed(0)}%)"><span>${x.cp/bt>=0.1?`${pEsc(x.n.replace(/^세탁세제\s*/,''))} ${(x.cp/bt*100).toFixed(0)}%`:''}</span></i>`).join('')}</div>`;
-    return `<div class="ovGrpH"><b>${pEsc(b.t)}</b><span>쿠팡 ${msEok(bt)} · ${ovGroupSel} 중 ${(bt/G.v*100).toFixed(0)}%${(e=>e>0?` · <b class="ovEstT">추정 시장 ${msEok(e)}</b>`:'')(xs.reduce((a,x)=>a+(x.est||0),0))}</span></div>${stack}`+
+    return `<div class="ovGrpH"><b>${pEsc(b.t)}</b><span>쿠팡 ${msEok(bt)} · ${ovGroupSel} 중 ${(bt/G.v*100).toFixed(0)}%${(e=>e>0?` · <b class="ovEstT">추정 시장 ${msEok(e)}</b>`:'')(xs.reduce((a,x)=>a+(x.est||0),0))}</span></div>${stack}${b.t==='세탁세제'?ovWashNote():''}`+
       xs.map((x,i)=>`<div class="ovSz2"><span class="ovSzN"><span class="ovDot" style="background:${OV_TYPE_C[i%OV_TYPE_C.length]}"></span>${pEsc(x.n)}${x.nS<5?' <span class="szThin">표본 부족</span>':''}</span><span class="ovSzBar"><i style="width:${Math.max(1.5,x.cp/mx*100).toFixed(1)}%;background:${OV_TYPE_C[i%OV_TYPE_C.length]}"></i></span><b>${msEok(x.cp)}</b><em>${(x.cp/bt*100).toFixed(0)}%</em>${ovEstCell(x)}</div>`).join(''); }).join('');
   const left=`
     <div class="msCard ovC"><div class="ovH">국내 세제 시장 규모 <span>${pEsc(ST.src)} 품목별 출하액(10인 이상) · ${pEsc(ST.year)}</span></div>
       <div class="ovDonutWrap"><div class="ovDonut"><canvas id="ovMkt"></canvas><div class="ovDC"><b>${(ST.parts[0].v/ST.total*100).toFixed(0)}%</b><span>세탁용 비중</span></div></div><div class="ovLgs">${lg}</div></div>
       <div class="ovAside">실내용 가향제 <b>${won(Math.round(ST.aroma))}억</b> (탈취제·방향제 포함, 세제 합계와 별도)</div>
       ${(()=>{ const ers=rows.filter(r=>!r.nj&&r.est>0), t=ers.reduce((a,r)=>a+r.est,0), lo=ers.reduce((a,r)=>a+r.estLo,0), hi=ers.reduce((a,r)=>a+r.estHi,0), cv=ers.filter(r=>r.estBasis==='쿠팡 환산').reduce((a,r)=>a+r.est,0);
-        return t>0?`<div class="ovAside est">품목 단위 <b>추정 시장 합계 ${(t/10000).toFixed(2)}조</b> <small>(범위 ${(lo/10000).toFixed(2)}~${(hi/10000).toFixed(2)}조)</small><br>= 통계청 세제 ${won(Math.round(ST.total))}억 + 가향제 ${won(Math.round(ST.aroma))}억 + 통계청 품목 없는 것(섬유유연제·청소포 등) 쿠팡 환산 ${msEok(cv)} — 참고용 추정</div>`:''; })()}
+        return t>0?`<div class="ovAside est">품목 단위 <b>추정 시장 합계 ${(t/10000).toFixed(2)}조</b> <small>(범위 ${(lo/10000).toFixed(2)}~${(hi/10000).toFixed(2)}조)</small><br>= 통계청 세제 ${won(Math.round(ST.total))}억 + 가향제 ${won(Math.round(ST.aroma))}억 + 통계청 품목 없는 것(향기지속제·청소포·제습제 등) 쿠팡 환산 ${msEok(cv)} — 참고용 추정</div>`:''; })()}
       <div class="msNote">출처: ${pEsc(ST.src)} 품목별 출하액(종사자 10인 이상 사업체 전수), ${pEsc(ST.year)}. 국내 제조사 출하 기준이라 수입품은 빠지고 수출·업소용은 들어 있습니다. 쿠팡 조사 숫자와는 기준이 달라 합산·비교하지 않습니다.</div></div>
 `;
   const right=`<div class="msCard ovC ovWide"><div class="ovH">${pEsc(ovGroupSel)} 품목별 구성 <span>${pEsc(ovGroupSel)} ${msEok(G.v)} · 품목군별 유형 비중(%는 품목군 안) · 연 환산</span></div>
