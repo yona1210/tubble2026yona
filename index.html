@@ -7240,17 +7240,20 @@ const COUPANG_CATS=[
       {n:'냉장고탈취제',u:'냉장고탈취제'},{n:'신발탈취제',u:'신발탈취제'},{n:'피톤치드 탈취제',u:'피톤치드 탈취제'}]}]},
   {n:'살균',c:[{n:'살균소독제',u:'살균소독제'}]},
   {n:'제습',c:[{n:'제습제',u:'제습제'}]},
-  {n:'기타',c:[{n:'세제선물세트',t:['선물세트'],note:'터블 선물세트 — 조사 파일에 해당 분류 없음'},
+  {n:'기타',c:[{n:'세제선물세트',t:['선물세트'],nj:true,note:'터블 선물세트 — 조사 파일에 해당 분류 없음 · 판정 제외'},
     {n:'다목적세제',m:'다목적 세정제',note:'로드맵 시장 규모만 있음(조사 파일에 없음)'}]}
 ];
 // [v145] 품목 노드 → 경쟁 매트릭스 행 이름: 새 조사(u) 행이 있으면 그것, 없으면 예전 이름(m)
 function ccKey(n,mx){ return (n.u&&mx&&mx[n.u])?n.u:(n.m||null); }
 // ===== [v134] 시장 전략 개편 — 한눈에 / 카테고리별 / 근거 자료 =====
 //  레퍼런스(큰 숫자 카드 + 섹션 요약줄 + 상태 pill): 첫 화면은 결론만, 카테고리는 표 하나(행을 펼치면 경쟁 Top5), 원자료는 근거 자료로.
-//  판정: 지킬 곳(점유 1%↑ 또는 선도) / 약한 곳(약세 또는 쿠팡 Top5 대비 3% 미만) / 키울 곳(그 외 진출) / 노릴 곳(미진출·시장 200억↑ 또는 Top5 20억↑) / 참고
+//  판정: 지킬 곳(점유 1%↑ 또는 선도) / 약한 곳(약세 또는 쿠팡 Top5 대비 3% 미만) / 키울 곳(그 외 진출) / 노릴 곳(미진출·시장 200억↑ 또는 Top5 50억↑) / 참고
 const MS_V={keep:{t:'지킬 곳',d:'점유 상위 — 지금 자리 방어',cls:'keep'},grow:{t:'키울 곳',d:'진출 중 — 판매 확대',cls:'grow'},
   weak:{t:'약한 곳',d:'쿠팡 상위 대비 크게 열세 — 개선 또는 정리 검토',cls:'weak'},opp:{t:'노릴 곳',d:'미진출인데 시장이 큼 — 신규 검토',cls:'opp'},ref:{t:'참고',d:'미진출',cls:'ref'}};
 const MS_ORDER=['keep','grow','weak','opp','ref'];
+// [v147] 노릴 곳 쿠팡 기준: 51개 세부 카테고리 조사 후 20억이면 19개(거의 전부)라 50억으로. 연환산 배수 = 12 ÷ 올해 업로드 개월 수.
+const MS_OPP_T5=50;
+const MS_ANN=L=>(L&&L.to>=L.from&&L.from>0)?12/(L.to-L.from+1):1;
 let msFilter='all', msQ='', msOpen=new Set();
 const msEok=v=>v==null||!(v>0)?'-':(v>=100?won(Math.round(v)):v>=10?(Math.round(v*10)/10):(Math.round(v*100)/100))+'억';
 const msPct=v=>v==null?'-':(v>=1?v.toFixed(1):v>=0.1?v.toFixed(2):v.toFixed(3))+'%';
@@ -7266,12 +7269,16 @@ function msRows(){
     const r=key?mx[key]:null, rev=(n.t||[]).reduce((a,c)=>a+(ca[c]||0),0)/1e8, items=[].concat(...(n.t||[]).map(c=>stockBy[c]||[]));
     // [v145] 시장 규모가 상위 분류 전체 값(세탁세제 8,500억 등)이면 품목 칸엔 안 붙이고 묶음에서 한 번만 센다(mktP)
     const mktP=r&&r.mktShared&&r.mktSize>0?{p:r.mktParent,v:+r.mktSize}:null;
-    const mkt=!n.mktOff&&!mktP&&r&&r.mktSize>0?+r.mktSize:null, top5=r&&r.top5Sum>0?+r.top5Sum:null, share=mkt&&rev>0?rev/mkt*100:null, comp=r?String(r.comp||''):'';   // [v136] mktOff: 시장 규모가 상위 묶음 전체 값인 품목(캡슐)
+    // [v147] 터블 매출은 올해 누적(예: 1~10월)이라 연간 시장·쿠팡 연 추정과 비교할 땐 12개월로 환산(revY)
+    const revY=rev*MS_ANN(L);
+    const mkt=!n.mktOff&&!mktP&&r&&r.mktSize>0?+r.mktSize:null, top5=r&&r.top5Sum>0?+r.top5Sum:null, share=mkt&&revY>0?revY/mkt*100:null, comp=r?String(r.comp||''):'';   // [v136] mktOff: 시장 규모가 상위 묶음 전체 값인 품목(캡슐)
+    const shareP=!share&&mktP&&revY>0?revY/mktP.v*100:null;   // [v147] 상위 분류 전체 대비 점유(세탁세제 8,500억 대비 등) — 표시용
     const isIn=rev>0||items.length>0; let v;
-    if(isIn){ if(/선도/.test(comp)||(share!=null&&share>=1)) v='keep'; else if(/약세/.test(comp)||(top5>=20&&rev<top5*0.03)) v='weak'; else v='grow'; }
-    else v=((mkt||0)>=200||(top5||0)>=20)?'opp':'ref';
+    if(n.nj) v='ref';   // [v147] 판정 제외(선물세트 등 시장 카테고리가 아닌 터블 묶음 상품)
+    else if(isIn){ if(/선도/.test(comp)||(share!=null&&share>=1)) v='keep'; else if(/약세/.test(comp)||(top5>=20&&revY<top5*0.03)) v='weak'; else v='grow'; }
+    else v=((mkt||0)>=200||(top5||0)>=MS_OPP_T5)?'opp':'ref';
     const note=viaU?(n.uNote!=null?n.uNote:(n.mktOff?n.note:'')):(n.note||'');
-    rows.push({id:'c'+rows.length,n:n.n,group:path[0],sub:path.slice(1).join(' › '),note:(mktP&&!note?`시장 규모는 상위 '${mktP.p}' 전체 ${msEok(mktP.v)} — 묶음에 표시`:note),basis:viaU?'':(n.basis||''),rev,items,mkt,mktP,top5,share,comp,
+    rows.push({id:'c'+rows.length,n:n.n,group:path[0],sub:path.slice(1).join(' › '),note:(mktP&&!note?`시장 규모는 상위 '${mktP.p}' 전체 ${msEok(mktP.v)} — 묶음에 표시`:note),basis:viaU?'':(n.basis||''),rev,revY,items,mkt,mktP,top5,share,shareP,comp,nj:!!n.nj,
       top1:r&&r.top1&&r.top1!=='-'?r.top1:'',top1Rev:r&&r.yearRev>0?+r.yearRev:null,v,t5:(key&&t5[key])||[]});
   };
   COUPANG_CATS.forEach(g=>walk(g,[]));
@@ -7279,14 +7286,14 @@ function msRows(){
 }
 function msHomeHtml(){
   const {rows,L,M}=msRows(), s=MARKET_DATA.summary, mktEok=(parseFloat(String(s.market))||0)*10000;
-  const by=v=>rows.filter(r=>r.v===v), nIn=rows.filter(r=>r.v!=='opp'&&r.v!=='ref').length;
+  const by=v=>rows.filter(r=>r.v===v), nIn=rows.filter(r=>r.v!=='opp'&&r.v!=='ref').length, nCat=rows.filter(r=>r.group!=='기타').length;
   const kpis=`<div class="msKpis">
     <div class="msKpi hero"><span class="msK">터블 ${L?L.cy:''} 매출</span><b>${L?L.total.toFixed(1)+'억':s.tubble2025}</b><em>${L?`${L.from}~${L.to}월 누적 · 2025년 연간 ${s.tubble2025}`:'2025 ERP'}</em></div>
     <div class="msKpi"><span class="msK">국내 세제 시장</span><b>${s.market}</b><em>2026.04 로드맵 추정 (연간)</em></div>
-    <div class="msKpi"><span class="msK">전체 점유율</span><b>${L&&mktEok?msPct(L.total/mktEok*100):s.share}</b><em>누적 매출 ÷ 연간 시장 규모</em></div>
-    <div class="msKpi"><span class="msK">진출 카테고리</span><b>${nIn}<small> / ${rows.length}</small></b><em>쿠팡 세부 카테고리 기준</em></div></div>`;
+    <div class="msKpi"><span class="msK">전체 점유율</span><b>${L&&mktEok?msPct(L.total*MS_ANN(L)/mktEok*100):s.share}</b><em>${L?`누적 매출 12개월 환산(${msEok(L.total*MS_ANN(L))}) ÷ 연간 시장 규모`:'2025 ERP ÷ 연간 시장 규모'}</em></div>
+    <div class="msKpi"><span class="msK">진출 카테고리</span><b>${nIn}<small> / ${nCat}</small></b><em>쿠팡 세부 카테고리 기준</em></div></div>`;
   const line={keep:r=>`${msEok(r.rev)} · 점유 <b>${msPct(r.share)}</b>`, grow:r=>`${msEok(r.rev)}${r.share!=null?` · 점유 ${msPct(r.share)}`:''}`,
-    weak:r=>`터블 ${msEok(r.rev)} <span class="msVs">vs</span> 쿠팡 Top5 <b>${msEok(r.top5)}</b>`, opp:r=>r.top5?`쿠팡 Top5 <b>${msEok(r.top5)}</b>${r.mkt?` · 시장 ${msEok(r.mkt)}`:''}`:`시장 <b>${msEok(r.mkt)}</b>`};
+    weak:r=>`터블 연 ${msEok(r.revY)} <span class="msVs">vs</span> 쿠팡 Top5 <b>${msEok(r.top5)}</b>`, opp:r=>r.top5?`쿠팡 Top5 <b>${msEok(r.top5)}</b>${r.mkt?` · 시장 ${msEok(r.mkt)}`:''}`:`시장 <b>${msEok(r.mkt)}</b>`};
   const sortK={keep:(a,b)=>b.rev-a.rev,grow:(a,b)=>b.rev-a.rev,weak:(a,b)=>(b.top5||0)-(a.top5||0),opp:(a,b)=>((b.top5||0)*20+(b.mkt||0))-((a.top5||0)*20+(a.mkt||0))};
   const card=v=>{ const rs=by(v).sort(sortK[v]), show=rs.slice(0,4);
     return `<div class="msDec ${MS_V[v].cls}"><div class="msDecH">${msPill(v)}<span class="msDecN">${rs.length}개</span></div>
@@ -7295,7 +7302,7 @@ function msHomeHtml(){
       ${rs.length>show.length?`<div class="msMore" onclick="msSet('${v}')">+ ${rs.length-show.length}개 더 보기 →</div>`:''}</div>`; };
   const ins=rows.filter(r=>r.rev>0).sort((a,b)=>b.rev-a.rev), mx=Math.max(...ins.map(r=>r.rev),1);
   const mix=`<div class="msCard"><div class="msCardH"><h3>터블 매출은 어디서 나오나</h3><span class="msSum">진출 ${ins.length}개 카테고리 · ${L?L.cy+'년 '+L.from+'~'+L.to+'월':''} · 막대 = 터블 매출</span></div>
-    <div class="msMix">${ins.map(r=>`<div class="msMixR" onclick="msGo('${r.id}')"><span class="msMixNm">${pEsc(r.n)}</span><span class="msMixBar"><i style="width:${Math.max(2,r.rev/mx*100).toFixed(1)}%"></i></span><span class="msMixV">${msEok(r.rev)}</span><span class="msMixS">${r.share!=null?'점유 '+msPct(r.share):'시장 규모 미조사'}</span>${msPill(r.v)}</div>`).join('')}</div></div>`;
+    <div class="msMix">${ins.map(r=>`<div class="msMixR" onclick="msGo('${r.id}')"><span class="msMixNm">${pEsc(r.n)}</span><span class="msMixBar"><i style="width:${Math.max(2,r.rev/mx*100).toFixed(1)}%"></i></span><span class="msMixV">${msEok(r.rev)}</span><span class="msMixS">${r.share!=null?'점유 '+msPct(r.share):r.shareP!=null?`점유 ${msPct(r.shareP)} <small>(${pEsc(r.mktP.p)} 전체 대비)</small>`:r.nj?'판정 제외 · 묶음 상품':'시장 규모 미조사'}</span>${msPill(r.v)}</div>`).join('')}</div></div>`;
   return `<div class="msHead"><h2>시장 전략</h2><p>국내 세제 시장에서 터블이 지킬 곳, 키울 곳, 약한 곳, 노릴 곳</p></div>${kpis}
     <div class="msDecs">${['keep','grow','weak','opp'].map(card).join('')}</div>${mix}
     <div class="msSrc">${msSrcChips(M,L)}</div>`;
@@ -7332,7 +7339,7 @@ function msCatsHtml(){
     <div class="msFilt">${pills}</div>
     <div style="overflow-x:auto"><table class="msTbl"><thead><tr><th class="l">카테고리</th><th>판정</th><th class="r">터블 매출</th><th class="r">점유율</th><th class="r">시장 규모</th><th class="r">쿠팡 Top5</th><th class="l">쿠팡 1위</th></tr></thead>
     <tbody>${body||'<tr><td colspan="7" class="msEmpty">조건에 맞는 카테고리가 없습니다</td></tr>'}</tbody></table></div>
-    <div class="msNote">판정 — <b>지킬 곳</b> 점유 1% 이상 또는 선도 · <b>약한 곳</b> 경쟁력 약세 또는 터블 매출이 쿠팡 Top5 합의 3% 미만 · <b>키울 곳</b> 그 외 진출 · <b>노릴 곳</b> 미진출이면서 시장 200억 이상 또는 쿠팡 Top5 20억 이상.
+    <div class="msNote">판정 — <b>지킬 곳</b> 점유 1% 이상 또는 선도 · <b>약한 곳</b> 경쟁력 약세 또는 터블 매출(12개월 환산)이 쿠팡 Top5 합의 3% 미만 · <b>키울 곳</b> 그 외 진출 · <b>노릴 곳</b> 미진출이면서 시장 200억 이상 또는 쿠팡 Top5 50억 이상.
       점유율 = 터블 올해 누적 매출 ÷ 연간 시장 규모.</div></div>
     <div class="msSrc">${msSrcChips(M,L)}</div>`;
 }
@@ -7407,7 +7414,7 @@ function catMapHtml(){
   };
   const tree=JSON.parse(JSON.stringify(COUPANG_CATS)); tree.forEach(g=>calc(g,0,[]));
   const nIn=leaves.filter(l=>l.in).length, nMkt=leaves.filter(l=>l.mkt||l.top5).length;
-  const opp=leaves.filter(l=>!l.in&&((l.mkt||0)>=200||(l.top5||0)>=20));
+  const opp=leaves.filter(l=>!l.in&&((l.mkt||0)>=200||(l.top5||0)>=MS_OPP_T5));
   const eok=v=>v>=10?won(Math.round(v)):(Math.round(v*10)/10);
   const fmtAmt=v=>v>0?salesEok(v):'';
   const show=l=>catMapFilter==='in'?l.in:catMapFilter==='out'?!l.in:true;
@@ -7420,7 +7427,7 @@ function catMapHtml(){
       rows.push(`<tr class="cmP d${n.depth}"><td class="l" style="padding-left:${pad}px">${n.depth?'▾ ':''}${pEsc(n.n)}</td><td class="r">${n.amt>0?`<b>${fmtAmt(n.amt)}</b>`:''}</td><td></td><td></td><td></td><td></td></tr>`);
       n.c.forEach(walk); return;
     }
-    const st=n.in?'<span class="cmB in">터블 진출</span>':((n.mkt||0)>=200||(n.top5||0)>=20)?'<span class="cmB opp">미진출 · 시장 큼</span>':'<span class="cmB out">미진출</span>';
+    const st=n.in?'<span class="cmB in">터블 진출</span>':((n.mkt||0)>=200||(n.top5||0)>=MS_OPP_T5)?'<span class="cmB opp">미진출 · 시장 큼</span>':'<span class="cmB out">미진출</span>';
     const itemsTip=n.items.length?` title="${pEsc(n.items.join(', '))}"`:'';
     rows.push(`<tr class="cmL${n.in?' in':''}"><td class="l" style="padding-left:${pad}px">${pEsc(n.n)}${n.note?`<span class="cmNote">${pEsc(n.note)}</span>`:''}</td>
       <td class="r"${itemsTip}>${n.amt>0?`<b>${fmtAmt(n.amt)}</b>`:''}${n.items.length?`<span class="cmSub">${n.items.length}품목</span>`:''}</td>
