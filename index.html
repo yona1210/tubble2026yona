@@ -647,6 +647,7 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .ovSpark{display:inline-flex;align-items:center;gap:5px}.ovSpark em{font-style:normal;font-size:10.5px;font-weight:700}.ovSpark em.up{color:#16a34a}.ovSpark em.dn{color:#64748b}
 .ovSec{font-size:15px;font-weight:800;color:#141a33;margin:6px 2px 10px}.ovSec span{font-size:11.5px;font-weight:500;color:#9aa1b2;margin-left:8px}
 .ovRowM{display:grid;grid-template-columns:1fr 1.25fr;gap:14px;margin-bottom:14px}
+.szThin{display:inline-block;font-size:10.5px;font-weight:700;color:#b45309;background:#fff7e6;border-radius:999px;padding:1px 7px;margin-left:4px}.mpGN em{display:block;font-style:normal;font-size:10.5px;color:#9aa1b2;font-weight:500;margin-top:1px}
 .ovSz3{display:grid;grid-template-columns:minmax(110px,160px) 1fr 66px 48px 70px 64px;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid #f3f4f8;font-size:12.5px}.ovSz3 b{text-align:right;color:#141a33}.ovSz3 em{font-style:normal;text-align:right;color:#7a8194;font-weight:700}.ovChips button small{opacity:.7;font-weight:500;margin-left:2px}
 .ovUnk{display:inline-block;font-size:11px;font-weight:700;color:#9aa1b2;background:#f1f3f8;border-radius:999px;padding:1px 8px}.ovFam{display:block;font-size:10px;color:#9aa1b2;font-weight:500}.ovVN{display:block;font-size:10px;color:#9aa1b2;font-weight:500;margin-top:3px;white-space:normal;max-width:170px;line-height:1.3}
 .ovAside{font-size:12px;color:#4a5470;background:#f6f7fb;border-radius:10px;padding:8px 12px;margin-top:10px}.ovAside b{color:#141a33}.ovFixed{font-size:11.5px;font-weight:700;color:#b45309;background:#fff7e6;border-radius:8px;padding:6px 10px;margin-bottom:10px}.ovSz2{display:grid;grid-template-columns:minmax(110px,180px) 1fr 70px 52px;align-items:center;gap:10px;padding:5px 2px;border-bottom:1px solid #f3f4f8;font-size:12.5px}.ovSz2 b{text-align:right;color:#141a33}.ovSz2 em{font-style:normal;text-align:right;color:#7a8194;font-weight:700}
@@ -7479,8 +7480,8 @@ const COUPANG_CATS=[
     {n:'다목적세제',m:'다목적 세정제',mk:'다목적 세정제',note:'로드맵 시장 규모만 있음(조사 파일에 없음)'},
     // [v150] 쿠팡 조사에 없는 로드맵 세부 시장 — 넣어야 지도 합계가 국내 시장 2.33조와 맞는다
     {n:'바닥세정제',mk:'바닥세정제',note:'쿠팡 조사 없음 · 로드맵 시장만'},{n:'주방후드/오븐',mk:'주방후드/오븐',note:'쿠팡 조사 없음 · 로드맵 시장만'},
-    {n:'이염방지시트',mk:'이염방지시트',note:'쿠팡 조사 없음 · 로드맵 시장만 (터블 이염방지 시트세제 매출은 세탁 › 시트세제)'},
-    {n:'배수구 클리너 (욕실)',mk:'배수구 클리너 (욕실)',note:'쿠팡 조사 없음 · 로드맵 시장만'},{n:'물때 제거제',mk:'물때 제거제',note:'쿠팡 조사 없음 · 로드맵 시장만'},
+    // [v159] 이염방지시트 → 세탁 › 시트세제로, 배수구 클리너(욕실) → 청소 › 배수구세정제로 합침(별도 칸 삭제)
+    {n:'물때 제거제',mk:'물때 제거제',note:'쿠팡 조사 없음 · 로드맵 시장만'},
     {n:'배송비 등 (품목 아님)',t:['기타'],nj:true,note:'매출 데이터의 커머스(사입_배송비) 등 품목 분류 밖 매출 — 판정 제외'}]}
 ];
 // [v145] 품목 노드 → 경쟁 매트릭스 행 이름: 새 조사(u) 행이 있으면 그것, 없으면 예전 이름(m)
@@ -7811,71 +7812,75 @@ function msCatsHtml(){
 //  타일 = 쿠팡 세부 카테고리. 색 = 판정(진출 여부 포함), 숫자 = 시장 규모(없으면 쿠팡 Top5), 터블 매출이 있으면 함께.
 // [v150] 품목별 규모 비교 — 품목 한 줄에 시장 규모(로드맵) · 쿠팡 추정 판매액 · 쿠팡 1위 · 터블 매출을 같은 '연간' 기준으로.
 //  쿠팡 = 시장 조사 '3. 상품 원자료' 조사 상품(최대 10개) 월 추정 × 12. 상위 공유 시장(세탁세제 8,500억 등)은 대분류 소계에서 한 번만 센다.
-function msSizeHtml(rows,L){
-  const D=DATA.coupangItemMarket, cimBy={}; ((D&&D.items)||[]).forEach(x=>{ cimBy[x.item]=x; });
-  const ann=MS_ANN(L);
-  const it=rows.map(r=>{ const c=r.u?cimBy[r.u]:null; return Object.assign({},r,{cpY:c?c.amt*12/1e8:null,b1:c&&c.brands[0]?c.brands[0][0]:'',b1s:c&&c.brands[0]&&c.amt>0?c.brands[0][1]/c.amt:null}); });
-  const mxM=Math.max(1,...it.map(r=>r.mkt||0)), mxC=Math.max(1,...it.map(r=>r.cpY||0)), mxT=Math.max(1,...it.map(r=>r.revY||0));
-  const bar=(v,mx,cls)=>v>0?`<div class="szB ${cls}"><i style="width:${Math.max(2,v/mx*90).toFixed(1)}px"></i><span>${msEok(v)}</span></div>`:'<span class="msDim">-</span>';
-  const mktSum=rs=>{ const sp={}; let s=0; rs.forEach(r=>{ if(r.mkt) s+=r.mkt; else if(r.mktP) sp[r.mktP.p]=r.mktP.v; }); return s+Object.values(sp).reduce((a,v)=>a+v,0); };
-  const sum=(rs,k)=>rs.reduce((a,r)=>a+(r[k]||0),0);
-  const groups=[...new Set(it.map(r=>r.group))];
-  const body=groups.map(g=>{ const rs=it.filter(r=>r.group===g);
-    const head=`<tr class="msG"><td>${pEsc(g)} <span>${rs.length}개</span></td><td class="r">${mktSum(rs)?msEok(mktSum(rs)):'-'}</td><td class="r">${sum(rs,'cpY')?msEok(sum(rs,'cpY')):'-'}</td><td></td><td class="r">${sum(rs,'revY')?msEok(sum(rs,'revY')):'-'}</td></tr>`;
-    return head+rs.map(r=>`<tr class="szR" onclick="msGo('${r.id}')">
-      <td class="l"><b>${pEsc(r.n)}</b>${r.sub?`<small>${pEsc(r.sub)}</small>`:''}</td>
-      <td>${r.mkt?bar(r.mkt,mxM,'m'):r.mktP?`<span class="szShared">${pEsc(String(r.mktP.p).replace(/\s*\(.*\)/,''))} ${msEok(r.mktP.v)}에 포함</span>`:'<span class="msDim">미조사</span>'}</td>
-      <td>${bar(r.cpY,mxC,'c')}</td>
-      <td class="l">${r.b1?`${pEsc(r.b1)} <span class="szPct">${(r.b1s*100).toFixed(0)}%</span>`:'<span class="msDim">-</span>'}</td>
-      <td>${bar(r.revY,mxT,'t')}</td></tr>`).join('');
-  }).join('');
-  // [v158] 합계 검산: 품목 추정 합 = 통계청 세제 소계 + 실내용 가향제 + 통계청 품목 없는 것 쿠팡 환산
-  const EST=msRows().EST, tM=mktSum(it), tC=sum(it,'cpY'), tT=sum(it,'revY'), chk=EST?Math.round(EST.total):0;
-  const foot=`<tr class="szTot"><td class="l">전체 합계</td><td class="r">${msEok(tM)}${EST?` <small>${Math.round(tM)===chk?'= ':'≠ '}통계청 세제 ${msEok(EST.stat)} + 가향제 ${msEok(EST.aroma)} + 쿠팡 환산 ${msEok(EST.conv)}</small>`:''}</td><td class="r">${msEok(tC)}</td><td></td><td class="r">${msEok(tT)}${L?` <small>${L.from}~${L.to}월 ${msEok(L.total)} 환산</small>`:''}</td></tr>`;
-  return `<div class="msCard"><div class="msCardH"><h3>품목별 규모 비교</h3><span class="msSum">모두 연간 기준 · 행을 누르면 카테고리별 상세</span></div>
-    <div style="overflow-x:auto"><table class="msTbl szTbl"><thead><tr><th class="l">품목</th><th class="l">시장 규모 <small>추정 · 연</small></th><th class="l">쿠팡 추정 판매액 <small>조사 상품 최대 10개 · 연</small></th><th class="l">쿠팡 1위 <small>비중</small></th><th class="l">터블 매출 <small>12개월 환산</small></th></tr></thead>
-    <tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>
-    <div class="msNote">시장 규모(추정) = 통계청 광업·제조업조사 계열 합계(세탁용·주방용·기타 세제·실내용 가향제)를 계열 안 쿠팡 조사 판매액 비율로 나눈 값. 통계청 품목이 없는 것(섬유유연제·향기지속제·청소포·제습제 등)은 쿠팡 연 판매액 × ${EST&&EST.kMed?EST.kMed.toFixed(1):'-'}배(4개 계열 '통계청 ÷ 쿠팡' 배수 중앙값). 로드맵 숫자는 쓰지 않습니다.
-      쿠팡 추정 판매액 = 시장 조사 상품의 '한 달 구매자 수 표시 × 판가' × 12 — 쿠팡 상위 상품만이라 시장 전체가 아닙니다. 터블 매출 = 매출 데이터 올해 누적을 12개월로 환산.
-      막대 길이는 열마다 따로(같은 열 안에서만 비교).</div></div>`;
+// [v159] 시장 지도 — 타일 숫자 = 쿠팡 조사 상품 연 추정액(최대 10개)로 통일, 대분류 상단 = 통계청 값, 로드맵 시장 규모·Top5 표기 제거
+function msMapStat(){
+  const ST=ovStat(DATA.coupangItemMarket);
+  return {'세탁':{v:ST.parts[0].v,t:'세탁용 합성세제'},'주방':{v:ST.parts[1].v,t:'주방용 합성세제'},'탈취':{v:ST.aroma,t:'실내용 가향제 · 방향제 포함'},
+    '청소':{v:ST.parts[2].v,t:'기타 세제 · 청소·기타 합산'},'기타':{v:null,t:'청소와 합산(기타 세제 2,094억)'},ST};
 }
+function msMapCim(){ const D=DATA.coupangItemMarket, by={}; ((D&&D.items)||[]).forEach(x=>{ by[x.item]=x; }); return by; }
 function msMapHtml(){
   const {rows,L,M}=msRows(); let k=0;
-  const tile=r=>`<div class="mpT ${r.v}" onclick="msGo('${r.id}')" title="${pEsc(r.n)} · ${MS_V[r.v].t}">
+  const cim=msMapCim(), GS=msMapStat();
+  const cpOf=r=>{ const c=r.u&&cim[r.u]; return c?c.amt*12/1e8:0; };
+  const tile=r=>{ if(!r||r.nj) return '';   // 배송비·선물세트는 시장 지도에서 제외(매출 화면에만)
+    const cp=cpOf(r);
+    return `<div class="mpT ${r.v}" onclick="msGo('${r.id}')" title="${pEsc(r.n)} · ${MS_V[r.v].t}${r.vNote?' · '+pEsc(r.vNote):''}">
       <b>${pEsc(r.n)}</b>
-      <span>${r.mkt?`시장 ${msEok(r.mkt)}`:r.top5?`쿠팡 Top5 ${msEok(r.top5)}`:'규모 미조사'}</span>
-      ${r.basis?`<span class="mpBasis">${pEsc(r.basis)}</span>`:''}
-      ${r.rev>0?`<em>터블 ${msEok(r.rev)}</em>`:''}</div>`;
-  const mxOf=c=>(M.matrix||[]).find(x=>x&&x.cat===c);
+      <span>${cp?`쿠팡 ${msEok(cp)}`:'쿠팡 조사 없음'}</span>
+      ${r.rev>0?`<em>터블 ${msEok(r.rev)}</em>`:''}</div>`; };
   const flat=n=>n.c?[].concat(...n.c.map(flat)):[rows[k++]];
-  const stat=(rs,seen)=>{ const sp={}; rs.forEach(r=>{ if(r.mktP&&!(seen&&seen.has(r.mktP.p))) sp[r.mktP.p]=r.mktP.v; }); if(seen) Object.keys(sp).forEach(p=>seen.add(p));   // seen: 앞 묶음에서 이미 센 상위 시장(유아섬유유연제 ↔ 섬유유연제)   // [v145] 상위 공유 시장 규모는 한 번만
-    const mk=rs.reduce((a,r)=>a+(r.mkt||0),0)+Object.values(sp).reduce((a,v)=>a+v,0), rev=rs.reduce((a,r)=>a+r.rev,0), nin=rs.filter(r=>r.v!=='opp'&&r.v!=='ref').length;
-    return {mk,rev,nin,n:rs.length,unk:rs.filter(r=>!r.mkt&&!r.mktP).length}; };
+  const stat=rs=>{ rs=rs.filter(r=>r&&!r.nj); return {cp:rs.reduce((a,r)=>a+cpOf(r),0),rev:rs.reduce((a,r)=>a+r.rev,0),nin:rs.filter(r=>r.v!=='opp'&&r.v!=='ref').length,n:rs.length}; };
   const groups=COUPANG_CATS.map(g=>{
     const blocks=[], base=[];
     g.c.forEach(ch=>{ if(!ch.c){ base.push(rows[k++]); return; }
-      // 한 단계 더 깊은 묶음(예: 탈취제 › 새집증후군제거)은 블록 안 소제목으로
-      const parts=[]; const own=[];
+      const parts=[], own=[];
       ch.c.forEach(x=>{ if(x.c) parts.push({t:x.n,rs:flat(x)}); else own.push(rows[k++]); });
-      const mr=null;   // [v158] 묶음 시장은 품목 추정치 합(로드맵 묶음값 mkm 미사용)
-      blocks.push({t:ch.n,rs:own,parts,vg:!!ch.vg,mk:mr&&mr.mktSize>0?+mr.mktSize:null}); });
-    if(base.length) blocks.push({t:blocks.length?'기타':g.n,rs:base,parts:[],base:true});   // [v136] 낱개 품목은 맨 뒤 '기타'
-    const all=[].concat(...blocks.map(b=>b.rs.concat(...b.parts.map(p=>p.rs)))), S0=stat(all);
-    const S=Object.assign({},S0,{mk:blocks.filter(b=>b.mk!=null).reduce((a,b)=>a+b.mk,0)+stat([].concat(...blocks.filter(b=>b.mk==null).map(b=>b.rs.concat(...b.parts.map(p=>p.rs))))).mk});
-    const seenP=new Set(); const bHtml=blocks.map(b=>{ const bs=stat(b.rs.concat(...b.parts.map(p=>p.rs)),seenP); const mk=b.mk!=null?b.mk:bs.mk;
-      return `<div class="mpB${b.base?' base':''}"><div class="mpBH"><b>${pEsc(b.t)}${b.vg?` <i class="mpVg" title="쿠팡에선 '${pEsc(g.n)}' 바로 아래 품목들 — 보기 쉽게 묶은 것">묶음</i>`:''}</b><span>${bs.n}개${bs.nin?` · 진출 ${bs.nin}`:''}${mk?` · 시장 ${msEok(mk)}`:''}${bs.rev>0?` · 터블 ${msEok(bs.rev)}`:''}</span></div>
+      blocks.push({t:ch.n,rs:own,parts,vg:!!ch.vg}); });
+    if(base.length) blocks.push({t:blocks.length?'기타':g.n,rs:base,parts:[],base:true});
+    const all=[].concat(...blocks.map(b=>b.rs.concat(...b.parts.map(p=>p.rs)))), S=stat(all);
+    if(!S.n) return '';
+    const bHtml=blocks.map(b=>{ const bs=stat(b.rs.concat(...b.parts.map(p=>p.rs))); if(!bs.n) return '';
+      return `<div class="mpB${b.base?' base':''}"><div class="mpBH"><b>${pEsc(b.t)}${b.vg?` <i class="mpVg" title="쿠팡에선 '${pEsc(g.n)}' 바로 아래 품목들 — 보기 쉽게 묶은 것">묶음</i>`:''}</b><span>${bs.n}개${bs.nin?` · 진출 ${bs.nin}`:''}${bs.cp>0?` · 쿠팡 ${msEok(bs.cp)}`:''}${bs.rev>0?` · 터블 ${msEok(bs.rev)}`:''}</span></div>
         <div class="mpTs">${b.rs.map(tile).join('')}</div>
         ${b.parts.map(p=>`<div class="mpSub">${pEsc(p.t)}</div><div class="mpTs">${p.rs.map(tile).join('')}</div>`).join('')}</div>`; }).join('');
+    const gs=GS[g.n];
+    const mk=gs&&gs.v?`<b>${won(Math.round(gs.v))}억</b><em>${pEsc(gs.t)}</em>`:gs?`<b>-</b><em>${pEsc(gs.t)}</em>`:`<b>-</b><em>통계청 개별 품목 없음</em>`;
     return `<div class="mpG"><div class="mpGH"><div><h3>${pEsc(g.n)}</h3><span>${S.n}개 품목 · 터블 진출 <b>${S.nin}</b></span></div>
-        <div class="mpGN"><div><small>시장 규모(조사분)</small><b>${S.mk?msEok(S.mk):'-'}</b></div><div><small>터블 ${L?L.cy:''} 매출</small><b>${S.rev>0?msEok(S.rev):'-'}</b></div></div></div>
+        <div class="mpGN"><div><small>시장 규모 (통계청)</small>${mk}</div><div><small>쿠팡 조사 (연)</small><b>${S.cp>0?msEok(S.cp):'-'}</b></div><div><small>터블 ${L?L.cy:''} 매출</small><b>${S.rev>0?msEok(S.rev):'-'}</b></div></div></div>
       <div class="mpBs">${bHtml}</div></div>`;
   }).join('');
   const leg=['keep','grow','weak','opp','ref'].map(v=>`<span class="mpL ${v}"><i></i>${MS_V[v].t}</span>`).join('');
   return `<div class="msHead"><h2>세제 시장 지도</h2><p>쿠팡 기준 세제 시장을 대분류 → 중분류 → 품목으로 펼쳤습니다. 타일을 누르면 카테고리별 상세(경쟁 상위 10개)로 이동합니다.</p></div>
-    <div class="mpLeg">${leg}<span class="mpLn">타일 숫자 = 시장 규모 추정(통계청 계열 배분·쿠팡 환산) · 없으면 쿠팡 Top5 · '터블' = 올해 누적 매출</span></div>
+    <div class="mpLeg">${leg}<span class="mpLn">타일 숫자 = 쿠팡 조사 상품 연 추정액(품목별 최대 10개) · 대분류 시장 규모 = 통계청 광업·제조업조사 출하액 · '터블' = 올해 누적 매출</span></div>
     ${groups}
     ${msSizeHtml(rows,L)}
     <div class="msSrc">${msSrcChips(M,L)}</div>`;
+}
+// [v159] 품목별 비교 표 — 품목 시장 규모는 출처 확인 전까지 '미확인', 대분류 소계만 통계청 값. 조사 상품 5개 미만은 '표본 부족'
+function msSizeHtml(rows,L){
+  const cim=msMapCim(), GS=msMapStat();
+  const it=rows.filter(r=>!r.nj).map(r=>{ const c=r.u?cim[r.u]:null; return Object.assign({},r,{cpY:c?c.amt*12/1e8:null,nS:c?c.n:0,b1:c&&c.brands[0]?c.brands[0][0]:'',b1s:c&&c.brands[0]&&c.amt>0?c.brands[0][1]/c.amt:null}); });
+  const mxC=Math.max(1,...it.map(r=>r.cpY||0)), mxT=Math.max(1,...it.map(r=>r.revY||0));
+  const bar=(v,mx,cls)=>v>0?`<div class="szB ${cls}"><i style="width:${Math.max(2,v/mx*90).toFixed(1)}px"></i><span>${msEok(v)}</span></div>`:'<span class="msDim">-</span>';
+  const sum=(rs,k)=>rs.reduce((a,r)=>a+(r[k]||0),0);
+  const groups=[...new Set(it.map(r=>r.group))];
+  const body=groups.map(g=>{ const rs=it.filter(r=>r.group===g), gs=GS[g];
+    const head=`<tr class="msG"><td>${pEsc(g)} <span>${rs.length}개</span></td><td class="l">${gs&&gs.v?`<b>${won(Math.round(gs.v))}억</b> <span>${pEsc(gs.t)}</span>`:`<span>${gs?pEsc(gs.t):'통계청 개별 품목 없음'}</span>`}</td><td class="r">${sum(rs,'cpY')?msEok(sum(rs,'cpY')):'-'}</td><td></td><td class="r">${sum(rs,'revY')?msEok(sum(rs,'revY')):'-'}</td></tr>`;
+    return head+rs.map(r=>`<tr class="szR" onclick="msGo('${r.id}')">
+      <td class="l"><b>${pEsc(r.n)}</b>${r.sub?`<small>${pEsc(r.sub)}</small>`:''}</td>
+      <td><span class="ovUnk">미확인</span></td>
+      <td>${bar(r.cpY,mxC,'c')}</td>
+      <td class="l">${r.b1?`${pEsc(r.b1)} <span class="szPct">${(r.b1s*100).toFixed(0)}%</span>${r.nS<5?` <span class="szThin" title="조사 상품 ${r.nS}개">표본 부족</span>`:''}`:'<span class="msDim">-</span>'}</td>
+      <td>${bar(r.revY,mxT,'t')}</td></tr>`).join('');
+  }).join('');
+  const ST=GS.ST, statSum=ST.total+ST.aroma, tC=sum(it,'cpY'), tT=sum(it,'revY');
+  const foot=`<tr class="szTot"><td class="l">전체 합계</td><td class="r">${msEok(statSum)} <small>= 통계청 세제 ${msEok(ST.total)} + 실내용 가향제 ${msEok(ST.aroma)}</small></td><td class="r">${msEok(tC)}</td><td></td><td class="r">${msEok(tT)} <small>상품 매출 12개월 환산 · 선물세트·배송비 제외</small></td></tr>`;
+  return `<div class="msCard"><div class="msCardH"><h3>품목별 규모 비교</h3><span class="msSum">모두 연간 기준 · 행을 누르면 카테고리별 상세</span></div>
+    <div style="overflow-x:auto"><table class="msTbl szTbl"><thead><tr><th class="l">품목</th><th class="l">시장 규모 <small>품목은 미확인 · 대분류는 통계청</small></th><th class="l">쿠팡 조사 상품 연 추정 <small>최대 10개</small></th><th class="l">쿠팡 1위 <small>비중</small></th><th class="l">터블 매출 <small>12개월 환산</small></th></tr></thead>
+    <tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>
+    <div class="msNote">대분류 시장 규모 = 통계청 광업·제조업조사 품목별 출하액(세탁용 합성세제·주방용 합성세제·실내용 가향제, 청소와 기타는 '기타 세제' 하나로 합산). 천연·살균·제습은 통계청 개별 품목이 없어 '-'. 품목별 시장 규모는 출처 확인 전까지 미확인.
+      쿠팡 조사 상품 연 추정 = '한 달 구매자 수 표시 × 판가' × 12, 품목별 상위 최대 10개 — 시장 전체 아님. 조사 상품이 5개 미만이면 1위 비중 옆에 '표본 부족'. 터블 매출 = 올해 누적 12개월 환산. 막대 길이는 열마다 따로.</div></div>`;
 }
 function msRefHtml(){
   const M=MKT(), L=M._live;
