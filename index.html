@@ -2605,7 +2605,7 @@ html[data-theme=dark]{color-scheme:dark}html[data-theme=dark] select,html[data-t
     <div class="marketSeg" id="marketSeg">
       <button class="mktTab on" data-mkt="home">한눈에</button>
       <button class="mktTab" data-mkt="map">시장 지도</button>
-      <button class="mktTab" data-mkt="cats">카테고리별</button>
+      <button class="mktTab" data-mkt="cats">품목별</button>
       <button class="mktTab" data-mkt="ref">근거 자료</button>
       <button class="mktTab" data-mkt="cim">쿠팡 품목별 시장</button>
     </div>
@@ -7669,7 +7669,7 @@ function ovStat(D){
   return {parts,total,year,src,aroma:num(aroma)||2710};
 }
 function ovMktHtml(E,ST,cimBy,rows){
-  // [v161] 오른쪽: 쿠팡 조사 상품 연 환산(품목별 최대 10개)과 대분류 안 비중만 — 품목 시장 규모 추정은 쓰지 않음
+  // [v161] 오른쪽: 쿠팡 조사 상품 연 환산(품목별 최대 10개)과 카테고리 안 비중만 — 품목 시장 규모 추정은 쓰지 않음
   const it=rows.filter(r=>!r.nj&&r.u&&cimBy[r.u]).map(r=>({n:r.n,group:r.group,cp:cimBy[r.u].amt*12/1e8,nS:cimBy[r.u].n}));
   const gs=[...new Set(it.map(x=>x.group))].map(g=>({g,v:it.filter(x=>x.group===g).reduce((a,x)=>a+x.cp,0),xs:it.filter(x=>x.group===g).sort((a,b)=>b.cp-a.cp)})).sort((a,b)=>b.v-a.v);
   if(!gs.length) return '';
@@ -7702,7 +7702,7 @@ function ovHtml(){
     ${kp("#2f6bff","trend",`터블 ${L?L.cy:""} 매출`,L?L.total.toFixed(1)+"억":s.tubble2025,L?`${L.from}~${L.to}월 누적 · ${msTubBasis(L).replace(/^[^에]*에 /,"")}`:"2025 ERP")}
     ${kp('#16a34a','chart','국내 세제 시장',mktTxt,`통계청 광업·제조업조사 품목별 출하액(10인 이상), ${pEsc(ST.year)}`)}
     ${kp("#7c3aed","target","전체 점유율",share!=null?msPct(share):"-",L?`세제 상품 12개월 환산 ${msEok(detRev*MS_ANN(L))} ÷ ${won(Math.round(mktTot))}억 (배송비·단상자·탈취제 제외)`:"")}
-    ${kp('#0d9488','box','진출 카테고리',`${nIn}<small> / ${nCat}</small>`,'쿠팡 세부 카테고리 기준')}
+    ${kp('#0d9488','box','진출 품목',`${nIn}<small> / ${nCat}</small>`,'쿠팡 조사 세부 품목 기준')}
     ${kp('#db2777','coin','쿠팡 상위 판매액',cpY!=null?msEok(cpY):'-',D?`쿠팡 조사 상품 연 환산 추정(품목별 상위 최대 10개, ${pEsc(CIM_NOTE.slice(0,10))})`:'시장 조사 업로드 필요')}
   </div>`;
   const tot=Object.values(cnt).reduce((a,v)=>a+v,0)||1;
@@ -7710,8 +7710,8 @@ function ovHtml(){
   const ins=rows.filter(r=>r.rev>0&&!r.nj).sort((a,b)=>b.rev-a.rev), tubTot=rows.reduce((a,r)=>a+r.rev,0)||1;
   const top=ins.slice(0,6).map((r,i)=>`<div class="ovTop" onclick="msGo('${r.id}')"><span class="ovTopN">${i+1}</span><span class="ovTopNm">${pEsc(r.n)}<small>${pEsc(r.group)}</small></span><b>${msEok(r.rev)}</b><em>${(r.rev/tubTot*100).toFixed(1)}%</em></div>`).join('');
   const row2=`<div class="ovRow2">
-    <div class="msCard ovC"><div class="ovH">판정 요약 <span>쿠팡 조사 ${nCat}개 기준${nRoad?` · 로드맵 전용 ${nRoad}개는 참고(별도, 출처 확인 전)`:""}${rows.some(r=>r.early)?" · 출시 초기는 참고에 포함":""}</span></div><div class="ovDonutWrap"><div class="ovDonut"><canvas id="ovVerdict"></canvas><div class="ovDC"><b>${tot}</b><span>카테고리</span></div></div><div class="ovLgs">${legend}</div></div></div>
-    <div class="msCard ovC"><div class="ovH">대분류별 쿠팡 상위 상품 판매액 <span>연 추정 · 품목별 조사 상품 최대 10개</span></div><div class="ovBarBox"><canvas id="ovGroupBar"></canvas></div></div>
+    <div class="msCard ovC"><div class="ovH">판정 요약 <span>쿠팡 조사 세부 품목 ${nCat}개 기준${nRoad?` · 로드맵 전용 ${nRoad}개는 참고(별도, 출처 확인 전)`:""}${rows.some(r=>r.early)?" · 출시 초기는 참고에 포함":""}</span></div><div class="ovDonutWrap"><div class="ovDonut"><canvas id="ovVerdict"></canvas><div class="ovDC"><b>${tot}</b><span>세부 품목</span></div></div><div class="ovLgs">${legend}</div></div></div>
+    <div class="msCard ovC"><div class="ovH">카테고리별 쿠팡 상위 상품 판매액 <span>연 추정 · 품목별 조사 상품 최대 10개</span></div><div class="ovBarBox"><canvas id="ovGroupBar"></canvas></div></div>
     <div class="msCard ovC"><div class="ovH">터블 매출 TOP ${Math.min(6,ins.length)} <span>${L?`${L.cy}년 ${L.from}~${L.to}월`:''}</span></div><div class="ovTops">${top||'<div class="msEmpty">매출 데이터 없음</div>'}</div></div>
   </div>`;
 // [v161] 시장 규모 열 = 품목 미확인 + 통계청 계열 값(작게), 점유율 = 터블 12개월 환산 ÷ 계열(계열 품목만) — 카테고리별 표와 같은 기준
@@ -7723,10 +7723,10 @@ function ovHtml(){
     <td class="r">${r.top5?msEok(r.top5):'-'}</td><td>${ovSpark(ovMonthly(r,L))}</td></tr>`; }).join('');
   const prodTot=(tubTot-shipRev)||1, glg=gRev.map((x,i)=>`<div class="ovLg"><i style="background:${OV_GROUP_C[i%OV_GROUP_C.length]}"></i><span>${pEsc(x.g)}</span><b>${msEok(x.v)}</b><em>${(x.v/prodTot*100).toFixed(0)}%</em></div>`).join("");
   const row3=`<div class="ovRow3">
-    <div class="msCard ovC"><div class="ovH">카테고리별 성과 <span>터블 진출 ${ins.length}개 · 매출은 12개월 환산 · 추세 = 올해 월별 매출(최근 3개월 vs 이전 3개월)</span></div>
-      <div style="overflow-x:auto"><table class="ovTbl"><thead><tr><th class="l">품목</th><th class="l">대분류</th><th>판정</th><th class="r">터블 매출(연)</th><th class="r">시장 규모</th><th class="r">점유율</th><th class="r">쿠팡 조사(연)</th><th class="r">쿠팡 Top5</th><th>추세</th></tr></thead><tbody>${tr}</tbody></table></div>
+    <div class="msCard ovC"><div class="ovH">품목별 성과 <span>터블 진출 ${ins.length}개 · 매출은 12개월 환산 · 추세 = 올해 월별 매출(최근 3개월 vs 이전 3개월)</span></div>
+      <div style="overflow-x:auto"><table class="ovTbl"><thead><tr><th class="l">품목</th><th class="l">카테고리</th><th>판정</th><th class="r">터블 매출(연)</th><th class="r">시장 규모</th><th class="r">점유율</th><th class="r">쿠팡 조사(연)</th><th class="r">쿠팡 Top5</th><th>추세</th></tr></thead><tbody>${tr}</tbody></table></div>
       <div class="msNote">시장 규모: 품목별 값은 출처 확인 전까지 미확인, 작은 글씨 = 통계청 광업·제조업조사(2024년) 계열 값. 점유율 = 터블 12개월 환산 매출 ÷ 계열(계열에 속한 품목만). 쿠팡 조사(연) = 상위 상품(최대 10개) × 12, 시장 전체 아님. 판정 = 화면 숫자 기준(지킬: 터블 ≥ 쿠팡 조사의 50% · 약한: 터블 < 쿠팡 Top5의 3% · 노릴: 미진출 + 쿠팡 조사 50억↑).</div></div>
-    <div class="msCard ovC"><div class="ovH">터블 매출 구성 <span>대분류별 · 상품 매출만${shipRev>0?` (배송비 ${msEok(shipRev)} 제외)`:''}</span></div><div class="ovDonut sm"><canvas id="ovMix"></canvas><div class="ovDC"><b>${msEok(tubTot-shipRev)}</b><span>${L?L.from+'~'+L.to+'월':''}</span></div></div><div class="ovLgs">${glg}</div></div>
+    <div class="msCard ovC"><div class="ovH">터블 매출 구성 <span>카테고리별 · 상품 매출만${shipRev>0?` (배송비 ${msEok(shipRev)} 제외)`:''}</span></div><div class="ovDonut sm"><canvas id="ovMix"></canvas><div class="ovDC"><b>${msEok(tubTot-shipRev)}</b><span>${L?L.from+'~'+L.to+'월':''}</span></div></div><div class="ovLgs">${glg}</div></div>
   </div>`;
   return {kpis,row2,row3,mkt:ovMktHtml(E,ST,cimBy,rows)};
 }
@@ -7756,7 +7756,7 @@ function msHomeHtml(){
     <div class="msKpi hero"><span class="msK">터블 ${L?L.cy:''} 매출</span><b>${L?L.total.toFixed(1)+'억':s.tubble2025}</b><em>${L?`${L.from}~${L.to}월 누적 · 2025년 연간 ${s.tubble2025}`:'2025 ERP'}</em></div>
     <div class="msKpi"><span class="msK">국내 세제 시장</span><b>${s.market}</b><em>2026.04 로드맵 추정 (연간)</em></div>
     <div class="msKpi"><span class="msK">전체 점유율</span><b>${L&&mktEok?msPct(L.total*MS_ANN(L)/mktEok*100):s.share}</b><em>${L?`누적 매출 12개월 환산(${msEok(L.total*MS_ANN(L))}) ÷ 연간 시장 규모`:'2025 ERP ÷ 연간 시장 규모'}</em></div>
-    <div class="msKpi"><span class="msK">진출 카테고리</span><b>${nIn}<small> / ${nCat}</small></b><em>쿠팡 세부 카테고리 기준</em></div></div>`;
+    <div class="msKpi"><span class="msK">진출 품목</span><b>${nIn}<small> / ${nCat}</small></b><em>쿠팡 조사 세부 품목 기준</em></div></div>`;
   const line={keep:r=>`${msEok(r.rev)} · 점유 <b>${msPct(r.share)}</b>`, grow:r=>`${msEok(r.rev)}${r.share!=null?` · 점유 ${msPct(r.share)}`:''}`,
     weak:r=>`터블 연 ${msEok(r.revY)} <span class="msVs">vs</span> 쿠팡 Top5 <b>${msEok(r.top5)}</b>`, opp:r=>r.top5?`쿠팡 Top5 <b>${msEok(r.top5)}</b>${r.mkt?` · 시장 ${msEok(r.mkt)}`:''}`:`시장 <b>${msEok(r.mkt)}</b>`};
   const sortK={keep:(a,b)=>b.rev-a.rev,grow:(a,b)=>b.rev-a.rev,weak:(a,b)=>(b.top5||0)-(a.top5||0),opp:(a,b)=>((b.top5||0)*20+(b.mkt||0))-((a.top5||0)*20+(a.mkt||0))};
@@ -7766,12 +7766,12 @@ function msHomeHtml(){
       ${show.length?show.map(r=>`<div class="msDecR" onclick="msGo('${r.id}')"><span class="msDecNm">${pEsc(r.n)}</span><span class="msDecV">${line[v](r)}</span></div>`).join(''):'<div class="msEmpty">해당 없음</div>'}
       ${rs.length>show.length?`<div class="msMore" onclick="msSet('${v}')">+ ${rs.length-show.length}개 더 보기 →</div>`:''}</div>`; };
   const ins=rows.filter(r=>r.rev>0).sort((a,b)=>b.rev-a.rev), mx=Math.max(...ins.map(r=>r.rev),1);
-  const mix=`<div class="msCard"><div class="msCardH"><h3>터블 매출은 어디서 나오나</h3><span class="msSum">진출 ${ins.length}개 카테고리 · ${L?L.cy+'년 '+L.from+'~'+L.to+'월':''} · 막대 = 터블 매출</span></div>
+  const mix=`<div class="msCard"><div class="msCardH"><h3>터블 매출은 어디서 나오나</h3><span class="msSum">진출 ${ins.length}개 품목 · ${L?L.cy+'년 '+L.from+'~'+L.to+'월':''} · 막대 = 터블 매출</span></div>
     <div class="msMix">${ins.map(r=>`<div class="msMixR" onclick="msGo('${r.id}')"><span class="msMixNm">${pEsc(r.n)}</span><span class="msMixBar"><i style="width:${Math.max(2,r.rev/mx*100).toFixed(1)}%"></i></span><span class="msMixV">${msEok(r.rev)}</span><span class="msMixS">${r.share!=null?'점유 '+msPct(r.share):r.shareP!=null?`점유 ${msPct(r.shareP)} <small>(${pEsc(r.mktP.p)} 전체 대비)</small>`:r.nj?'판정 제외 · 묶음 상품':'시장 규모 미조사'}</span>${msPill(r.v)}</div>`).join('')}</div></div>`;
   // [v153] 레퍼런스 3 레이아웃: 진한 KPI → 도넛·막대·순위 → 성과표·구성 도넛 → 판정별 목록(기존 카드 유지). 예전 KPI·'어디서 나오나'는 성과표로 대체
   const o=ovHtml(); void kpis; void mix;
   return `<div class="msHead"><h2>시장 전략</h2><p>국내 세제 시장에서 터블이 지킬 곳, 키울 곳, 약한 곳, 노릴 곳</p></div>${o.kpis}${o.mkt}${o.row2}${o.row3}
-    <div class="ovSec">판정별 카테고리 <span>지킬 곳 · 키울 곳 · 약한 곳 · 노릴 곳</span></div>
+    <div class="ovSec">판정별 품목 <span>지킬 곳 · 키울 곳 · 약한 곳 · 노릴 곳</span></div>
     <div class="msDecs">${['keep','grow','weak','opp'].map(card).join('')}</div>
     <div class="msSrc">${msSrcChips(M,L)}</div>`;
 }
@@ -7821,13 +7821,13 @@ function msCatsHtml(){
   const body=groups.map(g=>{ const rs=vis.filter(r=>r.group===g); if(!rs.length) return '';
     const gRev=rs.reduce((a,r)=>a+r.revY,0);
     return `<tr class="msG"><td colspan="7">${pEsc(g)} <span>${rs.length}개${gRev>0?` · 터블 연 ${msEok(gRev)}`:''}</span></td></tr>`+rs.map(row).join(''); }).join('');
-  const ref=roadOnly.length?`<div class="msCard"><div class="msCardH"><h3>참고 · 로드맵 전용</h3><span class="msSum">쿠팡 조사에 없는 로드맵 품목 ${roadOnly.length}개 — 출처 확인 전까지 판정·카테고리 수에서 제외</span></div>
+  const ref=roadOnly.length?`<div class="msCard"><div class="msCardH"><h3>참고 · 로드맵 전용</h3><span class="msSum">쿠팡 조사에 없는 로드맵 품목 ${roadOnly.length}개 — 출처 확인 전까지 판정·품목 수에서 제외</span></div>
     <div class="ovChips" style="margin:0">${roadOnly.map(r=>`<button>${pEsc(r.n)}</button>`).join('')}</div></div>`:'';
-  return `<div class="msCard"><div class="msCardH"><h3>카테고리별 위치</h3><span class="msSum">쿠팡 조사 카테고리 ${main.length}개 · 행을 누르면 터블 품목과 쿠팡 경쟁 상위 10개</span>
-      <input id="msQ" class="msSearch" placeholder="카테고리·브랜드 검색" value="${pEsc(msQ)}" oninput="msSearch(this.value)"></div>
+  return `<div class="msCard"><div class="msCardH"><h3>품목별 위치</h3><span class="msSum">쿠팡 조사 세부 품목 ${main.length}개 · 행을 누르면 터블 품목과 쿠팡 경쟁 상위 10개</span>
+      <input id="msQ" class="msSearch" placeholder="품목·브랜드 검색" value="${pEsc(msQ)}" oninput="msSearch(this.value)"></div>
     <div class="msFilt">${pills}</div>
-    <div style="overflow-x:auto"><table class="msTbl"><thead><tr><th class="l">카테고리</th><th>판정</th><th class="r">터블 매출 <small>12개월 환산</small></th><th class="r">점유율</th><th class="r">시장 규모</th><th class="r">쿠팡 Top5</th><th class="l">쿠팡 1위 브랜드 <small>비중</small></th></tr></thead>
-    <tbody>${body||'<tr><td colspan="7" class="msEmpty">조건에 맞는 카테고리가 없습니다</td></tr>'}</tbody></table></div>
+    <div style="overflow-x:auto"><table class="msTbl"><thead><tr><th class="l">품목</th><th>판정</th><th class="r">터블 매출 <small>12개월 환산</small></th><th class="r">점유율</th><th class="r">시장 규모</th><th class="r">쿠팡 Top5</th><th class="l">쿠팡 1위 브랜드 <small>비중</small></th></tr></thead>
+    <tbody>${body||'<tr><td colspan="7" class="msEmpty">조건에 맞는 품목이 없습니다</td></tr>'}</tbody></table></div>
     <div class="msNote">판정 — <b>지킬 곳</b> 점유 1% 이상 또는 선도 · <b>약한 곳</b> 경쟁력 약세 또는 터블 매출(12개월 환산)이 쿠팡 Top5 합의 3% 미만(단, B2B 비중 50% 이상 품목은 제외) · <b>키울 곳</b> 그 외 진출 · <b>노릴 곳</b> 미진출이면서 시장 200억 이상 또는 쿠팡 Top5 50억 이상(단, 쿠팡 1위 브랜드 비중 50% 이상이면 참고) · <b>출시 초기</b> 첫 매출 6개월 미만은 판정 제외.
       시장 규모: 품목별 값은 출처 확인 전까지 미확인, 아래 작은 글씨 = 통계청 광업·제조업조사 계열 값. 점유율 = 터블 12개월 환산 매출 ÷ 통계청 계열(계열에 속한 품목만). 쿠팡 1위 브랜드 = 품목 안 브랜드별 추정액 합계 1위와 비중, 조사 상품 5개 미만은 표본 부족.</div></div>
     ${ref}
@@ -7876,13 +7876,13 @@ function msMapHtml(){
       <div class="mpBs">${bHtml}</div></div>`;
   }).join('');
   const leg=['keep','grow','weak','opp','ref'].map(v=>`<span class="mpL ${v}"><i></i>${MS_V[v].t}</span>`).join('');
-  return `<div class="msHead"><h2>세제 시장 지도</h2><p>쿠팡 기준 세제 시장을 대분류 → 중분류 → 품목으로 펼쳤습니다. 타일을 누르면 카테고리별 상세(경쟁 상위 10개)로 이동합니다.</p></div>
-    <div class="mpLeg">${leg}<span class="mpLn">타일 숫자 = 쿠팡 조사 상품 연 추정액(품목별 최대 10개) · 대분류 시장 규모 = 통계청 광업·제조업조사 출하액 · '터블' = 올해 누적 매출</span></div>
+  return `<div class="msHead"><h2>세제 시장 지도</h2><p>쿠팡 기준 세제 시장을 카테고리 → 중분류 → 세부 품목으로 펼쳤습니다. 타일을 누르면 품목별 상세(경쟁 상위 10개)로 이동합니다.</p></div>
+    <div class="mpLeg">${leg}<span class="mpLn">타일 숫자 = 쿠팡 조사 상품 연 추정액(품목별 최대 10개) · 카테고리 시장 규모 = 통계청 광업·제조업조사 출하액 · '터블' = 올해 누적 매출</span></div>
     ${groups}
     ${msSizeHtml(rows,L)}
     <div class="msSrc">${msSrcChips(M,L)}</div>`;
 }
-// [v159] 품목별 비교 표 — 품목 시장 규모는 출처 확인 전까지 '미확인', 대분류 소계만 통계청 값. 조사 상품 5개 미만은 '표본 부족'
+// [v159] 품목별 비교 표 — 품목 시장 규모는 출처 확인 전까지 '미확인', 카테고리 소계만 통계청 값. 조사 상품 5개 미만은 '표본 부족'
 function msSizeHtml(rows,L){
   const cim=msMapCim(), GS=msMapStat();
   const it=rows.filter(r=>!r.nj).map(r=>{ const c=r.u?cim[r.u]:null; return Object.assign({},r,{cpY:c?c.amt*12/1e8:null,nS:c?c.n:0,b1:c&&c.brands[0]?c.brands[0][0]:'',b1s:c&&c.brands[0]&&c.amt>0?c.brands[0][1]/c.amt:null}); });
@@ -7901,10 +7901,10 @@ function msSizeHtml(rows,L){
   }).join('');
   const ST=GS.ST, statSum=ST.total+ST.aroma, tC=sum(it,'cpY'), tT=sum(it,'revY');
   const foot=`<tr class="szTot"><td class="l">전체 합계</td><td class="r">${msEok(statSum)} <small>= 통계청 세제 ${msEok(ST.total)} + 실내용 가향제 ${msEok(ST.aroma)}</small></td><td class="r">${msEok(tC)}</td><td></td><td class="r">${msEok(tT)} <small>상품 매출 12개월 환산 · 선물세트·배송비 제외</small></td></tr>`;
-  return `<div class="msCard"><div class="msCardH"><h3>품목별 규모 비교</h3><span class="msSum">모두 연간 기준 · 행을 누르면 카테고리별 상세</span></div>
-    <div style="overflow-x:auto"><table class="msTbl szTbl"><thead><tr><th class="l">품목</th><th class="l">시장 규모 <small>품목은 미확인 · 대분류는 통계청</small></th><th class="l">쿠팡 조사 상품 연 추정 <small>최대 10개</small></th><th class="l">쿠팡 1위 <small>비중</small></th><th class="l">터블 매출 <small>12개월 환산</small></th></tr></thead>
+  return `<div class="msCard"><div class="msCardH"><h3>품목별 규모 비교</h3><span class="msSum">모두 연간 기준 · 행을 누르면 품목별 상세</span></div>
+    <div style="overflow-x:auto"><table class="msTbl szTbl"><thead><tr><th class="l">품목</th><th class="l">시장 규모 <small>품목은 미확인 · 카테고리는 통계청</small></th><th class="l">쿠팡 조사 상품 연 추정 <small>최대 10개</small></th><th class="l">쿠팡 1위 <small>비중</small></th><th class="l">터블 매출 <small>12개월 환산</small></th></tr></thead>
     <tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>
-    <div class="msNote">대분류 시장 규모 = 통계청 광업·제조업조사 품목별 출하액(세탁용 합성세제·주방용 합성세제·실내용 가향제, 청소와 기타는 '기타 세제' 하나로 합산). 천연·살균·제습은 통계청 개별 품목이 없어 '-'. 품목별 시장 규모는 출처 확인 전까지 미확인.
+    <div class="msNote">카테고리 시장 규모 = 통계청 광업·제조업조사 품목별 출하액(세탁용 합성세제·주방용 합성세제·실내용 가향제, 청소와 기타는 '기타 세제' 하나로 합산). 천연·살균·제습은 통계청 개별 품목이 없어 '-'. 품목별 시장 규모는 출처 확인 전까지 미확인.
       쿠팡 조사 상품 연 추정 = '한 달 구매자 수 표시 × 판가' × 12, 품목별 상위 최대 10개 — 시장 전체 아님. 조사 상품이 5개 미만이면 1위 비중 옆에 '표본 부족'. 터블 매출 = 올해 누적 12개월 환산. 막대 길이는 열마다 따로.</div></div>`;
 }
 function msRefHtml(){
@@ -7915,7 +7915,7 @@ function msRefHtml(){
     <div class="msSrc" style="margin-bottom:12px">${msSrcChips(M,L)}</div>
     ${sec('세부 시장 규모','로드맵 23개 카테고리 · 범위·신뢰도·출처',mktStructureHtml(),false)}
     ${sec('경쟁 매트릭스 원본','쿠팡 조사 카테고리별 경쟁력·Top5·기회 점수',mktMatrixHtml(),false)}
-    ${sec('쿠팡 경쟁사 상위 제품 전체','카테고리별 최대 10위',mktTop5Html(),false)}
+    ${sec('쿠팡 경쟁사 상위 제품 전체','품목별 최대 10위',mktTop5Html(),false)}
     ${sec('전략 로드맵','방향·라인업 갭·추진 일정',mktStrategyHtml(),false)}
     ${sec('2025 터블 실매출 (ERP)','로드맵 작성 당시 카테고리별 매출',mktSalesHtml(),false)}
     ${sec('참고·주석','출처와 산정 방식',mktNotesHtml(),false)}`;
@@ -7966,9 +7966,9 @@ function catMapHtml(){
   const outside=(M.matrix||[]).filter(r=>r&&r.cat&&!used.has(r.cat)&&r.cat!=='이염방지시트').map(r=>`${pEsc(r.cat)}${r.mktSize>0?` ${won(Math.round(r.mktSize))}억`:''}`);
   const fb=(k,t)=>`<button type="button" class="${catMapFilter===k?'on':''}" onclick="catMapSet('${k}')">${t}</button>`;
   return `<div class="mCard"><h4>쿠팡 기준 세제 카테고리 지도 <span class="hsub">세탁세제 · 청소/주방세제 · 탈취제 전체 분류 × 터블 진출 · 시장 규모 · 경쟁사 조사</span></h4>
-    <div class="cmSum"><span><b>${leaves.length}</b>개 세부 카테고리</span><span class="in">터블 진출 <b>${nIn}</b></span><span>시장·경쟁사 데이터 있음 <b>${nMkt}</b></span><span class="opp">미진출 중 시장 큼 <b>${opp.length}</b>${opp.length?` — ${opp.map(l=>pEsc(l.n)).join(', ')}`:''}</span></div>
+    <div class="cmSum"><span><b>${leaves.length}</b>개 세부 품목</span><span class="in">터블 진출 <b>${nIn}</b></span><span>시장·경쟁사 데이터 있음 <b>${nMkt}</b></span><span class="opp">미진출 중 시장 큼 <b>${opp.length}</b>${opp.length?` — ${opp.map(l=>pEsc(l.n)).join(', ')}`:''}</span></div>
     <div class="cmFilter">${fb('all','전체')}${fb('in','터블 진출')}${fb('out','미진출')}</div>
-    <div style="overflow-x:auto"><table class="mTbl cmTbl"><thead><tr><th class="l">쿠팡 카테고리</th><th class="r">터블 ${cy||''} 매출</th><th class="r">시장 규모(억)</th><th class="r">쿠팡 Top5(억)</th><th class="c">경쟁력</th><th class="c">상태</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>
+    <div style="overflow-x:auto"><table class="mTbl cmTbl"><thead><tr><th class="l">쿠팡 세부 품목</th><th class="r">터블 ${cy||''} 매출</th><th class="r">시장 규모(억)</th><th class="r">쿠팡 Top5(억)</th><th class="c">경쟁력</th><th class="c">상태</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>
     <div class="csNote">시장 규모 = 로드맵 추정(국내 전체) · 쿠팡 Top5 = 경쟁 매트릭스(상위 5개 제품 연매출 추정 합) · 터블 매출 = 매출 데이터 ${cy}년 누적(카테고리 연결). 미진출 · 시장 큼 = 시장 200억 이상 또는 쿠팡 Top5 20억 이상.
       ${outside.length?`<br>쿠팡 분류에 따로 없는 로드맵 항목: ${outside.join(' · ')}`:''}</div></div>`;
 }
@@ -7976,7 +7976,7 @@ function mktStructureHtml(){
   const big=MARKET_DATA.bigCat.map(b=>`<tr><td class="l">${b.name}</td><td class="r">${b.size}</td><td class="r"><b>${b.pct}</b></td></tr>`).join('');
   const sub=MARKET_DATA.subCat.map(c=>`<tr><td>${c.big}</td><td class="l">${c.name}</td><td class="r">${won(c.min)}</td><td class="r">${won(c.max)}</td><td class="r"><b>${won(c.mid)}</b></td><td class="r">${c.pct!=null?(c.pct*100).toFixed(1)+'%':'-'}</td><td class="c">${confBadge(c.conf)}</td><td class="l muted">${c.src}</td></tr>`).join('');
   return `<div class="mCard"><h4>4대 대분류 시장 규모</h4>
-    <table class="mTbl"><thead><tr><th class="l">대분류</th><th class="r">시장 규모(억)</th><th class="r">비중</th></tr></thead><tbody>${big}</tbody></table></div>
+    <table class="mTbl"><thead><tr><th class="l">카테고리</th><th class="r">시장 규모(억)</th><th class="r">비중</th></tr></thead><tbody>${big}</tbody></table></div>
     <div class="mCard"><h4>23개 세부 카테고리 시장 규모 <span class="hsub">범위(min~max) · 신뢰도 A공식 / B조사 / C추정 / D단일</span></h4>
     <table class="mTbl"><thead><tr><th>대분류</th><th class="l">세부 카테고리</th><th class="r">최소</th><th class="r">최대</th><th class="r">중간값</th><th class="r">비중</th><th class="c">신뢰</th><th class="l">대표 브랜드·출처</th></tr></thead><tbody>${sub}</tbody></table></div>`;
 }
@@ -8055,7 +8055,7 @@ function mktTop5Html(){
       <table class="mTbl"><thead><tr><th class="c">순위</th><th class="l">브랜드</th><th class="l">제품명</th><th class="r">월판매</th><th class="r">판가</th><th class="r">연매출</th><th class="r">점유율</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }).join('');
   return `<div class="mCard"><h4>Top5 경쟁사 (쿠팡 실측 기준) ${upTag}</h4>
-    <div class="basisNote">카테고리별 상위 경쟁 브랜드. [Top5 조사 업로드]로 최신 데이터 반영(전체 교체).</div></div>`+cards;
+    <div class="basisNote"> 품목별 상위 경쟁 브랜드. [Top5 조사 업로드]로 최신 데이터 반영(전체 교체).</div></div>`+cards;
 }
 function mktStrategyHtml(){
   const planByCat=mktPlanByCat();
@@ -8075,7 +8075,7 @@ function mktStrategyHtml(){
     <div class="basisNote">'기획중' = 상품기획 탭에서 해당 카테고리로 연결(시장 참고)된 아이디어 수. 시장 갭 ↔ 진행 중인 기획을 한눈에.</div></div>
     <div class="mCard"><h4>라인업 GAP 분석 (대분류별 확장 여지) <span class="hsub">막대 = 터블 vs 경쟁사 평균 SKU</span></h4>
     <div style="position:relative;height:240px;width:100%;margin-bottom:12px"><canvas id="mktGapBar"></canvas></div>
-    <table class="mTbl"><thead><tr><th class="l">대분류</th><th class="r">시장 규모</th><th class="c">터블 SKU</th><th class="c">경쟁사 평균</th><th class="c">갭</th><th class="l">시사점</th></tr></thead><tbody>${gap}</tbody></table></div>
+    <table class="mTbl"><thead><tr><th class="l">카테고리</th><th class="r">시장 규모</th><th class="c">터블 SKU</th><th class="c">경쟁사 평균</th><th class="c">갭</th><th class="l">시사점</th></tr></thead><tbody>${gap}</tbody></table></div>
     <div class="mCard"><h4>2026-2028 중장기 로드맵</h4><div class="roadmap">${road}</div></div>`;
 }
 function mktNotesHtml(){
@@ -8175,7 +8175,7 @@ function cimHtml(){
   }).join('');
   const tbl=`<div class="msCard"><div class="msCardH"><h3>품목별 추정 월 판매액</h3><span class="msSum">${vis.length}개 품목 · 상품 ${vN}개 · 합계 ${cimEok(vAmt)}억원 · 행을 누르면 브랜드·상품</span></div>
     <div class="msFilt">${pills}</div>
-    <div style="overflow-x:auto"><table class="msTbl"><thead><tr><th class="l">대분류</th><th class="l">품목</th><th class="r">조사 상품 수</th><th class="r">추정 월 판매액(억원)</th><th class="r">평균 판가</th><th class="l">1위 브랜드</th><th class="r">1위 비중</th><th class="l">2위</th><th class="l">3위</th></tr></thead><tbody>${body}</tbody></table></div>
+    <div style="overflow-x:auto"><table class="msTbl"><thead><tr><th class="l">카테고리</th><th class="l">품목</th><th class="r">조사 상품 수</th><th class="r">추정 월 판매액(억원)</th><th class="r">평균 판가</th><th class="l">1위 브랜드</th><th class="r">1위 비중</th><th class="l">2위</th><th class="l">3위</th></tr></thead><tbody>${body}</tbody></table></div>
     <div class="msNote">평균 판가 = 조사 상품 판가 단순 평균 · 브랜드 순위·비중 = 품목 안 추정 월 판매액 기준 · <span class="cimTubB">터블</span> 표시 = 조사 상품에 터블 브랜드 포함</div></div>`;
   const R=D.ref;
   const refCard=R&&R.rows&&R.rows.length?`<div class="msCard"><div class="msCardH"><h3>시장 규모 참고</h3><span class="msSum">${pEsc(R.title||'')}</span></div>
