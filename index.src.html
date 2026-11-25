@@ -2469,13 +2469,11 @@ body{padding-bottom:48px}
       <button class="mktTab" data-mkt="cim">쿠팡 품목별 시장</button>
     </div>
     <div style="margin-left:auto;display:flex;gap:6px">
-      <button class="tbtn accent" id="btnMatrixUpload">📊 경쟁사 조사 업로드</button>
-      <button class="tbtn" id="btnCimUpload" title="터블_품목별_시장규모_경쟁사 엑셀(3. 상품 원자료)">품목별 시장 업로드</button>
+      <button class="tbtn accent" id="btnMatrixUpload" title="터블_품목별_시장규모_경쟁사 엑셀(3. 상품 원자료) — 예전 쿠팡_카테고리_조사 양식도 가능">📊 쿠팡 조사 업로드</button>
       <button class="tbtn" id="btnMarketTemplate">양식 다운로드</button>
     </div>
     <input type="file" id="matrixFileInput" accept=".xlsx,.xls,.csv" style="display:none">
     <input type="file" id="top5FileInput" accept=".xlsx,.xls,.csv" style="display:none">
-    <input type="file" id="cimFileInput" accept=".xlsx,.xls" style="display:none">
   </div>
   <div id="marketBody"><div class="mCard"><h4>카테고리별 경쟁 매트릭스 <span class="hsub">전체 시장(로드맵) 대비 쿠팡 Top5·터블 점유율</span> <span class="mBadge m-keep">업로드 반영 2026-06-26</span></h4>
     <div class="mLegend"><span class="mBadge m-lead">🟢 선도</span> <span class="mBadge m-keep">🟡 유지</span> <span class="mBadge m-grow">🟠 성장</span> <span class="mBadge m-weak">🔴 약세</span> <span class="mBadge m-new">🟣 신규</span></div>
@@ -7582,7 +7580,7 @@ const cimNum=v=>{ if(typeof v==='number') return isFinite(v)?v:null; const n=par
 const cimEok=v=>(v/1e8).toFixed(2);
 const cimPct=v=>v==null?'-':(v*100).toFixed(1)+'%';
 const cimIsTub=b=>/터블|tubble/i.test(String(b||''));
-function cimParse(file,wb){
+function cimParse(file,wb,quiet){ const toast=m=>{ if(!quiet) window.toast(m); };   // [v149] 쿠팡 조사 업로드 하나로 통합 — 조용히 시도(quiet)
   const raw=wb.SheetNames.find(n=>n.trim()==='3. 상품 원자료')||wb.SheetNames.find(n=>/상품\s*원자료/.test(n));
   if(!raw){ toast("'3. 상품 원자료' 시트를 찾을 수 없습니다"); return null; }
   const arr=XLSX.utils.sheet_to_json(wb.Sheets[raw],{header:1,defval:''});
@@ -7624,7 +7622,7 @@ function cimHtml(){
   const D=DATA.coupangItemMarket;
   const head=`<div class="msHead"><h2>쿠팡 품목별 시장</h2><p>품목별 쿠팡 상위 상품 추정 매출과 경쟁 브랜드</p></div>
     <div class="cimFixed">${CIM_NOTE}</div>`;
-  if(!D||!D.items||!D.items.length) return head+`<div class="msCard"><div class="msEmpty" style="padding:30px">아직 업로드된 품목별 시장 자료가 없습니다.<br>상단 [품목별 시장 업로드]로 '터블_품목별_시장규모_경쟁사' 엑셀을 올려 주세요.</div></div>`;
+  if(!D||!D.items||!D.items.length) return head+`<div class="msCard"><div class="msEmpty" style="padding:30px">아직 업로드된 품목별 시장 자료가 없습니다.<br>상단 [쿠팡 조사 업로드]로 '터블_품목별_시장규모_경쟁사' 엑셀을 올려 주세요.</div></div>`;
   const cats=D.cats||[...new Set(D.items.map(x=>x.cat))];
   if(cimCat!=='all'&&!cats.includes(cimCat)) cimCat='all';
   const vis=D.items.filter(x=>cimCat==='all'||x.cat===cimCat);
@@ -7660,20 +7658,6 @@ function cimHtml(){
 }
 window.cimSet=function(c){ cimCat=c; cimOpen=null; renderMarket(); };
 window.cimToggle=function(code){ cimOpen=(cimOpen===code)?null:code; renderMarket(); };
-document.getElementById('btnCimUpload').onclick=()=>document.getElementById('cimFileInput').click();
-document.getElementById('cimFileInput').onchange=e=>{
-  const file=e.target.files[0]; if(!file) return;
-  ensureXlsx(()=>readWorkbook(file,wb=>{
-    e.target.value='';
-    const r=cimParse(file,wb); if(!r) return;
-    const msg=`'${file.name}'\n\n품목 ${r.totals.items}개 · 상품 ${r.totals.products}개 · 추정 월 판매액 합계 ${cimEok(r.totals.amt)}억원`+
-      (r.ref?`\n시장 규모 참고 표 ${r.ref.rows.length}행`:'\n(시장 규모 참고 시트 없음)')+`\n\n쿠팡 품목별 시장 자료를 이 내용으로 교체할까요?`;
-    if(!confirm(msg)){ toast('업로드 취소됨'); return; }
-    DATA.coupangItemMarket=r; cimCat='all'; cimOpen=null; marketTab='cim';
-    markDirty(); renderMarket();
-    toast(`쿠팡 품목별 시장 반영 — 품목 ${r.totals.items}개 · 상품 ${r.totals.products}개. 파일 저장으로 백업하세요.`);
-  }));
-};
 function renderMarket(){
   const body=document.getElementById('marketBody'); if(!body) return;
   // [v134] 3탭(한눈에 / 카테고리별 / 근거 자료) — 예전 탭들은 근거 자료 안에 접어서 보관
@@ -7796,11 +7780,12 @@ function parseCollectionWorkbook(file, wb){
   // 수집 시그니처(카테고리·순위·제품명 + 쿠팡 판가/한달 판매)를 가진 '모든' 시트를 합침 (BK·병권 등 다중 시트 지원)
   for(const sname of wb.SheetNames){
     const arr=XLSX.utils.sheet_to_json(wb.Sheets[sname],{header:1,defval:''});
-    const hi=findHeaderRow(arr,['카테고리','순위','제품명']);
+    // [v149] 새 양식(터블_품목별_시장규모_경쟁사 '3. 상품 원자료')도 받음: 카테고리 대신 품목코드·품목, 순위는 '쿠팡 순위'
+    let hi=findHeaderRow(arr,['카테고리','순위','제품명']); if(hi<0) hi=findHeaderRow(arr,['품목코드','순위','제품명']);
     if(hi<0) continue;
     const head=arr[hi].map(x=>String(x).replace(/\r?\n/g,' ').trim());
     const col=pats=>head.findIndex(h=>pats.some(p=>new RegExp(p,'i').test(h)));
-    const ci={cat:col(['카테고리']),rank:col(['순위']),product:col(['제품명','상품명']),brand:col(['브랜드']),
+    const ci={cat:(col(['카테고리'])>=0?col(['카테고리']):head.indexOf('품목')),rank:col(['순위']),product:col(['제품명','상품명']),brand:col(['브랜드']),
       price:col(['쿠팡.*판가']),priceRef:col(['기존.*가격','참고']),monthQty:col(['한달.*판매','판매건','한달.*구매','예상.*구매']),
       review:col(['쿠팡.*리뷰']),rating:col(['쿠팡.*평점']),rocket:col(['로켓']),naverQty:col(['네이버.*구매건','6개월.*구매'])};
     // 수집 시그니처: 쿠팡 판가 또는 한달 판매 컬럼이 있어야 함(안내·요약 시트는 자동 제외)
@@ -7902,7 +7887,7 @@ function renderMarketPreview(pv){
       return `<div style="margin-bottom:10px"><b style="font-size:12px;color:var(--navy)">■ ${cat} (${pv.top5[cat].length}개)</b>
         <table class="mTbl" style="margin-top:4px"><thead><tr><th class="c">순위</th><th class="l">브랜드</th><th class="l">제품명</th><th class="r">월판매</th><th class="r">판가</th><th class="r">추정연매출</th><th class="r">점유율</th></tr></thead><tbody>${rs}</tbody></table></div>`;
     }).join('');
-    body.innerHTML=`<div class="previewNote" style="margin-bottom:10px">「${pv.sheetName}」 시트에서 <b>${pv.cats.length}개</b> 카테고리 · <b>${pv.productCount}개</b> 제품을 읽었습니다.<br>적용 시 <b>경쟁 매트릭스</b>와 <b>Top5</b>가 모두 교체됩니다. <b>전체 시장규모 = 로드맵 기준</b>, 쿠팡 Top5 합산(한달판매×판가×12)·점유율·터블 점유율은 자동 산출.</div>
+    body.innerHTML=`<div class="previewNote" style="margin-bottom:10px">「${pv.sheetName}」 시트에서 <b>${pv.cats.length}개</b> 카테고리 · <b>${pv.productCount}개</b> 제품을 읽었습니다.<br>적용 시 <b>경쟁 매트릭스</b>와 <b>Top5</b>가 모두 교체됩니다.${pv.cim?`<br><b>쿠팡 품목별 시장</b>도 함께 교체: 품목 ${pv.cim.totals.items}개 · 상품 ${pv.cim.totals.products}개 · 추정 월 판매액 ${cimEok(pv.cim.totals.amt)}억원${pv.cim.ref?` · 시장 규모 참고 ${pv.cim.ref.rows.length}행`:""}`:""} <b>전체 시장규모 = 로드맵 기준</b>, 쿠팡 Top5 합산(한달판매×판가×12)·점유율·터블 점유율은 자동 산출.</div>
       <div style="font-size:12px;font-weight:800;color:var(--navy);margin:4px 0 6px">① 경쟁 매트릭스 (${pv.matrix.length}개 카테고리)</div>
       <div class="previewScroll" style="margin-bottom:14px"><table class="mTbl"><thead><tr><th class="l">카테고리</th><th class="c">경쟁력</th><th class="r">전체 시장규모</th><th class="r">쿠팡 Top5</th><th class="r">Top5 점유율</th><th class="l">쿠팡 1위</th><th class="r">터블 매출</th><th class="r">터블 점유율</th></tr></thead><tbody>${mtxRows}</tbody></table></div>
       <div style="font-size:12px;font-weight:800;color:var(--navy);margin:4px 0 6px">② 경쟁사 상위 제품 (카테고리별 최대 10위)</div>${cards}`;
@@ -7935,7 +7920,7 @@ document.getElementById('matrixFileInput').onchange=e=>{
   const file=e.target.files[0]; if(!file)return;
   ensureXlsx(()=>readWorkbook(file,wb=>{
     const coll=parseCollectionWorkbook(file,wb);
-    if(coll&&coll.productCount){ renderMarketPreview(coll); e.target.value=''; return; }
+    if(coll&&coll.productCount){ coll.cim=cimParse(file,wb,true); renderMarketPreview(coll); e.target.value=''; return; }   // [v149] 새 양식이면 품목별 시장도 함께
     const arr=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
     const pv=parseMatrixUpload(file,arr);
     if(pv&&pv.rows.length) renderMarketPreview(pv); else if(pv) toast('반영할 데이터 행이 없습니다');
@@ -7962,7 +7947,8 @@ document.getElementById('btnMarketApply').onclick=()=>{
     DATA.marketOverride.top5=pendingMarket.top5;
     DATA.marketOverride.top5At=fmt(NOW);
     marketTab='matrix';
-    toast(`경쟁사 수집 ${pendingMarket.productCount}개 제품 반영 — 매트릭스·Top5 갱신. 파일 저장으로 백업하세요.`);
+    if(pendingMarket.cim){ DATA.coupangItemMarket=pendingMarket.cim; cimCat="all"; cimOpen=null; }   // [v149] 품목별 시장 동시 갱신
+    toast(`쿠팡 조사 ${pendingMarket.productCount}개 제품 반영 — 매트릭스·Top5${pendingMarket.cim?"·품목별 시장":""} 갱신. 파일 저장으로 백업하세요.`);
   } else if(pendingMarket.kind==='matrix'){
     DATA.marketOverride.matrix=pendingMarket.rows;
     DATA.marketOverride.matrixAt=fmt(NOW);
@@ -7979,17 +7965,19 @@ document.getElementById('btnMarketApply').onclick=()=>{
   markDirty(); renderMarket();
 };
 document.getElementById('btnMarketCancel').onclick=()=>{ pendingMarket=null; document.getElementById('marketPreviewModal').classList.remove('open'); toast('업로드 취소됨'); };
+// [v149] 양식 = 터블_품목별_시장규모_경쟁사의 '3. 상품 원자료'(+ '4. 시장 규모 참고'). 업로드된 자료가 있으면 그 내용을 채워서 내려줌(다음 조사 때 숫자만 고치면 됨)
 document.getElementById('btnMarketTemplate').onclick=()=>{
   ensureXlsx(()=>{
-    const wb=XLSX.utils.book_new();
-    const mx=[['카테고리','경쟁력','시장규모(억)','쿠팡1위','1위연매출(억)','터블매출(억)','대비배수','비고'],
-      ['텀블러세정제','🟢 선도',150,'라이프홀릭',2.8,7.07,'1/2.5배','예시 행 — 실제 조사값으로 교체']];
-    const t5=[['카테고리','순위','브랜드','제품명','월판매','판가','연매출(억)','점유율(%)'],
-      ['세탁세제',1,'허글리','허글리 8IN1 캡슐세제',30000,14800,53.3,0.63]];
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(mx),'경쟁매트릭스');
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(t5),'Top5경쟁사');
-    XLSX.writeFile(wb,`터블_경쟁사조사_업로드양식_${fmt(NOW)}.xlsx`);
-    toast('업로드 양식 다운로드됨 (시트 2종)');
+    const wb=XLSX.utils.book_new(), D=DATA.coupangItemMarket;
+    const raw=[['대분류','품목코드','품목','쿠팡 순위','제품명','브랜드','용량/스펙','한달 구매건 표시','쿠팡 판가(원)','추정 월 판매액(원)','로켓']];
+    if(D&&D.items&&D.items.length) D.items.forEach(x=>x.prods.forEach(p=>raw.push([x.cat,x.code,x.item,p[0],p[1],p[2],p[3],p[4],p[5],p[6],p[7]])));
+    else raw.push(['주방','D3','텀블러클리너',1,'예시 제품명 — 실제 조사값으로 교체','브랜드','5g,30정,1개',2000,7110,14220000,'O']);
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(raw),'3. 상품 원자료');
+    const R=D&&D.ref, ref=[[(R&&R.title)||'국내 시장 규모 참고치 (쿠팡 조사와 기준이 달라 합산·비교 금지)'],[],
+      (R&&R.head)||['구분','금액(억원)','전년비/성장률','기준 연도·기간','범위','출처','집계 방식','확인 상태','비고']].concat((R&&R.rows)||[]);
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(ref),'4. 시장 규모 참고');
+    XLSX.writeFile(wb,`터블_쿠팡조사_업로드양식_${fmt(NOW)}.xlsx`);
+    toast(D&&D.items?`업로드 양식 다운로드됨 — 현재 자료 ${D.totals.products}개 상품 포함`:'업로드 양식 다운로드됨');
   });
 };
 // 통합 상태머신 연동 (toggleCostEdit는 하위호환 유지)
