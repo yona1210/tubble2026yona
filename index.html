@@ -610,6 +610,7 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .msNote{font-size:11.5px;color:#9aa1b2;margin-top:10px;line-height:1.6}
 .msEmpty{font-size:12px;color:#b0b6c4;padding:8px 0;text-align:center}
 .msSrc{display:flex;flex-wrap:wrap;gap:6px}.msSrc span{font-size:11px;color:#7a8194;background:#f1f3f7;border-radius:999px;padding:3px 10px}
+/* [v148] 쿠팡 품목별 시장 */.cimFixed{background:#f4f6fb;border-radius:12px;padding:10px 14px;font-size:12.5px;color:#4a5470;margin-bottom:14px;line-height:1.5}.cimTubB{display:inline-block;background:#3355FF;color:#fff;border-radius:999px;padding:1px 8px;font-size:10.5px;font-weight:700;vertical-align:middle}.cimTubTxt{color:#3355FF;font-weight:800}.msTbl tr.cimTubRow td{background:#f3f6ff}.msT5 tr.cimTub td{background:#eaf0ff;color:#1f3bd6;font-weight:700}.cimX{display:flex;flex-direction:column;gap:14px}.cimX .msT5 td.l{white-space:normal;min-width:90px}.cimX .msT5 td{white-space:nowrap}.cimX .cimPn{min-width:280px;white-space:normal!important}.cimXh{font-size:12px;font-weight:800;color:#141a33;margin:0 0 6px}.cimRef td{font-size:12px;vertical-align:top}
 .msRef{background:#fff;border-radius:14px;box-shadow:0 0 0 1px #edf0f5;margin-bottom:10px}
 .msRef summary{cursor:pointer;padding:14px 18px;display:flex;align-items:baseline;gap:10px;list-style:none}.msRef summary::-webkit-details-marker{display:none}
 .msRef summary:before{content:'▸';color:#9aa1b2;font-size:12px}.msRef[open] summary:before{content:'▾'}
@@ -2465,13 +2466,16 @@ body{padding-bottom:48px}
       <button class="mktTab" data-mkt="map">시장 지도</button>
       <button class="mktTab" data-mkt="cats">카테고리별</button>
       <button class="mktTab" data-mkt="ref">근거 자료</button>
+      <button class="mktTab" data-mkt="cim">쿠팡 품목별 시장</button>
     </div>
     <div style="margin-left:auto;display:flex;gap:6px">
       <button class="tbtn accent" id="btnMatrixUpload">📊 경쟁사 조사 업로드</button>
+      <button class="tbtn" id="btnCimUpload" title="터블_품목별_시장규모_경쟁사 엑셀(3. 상품 원자료)">품목별 시장 업로드</button>
       <button class="tbtn" id="btnMarketTemplate">양식 다운로드</button>
     </div>
     <input type="file" id="matrixFileInput" accept=".xlsx,.xls,.csv" style="display:none">
     <input type="file" id="top5FileInput" accept=".xlsx,.xls,.csv" style="display:none">
+    <input type="file" id="cimFileInput" accept=".xlsx,.xls" style="display:none">
   </div>
   <div id="marketBody"><div class="mCard"><h4>카테고리별 경쟁 매트릭스 <span class="hsub">전체 시장(로드맵) 대비 쿠팡 Top5·터블 점유율</span> <span class="mBadge m-keep">업로드 반영 2026-06-26</span></h4>
     <div class="mLegend"><span class="mBadge m-lead">🟢 선도</span> <span class="mBadge m-keep">🟡 유지</span> <span class="mBadge m-grow">🟠 성장</span> <span class="mBadge m-weak">🔴 약세</span> <span class="mBadge m-new">🟣 신규</span></div>
@@ -7568,10 +7572,112 @@ function mktNotesHtml(){
       <div class="cfLegend">${confBadge('A')} 공식 공시 &nbsp; ${confBadge('B')} 공식 조사기관 &nbsp; ${confBadge('C')} 업계 추정 &nbsp; ${confBadge('D')} 단일 채널 추정</div></div>
     <div class="basisNote">본 시장 분석은 2026.04 기준 작성된 로드맵 문서(터블_국내세제시장_로드맵)를 시스템에 임베드한 것으로, 외부 공유본에서는 표시되지 않습니다.</div></div>`;
 }
+// ===== [v148] 쿠팡 품목별 시장 — '터블_품목별_시장규모_경쟁사' 엑셀의 '3. 상품 원자료'만 읽어 직접 집계 =====
+//  1·2번 시트는 수식이라 쓰지 않는다. '4. 시장 규모 참고'는 표 그대로 보관·표시(합산·순위 계산 금지 — 쿠팡 조사와 기준이 다름).
+//  DATA.coupangItemMarket = { file, at, totals:{items,products,amt}, cats:[], items:[{cat,code,item,n,amt,qty,avgPrice,brands:[[브랜드,금액,상품수]],prods:[[순위,제품명,브랜드,용량,구매건,판가,금액,로켓]]}], ref:{title,head,rows} }
+const CIM_NOTE='2026.11.23 쿠팡 자체 조사, 품목별 상위 최대 10개 상품, 추정액 = 구매자 수 표시 × 조사일 판가. 시장 전체 규모 아님';
+const CIM_COLS={cat:'대분류',code:'품목코드',item:'품목',rank:'쿠팡 순위',name:'제품명',brand:'브랜드',spec:'용량/스펙',qty:'한달 구매건 표시',price:'쿠팡 판가(원)',amt:'추정 월 판매액(원)',rocket:'로켓'};
+let cimCat='all', cimOpen=null;
+const cimNum=v=>{ if(typeof v==='number') return isFinite(v)?v:null; const n=parseFloat(String(v==null?'':v).replace(/[,원\s]/g,'')); return isFinite(n)?n:null; };
+const cimEok=v=>(v/1e8).toFixed(2);
+const cimPct=v=>v==null?'-':(v*100).toFixed(1)+'%';
+const cimIsTub=b=>/터블|tubble/i.test(String(b||''));
+function cimParse(file,wb){
+  const raw=wb.SheetNames.find(n=>n.trim()==='3. 상품 원자료')||wb.SheetNames.find(n=>/상품\s*원자료/.test(n));
+  if(!raw){ toast("'3. 상품 원자료' 시트를 찾을 수 없습니다"); return null; }
+  const arr=XLSX.utils.sheet_to_json(wb.Sheets[raw],{header:1,defval:''});
+  const hi=arr.findIndex(r=>r&&r.some(x=>String(x).trim()==='품목코드')&&r.some(x=>String(x).trim()==='브랜드'));
+  if(hi<0){ toast('원자료 시트에서 헤더(품목코드·브랜드)를 찾을 수 없습니다'); return null; }
+  const head=arr[hi].map(x=>String(x).replace(/\r?\n/g,' ').trim()), ci={}, miss=[];
+  Object.keys(CIM_COLS).forEach(k=>{ ci[k]=head.indexOf(CIM_COLS[k]); if(ci[k]<0) miss.push(CIM_COLS[k]); });
+  if(miss.length){ toast('원자료 컬럼이 없습니다: '+miss.join(', ')); return null; }
+  const byCode=new Map(); let products=0, amtSum=0;
+  for(let r=hi+1;r<arr.length;r++){
+    const row=arr[r]; if(!row) continue;
+    const code=String(row[ci.code]).trim(), item=String(row[ci.item]).trim(); if(!code||!item) continue;
+    const qty=cimNum(row[ci.qty]), price=cimNum(row[ci.price]);
+    let amt=cimNum(row[ci.amt]); if(amt==null&&qty!=null&&price!=null) amt=qty*price; if(amt==null) amt=0;
+    if(!byCode.has(code)) byCode.set(code,{cat:String(row[ci.cat]).trim(),code,item,n:0,amt:0,qty:0,pSum:0,pN:0,bm:new Map(),prods:[]});
+    const g=byCode.get(code), brand=String(row[ci.brand]).trim()||'-';
+    g.n++; g.amt+=amt; g.qty+=qty||0; if(price!=null){ g.pSum+=price; g.pN++; }
+    const b=g.bm.get(brand)||{amt:0,n:0}; b.amt+=amt; b.n++; g.bm.set(brand,b);
+    g.prods.push([cimNum(row[ci.rank]),String(row[ci.name]).trim(),brand,String(row[ci.spec]).trim(),qty,price,amt,String(row[ci.rocket]).trim()]);
+    products++; amtSum+=amt;
+  }
+  if(!products){ toast('원자료에 상품 행이 없습니다'); return null; }
+  const items=[...byCode.values()].map(g=>({cat:g.cat,code:g.code,item:g.item,n:g.n,amt:g.amt,qty:g.qty,avgPrice:g.pN?Math.round(g.pSum/g.pN):null,
+    brands:[...g.bm.entries()].sort((a,b)=>b[1].amt-a[1].amt).map(([b,v])=>[b,v.amt,v.n]),
+    prods:g.prods.sort((a,b)=>(a[0]==null?999:a[0])-(b[0]==null?999:b[0]))}));
+  const cats=[...new Set(items.map(x=>x.cat))];
+  // '4. 시장 규모 참고' — 표 그대로(빈 줄만 건너뜀)
+  let ref=null; const rs=wb.SheetNames.find(n=>/시장\s*규모\s*참고/.test(n));
+  if(rs){
+    const a=XLSX.utils.sheet_to_json(wb.Sheets[rs],{header:1,defval:''}).map(r=>r.map(x=>x==null?'':x));
+    const nonEmpty=r=>r&&r.some(x=>String(x).trim()!=='');
+    const h=a.findIndex(r=>r&&String(r[0]).trim()==='구분');
+    const title=a.slice(0,h<0?0:h).filter(nonEmpty).map(r=>r.filter(x=>String(x).trim()!=='').join(' ')).join(' · ');
+    if(h>=0){ const width=a[h].length; ref={title,head:a[h].map(x=>String(x).trim()),rows:a.slice(h+1).filter(nonEmpty).map(r=>r.slice(0,width))}; }
+  }
+  return {file:file.name,at:fmt(NOW),totals:{items:items.length,products,amt:amtSum},cats,items,ref};
+}
+function cimHtml(){
+  const D=DATA.coupangItemMarket;
+  const head=`<div class="msHead"><h2>쿠팡 품목별 시장</h2><p>품목별 쿠팡 상위 상품 추정 매출과 경쟁 브랜드</p></div>
+    <div class="cimFixed">${CIM_NOTE}</div>`;
+  if(!D||!D.items||!D.items.length) return head+`<div class="msCard"><div class="msEmpty" style="padding:30px">아직 업로드된 품목별 시장 자료가 없습니다.<br>상단 [품목별 시장 업로드]로 '터블_품목별_시장규모_경쟁사' 엑셀을 올려 주세요.</div></div>`;
+  const cats=D.cats||[...new Set(D.items.map(x=>x.cat))];
+  if(cimCat!=='all'&&!cats.includes(cimCat)) cimCat='all';
+  const vis=D.items.filter(x=>cimCat==='all'||x.cat===cimCat);
+  const vAmt=vis.reduce((a,x)=>a+x.amt,0), vN=vis.reduce((a,x)=>a+x.n,0);
+  const pills=`<button class="${cimCat==='all'?'on':''}" onclick="cimSet('all')">전체 <b>${D.items.length}</b></button>`+
+    cats.map(c=>`<button class="${cimCat===c?'on':''}" onclick="cimSet('${pEsc(c).replace(/'/g,"\\'")}')">${pEsc(c)} <b>${D.items.filter(x=>x.cat===c).length}</b></button>`).join('');
+  const bn=(x,i)=>x.brands[i]?`<span class="${cimIsTub(x.brands[i][0])?'cimTubTxt':''}">${pEsc(x.brands[i][0])}</span>`:'<span class="msDim">-</span>';
+  const body=vis.map(x=>{
+    const open=cimOpen===x.code, hasTub=x.brands.some(b=>cimIsTub(b[0]));
+    const row=`<tr class="msR${open?' open':''}${hasTub?' cimTubRow':''}" onclick="cimToggle('${pEsc(x.code)}')">
+      <td class="l">${pEsc(x.cat)}</td>
+      <td class="l"><span class="msCar">${open?'▾':'▸'}</span><b>${pEsc(x.item)}</b>${hasTub?' <span class="cimTubB">터블</span>':''}</td>
+      <td class="r">${x.n}</td><td class="r"><b>${cimEok(x.amt)}</b></td><td class="r">${x.avgPrice!=null?won(x.avgPrice)+'원':'-'}</td>
+      <td class="l">${bn(x,0)}</td><td class="r">${x.brands[0]&&x.amt>0?cimPct(x.brands[0][1]/x.amt):'-'}</td><td class="l">${bn(x,1)}</td><td class="l">${bn(x,2)}</td></tr>`;
+    if(!open) return row;
+    const bt=x.brands.map((b,i)=>`<tr class="${cimIsTub(b[0])?'cimTub':''}"><td>${i+1}</td><td class="l"><b>${pEsc(b[0])}</b></td><td>${b[2]}</td><td>${cimEok(b[1])}억</td><td>${x.amt>0?cimPct(b[1]/x.amt):'-'}</td></tr>`).join('');
+    const pt=x.prods.map(p=>`<tr class="${cimIsTub(p[2])?'cimTub':''}"><td>${p[0]!=null?p[0]:''}</td><td class="l cimPn">${pEsc(p[1])}</td><td class="l"><b>${pEsc(p[2])}</b></td><td class="l">${pEsc(p[3])}</td><td>${p[4]!=null?won(p[4]):'-'}</td><td>${p[5]!=null?won(p[5])+'원':'-'}</td><td>${cimEok(p[6])}억</td><td>${pEsc(p[7])}</td></tr>`).join('');
+    return row+`<tr class="msX"><td colspan="9"><div class="cimX">
+      <div style="max-width:640px"><div class="cimXh">브랜드별 추정 월 판매액</div><table class="msT5"><thead><tr><th>순위</th><th class="l">브랜드</th><th>상품 수</th><th>추정 월 판매액</th><th>비중</th></tr></thead><tbody>${bt}</tbody></table></div>
+      <div><div class="cimXh">조사 상품 ${x.n}개</div><table class="msT5"><thead><tr><th>쿠팡 순위</th><th class="l">제품명</th><th class="l">브랜드</th><th class="l">용량/스펙</th><th>한달 구매건 표시</th><th>판가</th><th>추정 월 판매액</th><th>로켓</th></tr></thead><tbody>${pt}</tbody></table></div>
+    </div></td></tr>`;
+  }).join('');
+  const tbl=`<div class="msCard"><div class="msCardH"><h3>품목별 추정 월 판매액</h3><span class="msSum">${vis.length}개 품목 · 상품 ${vN}개 · 합계 ${cimEok(vAmt)}억원 · 행을 누르면 브랜드·상품</span></div>
+    <div class="msFilt">${pills}</div>
+    <div style="overflow-x:auto"><table class="msTbl"><thead><tr><th class="l">대분류</th><th class="l">품목</th><th class="r">조사 상품 수</th><th class="r">추정 월 판매액(억원)</th><th class="r">평균 판가</th><th class="l">1위 브랜드</th><th class="r">1위 비중</th><th class="l">2위</th><th class="l">3위</th></tr></thead><tbody>${body}</tbody></table></div>
+    <div class="msNote">평균 판가 = 조사 상품 판가 단순 평균 · 브랜드 순위·비중 = 품목 안 추정 월 판매액 기준 · <span class="cimTubB">터블</span> 표시 = 조사 상품에 터블 브랜드 포함</div></div>`;
+  const R=D.ref;
+  const refCard=R&&R.rows&&R.rows.length?`<div class="msCard"><div class="msCardH"><h3>시장 규모 참고</h3><span class="msSum">${pEsc(R.title||'')}</span></div>
+    <div style="overflow-x:auto"><table class="msTbl cimRef"><thead><tr>${R.head.map(h=>`<th class="l">${pEsc(h)}</th>`).join('')}</tr></thead>
+    <tbody>${R.rows.map(r=>`<tr>${R.head.map((_,i)=>{ const v=r[i]; return `<td class="l">${typeof v==='number'?v.toLocaleString('ko-KR'):pEsc(v)}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
+    <div class="msNote">엑셀 '4. 시장 규모 참고' 표를 그대로 옮긴 것입니다. 기준이 서로 달라 합산·비교하지 않습니다.</div></div>`:'';
+  return head+tbl+refCard+`<div class="msSrc"><span>품목별 시장 · ${pEsc(D.file||'')} · ${pEsc(D.at||'')} 업로드</span><span>품목 ${D.totals.items}개 · 상품 ${D.totals.products}개 · 합계 ${cimEok(D.totals.amt)}억원</span></div>`;
+}
+window.cimSet=function(c){ cimCat=c; cimOpen=null; renderMarket(); };
+window.cimToggle=function(code){ cimOpen=(cimOpen===code)?null:code; renderMarket(); };
+document.getElementById('btnCimUpload').onclick=()=>document.getElementById('cimFileInput').click();
+document.getElementById('cimFileInput').onchange=e=>{
+  const file=e.target.files[0]; if(!file) return;
+  ensureXlsx(()=>readWorkbook(file,wb=>{
+    e.target.value='';
+    const r=cimParse(file,wb); if(!r) return;
+    const msg=`'${file.name}'\n\n품목 ${r.totals.items}개 · 상품 ${r.totals.products}개 · 추정 월 판매액 합계 ${cimEok(r.totals.amt)}억원`+
+      (r.ref?`\n시장 규모 참고 표 ${r.ref.rows.length}행`:'\n(시장 규모 참고 시트 없음)')+`\n\n쿠팡 품목별 시장 자료를 이 내용으로 교체할까요?`;
+    if(!confirm(msg)){ toast('업로드 취소됨'); return; }
+    DATA.coupangItemMarket=r; cimCat='all'; cimOpen=null; marketTab='cim';
+    markDirty(); renderMarket();
+    toast(`쿠팡 품목별 시장 반영 — 품목 ${r.totals.items}개 · 상품 ${r.totals.products}개. 파일 저장으로 백업하세요.`);
+  }));
+};
 function renderMarket(){
   const body=document.getElementById('marketBody'); if(!body) return;
   // [v134] 3탭(한눈에 / 카테고리별 / 근거 자료) — 예전 탭들은 근거 자료 안에 접어서 보관
-  const map={home:msHomeHtml,map:msMapHtml,cats:msCatsHtml,ref:msRefHtml};
+  const map={home:msHomeHtml,map:msMapHtml,cats:msCatsHtml,ref:msRefHtml,cim:cimHtml};   // [v148] cim = 쿠팡 품목별 시장
   if(!map[marketTab]) marketTab='home';
   body.innerHTML=map[marketTab]();
   document.querySelectorAll('#marketSeg .mktTab').forEach(b=>b.classList.toggle('on',b.dataset.mkt===marketTab));
