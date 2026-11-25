@@ -648,6 +648,12 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .ovSpark{display:inline-flex;align-items:center;gap:5px}.ovSpark em{font-style:normal;font-size:10.5px;font-weight:700}.ovSpark em.up{color:#16a34a}.ovSpark em.dn{color:#64748b}
 .ovSec{font-size:15px;font-weight:800;color:#141a33;margin:6px 2px 10px}.ovSec span{font-size:11.5px;font-weight:500;color:#9aa1b2;margin-left:8px}
 .ovRowM{display:grid;grid-template-columns:1fr 1.25fr;gap:14px;margin-bottom:14px}
+/* [v166] 한눈에 흐름 배치 */
+.ovSec{display:flex;align-items:baseline;gap:8px}.ovSec i{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:#1e2a5a;color:#fff;font-style:normal;font-size:11.5px;font-weight:800;align-self:center}
+.ovWide{margin-bottom:14px}.ovWide .ovSzs{max-height:none;overflow:visible}
+.ovRowV{display:grid;grid-template-columns:minmax(280px,1fr) 2.4fr;gap:14px;align-items:start;margin-bottom:14px}.ovRowV>.msCard{margin-bottom:0}
+.ovRowV .msDecs{grid-template-columns:repeat(2,minmax(0,1fr));margin:0}
+@media(max-width:1200px){.ovRowV{grid-template-columns:1fr}}
 .ovSzs>*{flex-shrink:0}   /* [v165] 목록이 스크롤될 때 품목군 유형 막대가 높이 0으로 눌리던 문제 */
 .ovInfo{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#eef1f8;color:#6b7390;font-size:10px;font-weight:700;cursor:help;vertical-align:middle;margin-left:3px}
 .ovRow2.two{grid-template-columns:1fr 1.6fr}.ovGrpH{display:flex;align-items:baseline;gap:8px;margin:10px 0 2px;font-size:12.5px}.ovGrpH b{color:#141a33}.ovGrpH span{color:#9aa1b2;font-size:11px}
@@ -7494,8 +7500,10 @@ const COUPANG_CATS=[
     {n:'청소포/티슈',c:[{n:'물걸레 청소포',u:'물걸레 청소포'},{n:'세정티슈(파우치형)',u:'세정티슈(파우치형)',t:['세정티슈']},{n:'세정티슈(통형)',u:'세정티슈(통형)'},
       {n:'정전기 청소포',u:'정전기 청소포'},{n:'유리거울 세정티슈',u:'유리거울 세정티슈'}]}]},
   {n:'주방',c:[
-    {n:'주방세제',c:[{n:'일반주방세제',m:'주방세제',u:'일반주방세제',t:['주방세제']},{n:'천연성분주방세제',u:'천연성분주방세제'},{n:'다목적 용기세척제',m:'용기세척제 (텀블러)',u:'텀블러클리너',t:['다목적용기세척제']},
-      {n:'야채과일세정제',u:'야채과일세정제'},{n:'식기세척기용세제',m:'식기세척기세제',u:'식기세척기용세제',t:['식기세척기세제']},{n:'유아 주방세제',u:'유아 주방세제'}]}]},
+    // [v166] 주방을 성격별 품목군으로 나눔(쿠팡은 한 묶음): 주방세제 / 식기세척기세제 / 용기·야채 세정
+    {n:'주방세제',c:[{n:'일반주방세제',m:'주방세제',u:'일반주방세제',t:['주방세제']},{n:'천연성분주방세제',u:'천연성분주방세제'},{n:'유아 주방세제',u:'유아 주방세제'}]},
+    {n:'식기세척기세제',c:[{n:'식기세척기용세제',m:'식기세척기세제',u:'식기세척기용세제',t:['식기세척기세제']}]},
+    {n:'용기·야채 세정',c:[{n:'다목적 용기세척제',m:'용기세척제 (텀블러)',u:'텀블러클리너',t:['다목적용기세척제']},{n:'야채과일세정제',u:'야채과일세정제'}]}]},
   {n:'탈취',c:[
     {n:'탈취제',c:[{n:'섬유탈취제',u:'섬유탈취제'},{n:'실내용탈취제',m:'탈취제 (공간 겔)',u:'실내용탈취제',t:['탈취제']},{n:'차량용탈취제',u:'차량용탈취제'},{n:'화장실탈취제',u:'화장실탈취제'},
       {n:'냉장고탈취제',u:'냉장고탈취제'},{n:'신발탈취제',u:'신발탈취제'},{n:'피톤치드 탈취제',u:'피톤치드 탈취제'}]}]},
@@ -7642,6 +7650,7 @@ function ovData(){
   const cnt={keep:0,grow:0,weak:0,opp:0,ref:0}; rows.filter(r=>!r.nj&&r.u).forEach(r=>cnt[r.v]++);   // [v160] 쿠팡 조사 51개 기준(로드맵 전용·선물세트·배송비 제외)
   const groups=[...new Set(rows.map(r=>r.group))].filter(g=>g!=='기타');
   const gCp=groups.map(g=>rows.filter(r=>r.group===g).reduce((a,r)=>{ const c=r.u?cimBy[r.u]:null; return a+(c?c.amt*12/1e8:0); },0));
+{ const o2=groups.map((g,i)=>[g,gCp[i]]).sort((a,b)=>b[1]-a[1]); groups.splice(0,groups.length,...o2.map(x=>x[0])); gCp.splice(0,gCp.length,...o2.map(x=>x[1])); }   // [v166] 카테고리별 판매액 큰 순서
   const isShip=r=>/^배송비/.test(r.n);   // [v155] 배송비(품목 아님)는 매출 구성에서 제외
   const gRev=[...new Set(rows.map(r=>r.group))].map(g=>({g,v:rows.filter(r=>r.group===g&&!isShip(r)).reduce((a,r)=>a+r.rev,0)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
   const shipRev=rows.filter(isShip).reduce((a,r)=>a+r.rev,0);
@@ -7708,15 +7717,17 @@ function ovMktHtml(E,ST,cimBy,rows){
     const stack=`<div class="ovStack sm">${xs.map((x,i)=>`<i style="width:${(x.cp/bt*100).toFixed(2)}%;background:${OV_TYPE_C[i%OV_TYPE_C.length]}" title="${pEsc(x.n)} ${msEok(x.cp)} (${(x.cp/bt*100).toFixed(0)}%)"><span>${x.cp/bt>=0.1?`${pEsc(x.n.replace(/^세탁세제\s*/,''))} ${(x.cp/bt*100).toFixed(0)}%`:''}</span></i>`).join('')}</div>`;
     return `<div class="ovGrpH"><b>${pEsc(b.t)}</b><span>${msEok(bt)} · ${ovGroupSel} 중 ${(bt/G.v*100).toFixed(0)}%</span></div>${stack}`+
       xs.map((x,i)=>`<div class="ovSz2"><span class="ovSzN"><span class="ovDot" style="background:${OV_TYPE_C[i%OV_TYPE_C.length]}"></span>${pEsc(x.n)}${x.nS<5?' <span class="szThin">표본 부족</span>':''}</span><span class="ovSzBar"><i style="width:${Math.max(1.5,x.cp/mx*100).toFixed(1)}%;background:${OV_TYPE_C[i%OV_TYPE_C.length]}"></i></span><b>${msEok(x.cp)}</b><em>${(x.cp/bt*100).toFixed(0)}%</em></div>`).join(''); }).join('');
-  return `<div class="ovRowM">
+  const left=`
     <div class="msCard ovC"><div class="ovH">국내 세제 시장 규모 <span>${pEsc(ST.src)} 품목별 출하액(10인 이상) · ${pEsc(ST.year)}</span></div>
       <div class="ovDonutWrap"><div class="ovDonut"><canvas id="ovMkt"></canvas><div class="ovDC"><b>${(ST.parts[0].v/ST.total*100).toFixed(0)}%</b><span>세탁용 비중</span></div></div><div class="ovLgs">${lg}</div></div>
       <div class="ovAside">실내용 가향제 <b>${won(Math.round(ST.aroma))}억</b> (탈취제·방향제 포함, 세제 합계와 별도)</div>
       <div class="msNote">출처: ${pEsc(ST.src)} 품목별 출하액(종사자 10인 이상 사업체 전수), ${pEsc(ST.year)}. 국내 제조사 출하 기준이라 수입품은 빠지고 수출·업소용은 들어 있습니다. 쿠팡 조사 숫자와는 기준이 달라 합산·비교하지 않습니다.</div></div>
-    <div class="msCard ovC"><div class="ovH">${pEsc(ovGroupSel)} 품목별 구성 <span>${pEsc(ovGroupSel)} ${msEok(G.v)} · 품목군별 유형 비중(%는 품목군 안) · 연 환산</span></div>
+`;
+  const right=`<div class="msCard ovC ovWide"><div class="ovH">${pEsc(ovGroupSel)} 품목별 구성 <span>${pEsc(ovGroupSel)} ${msEok(G.v)} · 품목군별 유형 비중(%는 품목군 안) · 연 환산</span></div>
       <div class="ovFixed">쿠팡 조사 기준, 시장 전체 규모 아님 — 품목별 쿠팡 상위 상품(최대 10개) 추정 판매액 × 12</div>
       <div class="ovChips">${chips}</div><div class="ovSzs">${bars}</div></div>
-  </div>`;
+`;
+  return {left,right};   // [v166] 왼쪽(국내 시장)·오른쪽(품목 구성)을 따로 배치
 }
 const OV_STAT_C=['#2f6bff','#16a34a','#7c3aed'];
 window.ovPickGroup=function(g){ ovGroupSel=g; if(typeof renderMarket==='function') renderMarket(); };
@@ -7739,10 +7750,12 @@ function ovHtml(){
   const legend=['keep','grow','weak','opp','ref'].map(v=>`<div class="ovLg" onclick="msSet('${v}')"><i style="background:${OV_C[v]}"></i><span>${MS_V[v].t}</span><b>${cnt[v]}</b><em>${(cnt[v]/tot*100).toFixed(0)}%</em></div>`).join('');
   const ins=rows.filter(r=>r.rev>0&&!r.nj).sort((a,b)=>b.rev-a.rev), tubTot=rows.reduce((a,r)=>a+r.rev,0)||1;
   const top=ins.slice(0,6).map((r,i)=>`<div class="ovTop" onclick="msGo('${r.id}')"><span class="ovTopN">${i+1}</span><span class="ovTopNm">${pEsc(r.n)}<small>${pEsc(r.group)}</small></span><b>${msEok(r.rev)}</b><em>${(r.rev/tubTot*100).toFixed(1)}%</em></div>`).join('');
-  const row2=`<div class="ovRow2 two">   <!-- [v164] 터블 TOP6는 아래 품목별 성과와 같아 삭제 -->
+  // [v166] 판정 요약 카드와 카테고리 막대 카드를 따로 — 배치는 msHomeHtml에서(전체 → 카테고리 → 품목 → 할 일)
+  const verdictCard=`
     <div class="msCard ovC"><div class="ovH">판정 요약 <span>쿠팡 조사 세부 품목 ${nCat}개 기준${nRoad?` · 로드맵 전용 ${nRoad}개는 참고(별도, 출처 확인 전)`:""}${rows.some(r=>r.early)?" · 출시 초기는 참고에 포함":""}</span></div><div class="ovDonutWrap"><div class="ovDonut"><canvas id="ovVerdict"></canvas><div class="ovDC"><b>${tot}</b><span>세부 품목</span></div></div><div class="ovLgs">${legend}</div></div></div>
-    <div class="msCard ovC"><div class="ovH">카테고리별 쿠팡 상위 상품 판매액 <span>연 추정 · 품목별 조사 상품 최대 10개</span></div><div class="ovBarBox"><canvas id="ovGroupBar"></canvas></div></div>
-  </div>`;
+`;
+  const barCard=`<div class="msCard ovC"><div class="ovH">카테고리별 쿠팡 상위 상품 판매액 <span>연 추정 · 품목별 조사 상품 최대 10개</span></div><div class="ovBarBox"><canvas id="ovGroupBar"></canvas></div></div>
+`;
 // [v161] 시장 규모 열 = 품목 미확인 + 통계청 계열 값(작게), 점유율 = 터블 12개월 환산 ÷ 계열(계열 품목만) — 카테고리별 표와 같은 기준
   const tr=ins.map(r=>{ const c=r.u&&cimBy[r.u];
     return `<tr onclick="msGo('${r.id}')"><td class="l"><b>${pEsc(r.n)}</b></td><td class="l">${pEsc(r.group)}</td><td style="white-space:nowrap">${msVerdictBadge(r)}${r.vNote?` <span class="ovInfo" title="${pEsc(r.vNote)}">ⓘ</span>`:''}</td>
@@ -7757,7 +7770,8 @@ function ovHtml(){
       <div class="msNote">시장 규모: 품목별 값은 출처 확인 전까지 미확인, 작은 글씨 = 통계청 광업·제조업조사(2024년) 계열 값. 점유율 = 터블 12개월 환산 매출 ÷ 계열(계열에 속한 품목만). 쿠팡 조사(연) = 상위 상품(최대 10개) × 12, 시장 전체 아님. 판정 = 화면 숫자 기준(지킬: 터블 ≥ 쿠팡 조사의 50% · 약한: 터블 < 쿠팡 Top5의 3% · 노릴: 미진출 + 쿠팡 조사 50억↑).</div></div>
     <div class="msCard ovC"><div class="ovH">터블 매출 구성 <span>카테고리별 · 상품 매출만${shipRev>0?` (배송비 ${msEok(shipRev)} 제외)`:''}</span></div><div class="ovDonut sm"><canvas id="ovMix"></canvas><div class="ovDC"><b>${msEok(tubTot-shipRev)}</b><span>${L?L.from+'~'+L.to+'월':''}</span></div></div><div class="ovLgs">${glg}</div></div>
   </div>`;
-  return {kpis,row2,row3,mkt:ovMktHtml(E,ST,cimBy,rows)};
+  const mk=ovMktHtml(E,ST,cimBy,rows);
+  return {kpis,row3,verdictCard,barCard,mktL:mk?mk.left:'',mktR:mk?mk.right:''};
 }
 function ovDraw(){
   ovCharts.forEach(c=>{ try{ c.destroy(); }catch(e){} }); ovCharts=[];
@@ -7801,9 +7815,16 @@ function msHomeHtml(){
       ${rs.length>show.length?`<div class="msMore" onclick="msSet('${v}')">+ ${rs.length-show.length}개 더 보기 →</div>`:''}</div>`; };
 // [v164] 예전 디자인(진한 KPI·도넛·막대·카드) 유지 + 중복 제거: 터블 TOP6(성과표와 같음) 삭제, 품목별 구성은 품목군별 유형 비중 막대로  const o=ovHtml();
 const o=ovHtml();
-  return `<div class="msHead"><h2>시장 전략</h2><p>국내 세제 시장에서 터블이 지킬 곳, 키울 곳, 약한 곳, 노릴 곳</p></div>${o.kpis}${o.mkt}${o.row2}${o.row3}
-    <div class="ovSec">판정별 품목 <span>지킬 곳 · 키울 곳 · 약한 곳 · 노릴 곳</span></div>
-    <div class="msDecs">${['keep','grow','weak','opp'].map(card).join('')}</div>
+  // [v166] 위에서 아래로: ① 전체 시장 · 카테고리 → ② 카테고리 안 품목군·유형 → ③ 터블 성과 → ④ 할 일
+  return `<div class="msHead"><h2>시장 전략</h2><p>전체 시장 → 카테고리 → 세부 품목 → 할 일 순서로 봅니다</p></div>${o.kpis}
+    <div class="ovSec"><i>1</i>전체 시장 · 카테고리 <span>통계청 세제 출하액 · 카테고리별 쿠팡 조사 판매액(큰 순서)</span></div>
+    <div class="ovRowM">${o.mktL}${o.barCard}</div>
+    <div class="ovSec"><i>2</i>카테고리 안 세부 품목 <span>품목군별 유형 비중 — 카테고리 버튼으로 전환</span></div>
+    ${o.mktR}
+    <div class="ovSec"><i>3</i>터블 성과 <span>진출 품목별 매출·추세 · 카테고리별 매출 구성</span></div>
+    ${o.row3}
+    <div class="ovSec"><i>4</i>판정별 할 일 <span>지킬 곳 · 키울 곳 · 약한 곳 · 노릴 곳</span></div>
+    <div class="ovRowV">${o.verdictCard}<div class="msDecs">${['keep','grow','weak','opp'].map(card).join('')}</div></div>
     <div class="msSrc">${msSrcChips(M,L)}</div>`;
 }
 function msSrcChips(M,L){   // [v157] 출처 표기: 통계청(연도) · 쿠팡 조사일 · 터블 매출 기준(배송비·단상자 포함 여부)
