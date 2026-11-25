@@ -7549,9 +7549,11 @@ function ovData(){
   const cnt={keep:0,grow:0,weak:0,opp:0,ref:0}; rows.filter(r=>!r.nj).forEach(r=>cnt[r.v]++);   // 판정 카드와 같은 기준(선물세트·배송비만 제외)
   const groups=[...new Set(rows.map(r=>r.group))].filter(g=>g!=='기타');
   const gCp=groups.map(g=>rows.filter(r=>r.group===g).reduce((a,r)=>{ const c=r.u?cimBy[r.u]:null; return a+(c?c.amt*12/1e8:0); },0));
-  const gRev=[...new Set(rows.map(r=>r.group))].map(g=>({g,v:rows.filter(r=>r.group===g).reduce((a,r)=>a+r.rev,0)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+  const isShip=r=>/^배송비/.test(r.n);   // [v155] 배송비(품목 아님)는 매출 구성에서 제외
+  const gRev=[...new Set(rows.map(r=>r.group))].map(g=>({g,v:rows.filter(r=>r.group===g&&!isShip(r)).reduce((a,r)=>a+r.rev,0)})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+  const shipRev=rows.filter(isShip).reduce((a,r)=>a+r.rev,0);
   const E=ovEstimate(rows,cimBy); E.cs=ovCpShare(D); E.cpTot=D&&D.totals?D.totals.amt*12/1e8:0; E.online=E.cpTot/E.cs.v;
-  return {rows,L,M,s,subSum,D,cimBy,cnt,groups,gCp,gRev,E};
+  return {rows,L,M,s,subSum,D,cimBy,cnt,groups,gCp,gRev,E,shipRev};
 }
 // [v154] 국내 시장 규모 추정 — 품목(세부 카테고리)별
 //  ① 로드맵 숫자가 품목에 있으면 그대로(로드맵)
@@ -7575,7 +7577,7 @@ function ovEstimate(rows,cimBy){
   const est=it.filter(x=>x.est>0);
   const road=est.filter(x=>x.basis!=='쿠팡 환산').reduce((a,x)=>a+x.est,0), conv=est.filter(x=>x.basis==='쿠팡 환산').reduce((a,x)=>a+x.est,0);
   const gs=[...new Set(est.map(x=>x.group))].map(g=>({g,v:est.filter(x=>x.group===g).reduce((a,x)=>a+x.est,0),xs:est.filter(x=>x.group===g).sort((a,b)=>b.est-a.est)})).sort((a,b)=>b.v-a.v);
-  return {gs,road,conv,total:road+conv,kAll,kG,kN:rs.length};
+  return {gs,road,conv,total:road+conv,kAll,kG,kN:rs.length,byId:Object.fromEntries(est.map(x=>[x.r.id,x]))};
 }
 // [v154] 쿠팡의 온라인 세제 판매 비중 — 시장 조사 '4. 시장 규모 참고'의 '쿠팡 채널 비중' 행(NIQ eCom)에서 읽음, 없으면 72%
 function ovCpShare(D){
@@ -7604,14 +7606,16 @@ function ovMktHtml(E){
 }
 window.ovPickGroup=function(g){ ovGroupSel=g; if(typeof renderMarket==='function') renderMarket(); };
 function ovHtml(){
-  const {rows,L,M,s,subSum,D,cnt,groups,gCp,gRev,E}=ovData();
+  const {rows,L,M,s,subSum,D,cnt,groups,gCp,gRev,E,shipRev}=ovData();
   const nIn=rows.filter(r=>r.v!=='opp'&&r.v!=='ref'&&!r.nj).length, nCat=rows.filter(r=>r.group!=='기타').length;
-  const share=L&&subSum?L.total*MS_ANN(L)/subSum*100:null, cpY=D&&D.totals?D.totals.amt*12/1e8:null;
+  // [v155] 시장 규모·점유율은 아래 도넛과 같은 '추정 합계'(로드맵 + 로드맵에 없는 품목 쿠팡 환산) 기준으로 통일
+  const mktTot=E&&E.total?E.total:subSum, mktTxt=mktTot>=10000?(mktTot/10000).toFixed(2)+'조':msEok(mktTot);
+  const share=L&&mktTot?L.total*MS_ANN(L)/mktTot*100:null, cpY=D&&D.totals?D.totals.amt*12/1e8:null;
   const kp=(c,ico,lab,val,sub)=>`<div class="ovKpi" style="--c:${c}"><span class="ovKI">${dkIcon(ico)}</span><div><div class="ovKL">${lab}</div><div class="ovKV">${val}</div><div class="ovKS">${sub}</div></div></div>`;
   const kpis=`<div class="ovKpis">
     ${kp('#2f6bff','trend',`터블 ${L?L.cy:''} 매출`,L?L.total.toFixed(1)+'억':s.tubble2025,L?`${L.from}~${L.to}월 누적 · 2025년 ${s.tubble2025}`:'2025 ERP')}
-    ${kp('#16a34a','chart','국내 세제 시장',s.market,'2026.04 로드맵 추정 · 연간')}
-    ${kp('#7c3aed','target','전체 점유율',share!=null?msPct(share):s.share,L?`12개월 환산 ${msEok(L.total*MS_ANN(L))} ÷ 시장`:'')}
+    ${kp('#16a34a','chart','국내 세제 시장 (추정)',mktTxt,E&&E.conv?`로드맵 ${s.market} + 미포함 품목 ${msEok(E.conv)}`:'2026.04 로드맵 추정 · 연간')}
+    ${kp('#7c3aed','target','전체 점유율',share!=null?msPct(share):s.share,L?`12개월 환산 ${msEok(L.total*MS_ANN(L))} ÷ ${mktTxt}`:'')}
     ${kp('#0d9488','box','진출 카테고리',`${nIn}<small> / ${nCat}</small>`,'쿠팡 세부 카테고리 기준')}
     ${kp('#db2777','coin','쿠팡 상위 판매액',cpY!=null?msEok(cpY):'-',D?`온라인 하한 ≈ ${msEok(E.online)} (쿠팡 ${Math.round(E.cs.v*100)}%)`:'시장 조사 업로드 필요')}
   </div>`;
@@ -7625,14 +7629,16 @@ function ovHtml(){
     <div class="msCard ovC"><div class="ovH">터블 매출 TOP ${Math.min(6,ins.length)} <span>${L?`${L.cy}년 ${L.from}~${L.to}월`:''}</span></div><div class="ovTops">${top||'<div class="msEmpty">매출 데이터 없음</div>'}</div></div>
   </div>`;
   const tr=ins.map(r=>`<tr onclick="msGo('${r.id}')"><td class="l"><b>${pEsc(r.n)}</b></td><td class="l">${pEsc(r.group)}</td><td>${msPill(r.v)}</td>
-    <td class="r"><b>${msEok(r.revY)}</b></td><td class="r">${r.mkt?msEok(r.mkt):r.mktP?`<span class="msDim">${pEsc(String(r.mktP.p).replace(/\s*\(.*\)/,''))} ${msEok(r.mktP.v)}</span>`:'<span class="msDim">-</span>'}</td>
-    <td class="r">${r.share!=null?msPct(r.share):r.shareP!=null?`<span class="msDim">${msPct(r.shareP)}</span>`:'-'}</td><td class="r">${r.top5?msEok(r.top5):'-'}</td><td>${ovSpark(ovMonthly(r,L))}</td></tr>`).join('');
-  const glg=gRev.map((x,i)=>`<div class="ovLg"><i style="background:${OV_GROUP_C[i%OV_GROUP_C.length]}"></i><span>${pEsc(x.g)}</span><b>${msEok(x.v)}</b><em>${(x.v/tubTot*100).toFixed(0)}%</em></div>`).join('');
+    <td class="r"><b>${msEok(r.revY)}</b></td>${(()=>{ const x=E&&E.byId[r.id]; if(!x) return '<td class="r"><span class="msDim">-</span></td><td class="r">-</td>';
+      const b=x.basis==='로드맵'?'':`<span class="ovB ${x.basis==='배분'?'alloc':'conv'}">${x.basis}</span> `;
+      return `<td class="r">${b}${msEok(x.est)}</td><td class="r">${r.revY>0?msPct(r.revY/x.est*100):'-'}</td>`; })()}
+    <td class="r">${r.top5?msEok(r.top5):'-'}</td><td>${ovSpark(ovMonthly(r,L))}</td></tr>`).join('');
+  const prodTot=(tubTot-shipRev)||1, glg=gRev.map((x,i)=>`<div class="ovLg"><i style="background:${OV_GROUP_C[i%OV_GROUP_C.length]}"></i><span>${pEsc(x.g)}</span><b>${msEok(x.v)}</b><em>${(x.v/prodTot*100).toFixed(0)}%</em></div>`).join("");
   const row3=`<div class="ovRow3">
     <div class="msCard ovC"><div class="ovH">카테고리별 성과 <span>터블 진출 ${ins.length}개 · 매출은 12개월 환산 · 추세 = 올해 월별 매출(최근 3개월 vs 이전 3개월)</span></div>
       <div style="overflow-x:auto"><table class="ovTbl"><thead><tr><th class="l">품목</th><th class="l">대분류</th><th>판정</th><th class="r">터블 매출(연)</th><th class="r">시장 규모</th><th class="r">점유율</th><th class="r">쿠팡 Top5</th><th>추세</th></tr></thead><tbody>${tr}</tbody></table></div>
-      <div class="msNote">회색 시장 규모·점유율 = 상위 분류 전체 기준(세탁세제 8,500억 등). 행을 누르면 카테고리별 상세.</div></div>
-    <div class="msCard ovC"><div class="ovH">터블 매출 구성 <span>대분류별</span></div><div class="ovDonut sm"><canvas id="ovMix"></canvas><div class="ovDC"><b>${msEok(tubTot)}</b><span>${L?L.from+'~'+L.to+'월':''}</span></div></div><div class="ovLgs">${glg}</div></div>
+      <div class="msNote">시장 규모 = 위 '국내 세제 시장 규모'의 품목별 추정치(<span class="ovB alloc">배분</span> 상위 시장을 쿠팡 비율로 나눔 · <span class="ovB conv">쿠팡 환산</span> 로드맵에 없는 품목). 점유율 = 터블 연 환산 매출 ÷ 품목 시장. 행을 누르면 카테고리별 상세.</div></div>
+    <div class="msCard ovC"><div class="ovH">터블 매출 구성 <span>대분류별 · 상품 매출만${shipRev>0?` (배송비 ${msEok(shipRev)} 제외)`:''}</span></div><div class="ovDonut sm"><canvas id="ovMix"></canvas><div class="ovDC"><b>${msEok(tubTot-shipRev)}</b><span>${L?L.from+'~'+L.to+'월':''}</span></div></div><div class="ovLgs">${glg}</div></div>
   </div>`;
   return {kpis,row2,row3,mkt:ovMktHtml(E)};
 }
