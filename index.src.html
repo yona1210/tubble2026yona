@@ -648,7 +648,7 @@ table.gantt{border-collapse:collapse;width:100%;table-layout:fixed}
 .ovSpark{display:inline-flex;align-items:center;gap:5px}.ovSpark em{font-style:normal;font-size:10.5px;font-weight:700}.ovSpark em.up{color:#16a34a}.ovSpark em.dn{color:#64748b}
 .ovSec{font-size:15px;font-weight:800;color:#141a33;margin:6px 2px 10px}.ovSec span{font-size:11.5px;font-weight:500;color:#9aa1b2;margin-left:8px}
 .ovRowM{display:grid;grid-template-columns:1fr 1.25fr;gap:14px;margin-bottom:14px}
-.kwChartBox{position:relative;height:320px}.kwUp{color:#16a34a}.kwDn{color:#64748b}.kwUnit{font-size:12px;color:#64748b;margin:6px 0 4px}.kwWarn{color:#c2410c;font-weight:600}.kwChips button{display:inline-flex;align-items:center;gap:5px}.kwChips button .ovDot{margin:0}.kwIn{font:inherit;font-size:12px;padding:3px 6px;border:1px solid #d6dbe8;border-radius:6px;background:#fff;color:inherit}.kwPill{display:inline-block;min-width:46px;text-align:center;padding:2px 8px;border-radius:10px;font-weight:700;font-size:12px;line-height:1.5}.kwPill.up{background:#e7f6ec;color:#15803d}.kwPill.dn{background:#eef1f6;color:#475569}.kwPill.bad{background:#fff1e3;color:#c2410c}.kwSub{font-size:11px;color:#94a3b8;margin-top:3px;font-weight:400}.kwThSub{font-size:11px;font-weight:400;opacity:.75}.kwFlow{margin-left:6px;color:#334155;white-space:nowrap}.kwYoy{white-space:nowrap}.kwTbl td{vertical-align:middle;padding-top:9px;padding-bottom:9px}.kwTbl th.c,.kwTbl td.c{text-align:center!important}.kwTbl thead th[colspan]{border-bottom:1px solid rgba(255,255,255,.35)}
+.kwChartBox{position:relative;height:320px}.kwUp{color:#16a34a}.kwDn{color:#64748b}.kwUnit{font-size:12px;color:#64748b;margin:6px 0 4px}.kwWarn{color:#c2410c;font-weight:600}.kwChips button{display:inline-flex;align-items:center;gap:5px}.kwChips button .ovDot{margin:0}.kwIn{font:inherit;font-size:12px;padding:3px 6px;border:1px solid #d6dbe8;border-radius:6px;background:#fff;color:inherit}.kwPill{display:inline-block;min-width:46px;text-align:center;padding:2px 8px;border-radius:10px;font-weight:700;font-size:12px;line-height:1.5}.kwPill.up{background:#e7f6ec;color:#15803d}.kwPill.dn{background:#eef1f6;color:#475569}.kwPill.bad{background:#fff1e3;color:#c2410c}.kwSub{font-size:11px;color:#94a3b8;margin-top:3px;font-weight:400}.kwThSub{font-size:11px;font-weight:400;opacity:.75}.kwFlow{margin-left:6px;color:#334155;white-space:nowrap}.kwYoy{white-space:nowrap}.kwTbl td{vertical-align:middle;padding-top:9px;padding-bottom:9px}.kwTbl th.c,.kwTbl td.c{text-align:center!important}.kwTbl thead th[colspan]{border-bottom:1px solid rgba(255,255,255,.35)}.kwTbl td.kwRef{background:#fafbfd}.kwTbl td.kwRef .kwPill{opacity:.85}.kwTbl thead th.kwRefH{background:#2b3566!important;font-weight:500}.kwTurn{display:inline-block;margin-left:4px;padding:1px 6px;border-radius:8px;font-size:11px;font-weight:700;background:#e8f0ff;color:#2f6bff}.kwSeg{display:inline-flex;border:1px solid #d6dbe8;border-radius:8px;overflow:hidden;margin-right:8px;vertical-align:middle}.kwSeg button{font:inherit;font-size:12px;padding:3px 10px;border:0;background:#fff;color:#475569;cursor:pointer}.kwSeg button.on{background:#1f2a5c;color:#fff;font-weight:600}
 .ovWash{font-size:11.5px;color:#4a5470;background:#f5f7ff;border-left:3px solid #2f6bff;border-radius:6px;padding:7px 10px;margin:4px 0 8px;line-height:1.55}.ovWash b{color:#141a33}
 .ovAside.est{background:#f5f7ff;border:1px dashed #c7d2fe}.ovAside small{color:#8a90a2}.ovCatEst{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 12px;margin-top:10px}.ovCatEst div{font-size:11.5px;color:#4a5470;display:flex;justify-content:space-between;gap:6px;border-bottom:1px solid #f1f3f8;padding:3px 0}.ovCatEst b{color:#4338ca}
 .ovWide .ovSz2{grid-template-columns:minmax(120px,190px) 1fr 66px 44px 190px}.ovEst{font-size:11.5px;font-weight:700;color:#141a33;border-radius:8px;padding:2px 8px;white-space:nowrap;text-align:right}.ovEst small{font-weight:500;color:#8a90a2;margin-left:3px}.ovEst.stat{border:1px solid #c7d2fe;background:#f5f7ff}.ovEst.conv{border:1px dashed #c4b5fd;background:#faf7ff}.ovEst.none{color:#b0b6c4;border:1px solid transparent}.ovEstT{color:#4338ca}
@@ -8365,6 +8365,19 @@ function kwSelected(){ const S=kwStore(), all=kwList(); if(kwOn) kwOn=kwOn.filte
 function kwColor(k){ return OV_TYPE_C[Math.max(0,kwList().indexOf(k))%OV_TYPE_C.length]; }
 function kwMode(sel){ if(sel.length&&sel.every(k=>kwScale(k))) return 'vol'; return 'idx'; }
 function kwLastFullMonth(){ const d=new Date(NOW.getFullYear(),NOW.getMonth()-1,1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+// [v178] 지속 추세 — 한 달·석 달 비교는 이벤트에 흔들림 → ① 연간: 최근 12개월 평균 vs 그 전 12개월(계절 상쇄) ② 방향: 12개월 이동평균이 최근 6개월간 ±3% 넘게 움직였는지 + 몇 개월째 + 꺾임 조짐
+function kwTrend(mo){
+  const cm=NOW.getFullYear()+'-'+String(NOW.getMonth()+1).padStart(2,'0'), ms=Object.keys(mo).sort().filter(m=>m<cm), v=ms.map(m=>mo[m]);
+  const avg=a=>a.length?a.reduce((p,q)=>p+q,0)/a.length:null, o={};
+  if(v.length>=24){ o.a=avg(v.slice(-12)); o.b=avg(v.slice(-24,-12)); o.pct=o.b>0?(o.a/o.b-1)*100:null; o.from=ms[ms.length-12]; o.to=ms[ms.length-1]; }
+  const ma=[]; for(let i=11;i<v.length;i++) ma.push(avg(v.slice(i-11,i+1)));
+  if(ma.length>=7){ const n=ma.length, ch=ma[n-7]>0?ma[n-1]/ma[n-7]-1:0; o.dir=ch>=.03?'up':ch<=-.03?'down':'flat'; o.ch=ch*100;
+    const d=ma.slice(1).map((x,i)=>x-ma[i]); let s=0; for(let i=d.length-1;i>=0;i--){ if((o.dir==='up'&&d[i]>0)||(o.dir==='down'&&d[i]<0)) s++; else break; } o.streak=s; o.all=s>0&&s===d.length;
+    const l=d.slice(-2); if(l.length===2){ if(o.dir==='down'&&l[0]>0&&l[1]>0) o.turn='반등 조짐'; if(o.dir==='up'&&l[0]<0&&l[1]<0) o.turn='꺾임 조짐'; } }
+  return o;
+}
+let kwSmooth=false;
+window.kwSmoothSet=function(on){ kwSmooth=!!on; renderMarket(); };
 function kwHtml(rows){
   const S=kwStore(), all=kwList(); kwFx=null;
   const guide=`네이버 데이터랩(datalab.naver.com) → 검색어트렌드 → 키워드 입력(최대 5개) → 조회 → 엑셀 다운로드 → 위 <b>🔍 키워드 조사 업로드</b>. 올릴 때마다 키워드가 쌓이고, 같은 키워드를 다시 올리면 최신 파일로 바뀝니다. <b>다른 품목을 조회할 때는 기준 키워드 하나(예: 캡슐세제)를 꼭 같이 넣고 나머지 4개만 바꾸세요</b> — 기준 키워드 값의 비율로 새 키워드도 자동으로 같은 눈금(추정 월 검색량)에 맞춰집니다.`;
@@ -8375,18 +8388,22 @@ function kwHtml(rows){
     // [v175] 전년 동월 대비 — 기준 달 = 한 달 검색량을 넣은 달(없으면 지난달, 그 달 데이터가 없으면 마지막 달). 지수끼리 비율이라 검색량 없이도 계산
     const lf=kwLastFullMonth(), ms=Object.keys(mo).sort(), bm=(e.vol&&e.vol.ym&&mo[e.vol.ym]!=null)?e.vol.ym:mo[lf]!=null?lf:ms[ms.length-1], pm=bm?(+bm.slice(0,4)-1)+bm.slice(4):null;
     const ym={cur:bm,prev:pm,a:bm?mo[bm]:null,b:pm?mo[pm]:null}; ym.pct=ym.a!=null&&ym.b>0?(ym.a/ym.b-1)*100:null;
-    return {k,e,sc,s:kwStat(mo),ym,it:kwItem(k,rows),from:ds[0],to:ds[ds.length-1]}; });
+    return {k,e,sc,s:kwStat(mo),ym,tr:kwTrend(mo),it:kwItem(k,rows),from:ds[0],to:ds[ds.length-1]}; });
   const chips=all.map(k=>`<button class="${sel.includes(k)?'on':''}" onclick="kwToggle(${all.indexOf(k)})"><span class="ovDot" style="background:${kwColor(k)}"></span>${pEsc(k)}</button>`).join('');
-  const sv=st.filter(x=>sel.includes(x.k)&&x.ym.pct!=null).sort((a,b)=>b.ym.pct-a.ym.pct), top=sv[0], low=sv[sv.length-1];
+  const sv=st.filter(x=>sel.includes(x.k)&&x.tr.pct!=null).sort((a,b)=>b.tr.pct-a.tr.pct), top=sv[0], low=sv[sv.length-1];
+  const cnt=d=>st.filter(x=>sel.includes(x.k)&&x.tr.dir===d).length;
+  const tp=t=>!t.dir?'<span class="msDim">데이터 부족</span>':`<span class="kwPill ${t.dir==='up'?'up':t.dir==='down'?'bad':'dn'}">${t.dir==='up'?'▲ 상승':t.dir==='down'?'▼ 하락':'→ 보합'}</span>`;
   // [v176] 가독성: 증감은 색 배지(오름 초록 · 내림 회색 · 30% 넘게 내림 주황), 작년→올해 건수는 같은 줄, 기간·환산 방식은 작은 글씨로 해당 칸 아래, 검색량 큰 순
   const pp=v=>v==null?'<span class="msDim">-</span>':`<span class="kwPill ${v>=0?'up':v<=-30?'bad':'dn'}">${v>=0?'▲':'▼'}${Math.abs(v).toFixed(0)}%</span>`;
   const ymS=m=>m?m.slice(2).replace('-','.'):'', ymSet=[...new Set(st.filter(x=>x.ym.pct!=null).map(x=>x.ym.prev+'|'+x.ym.cur))], ymOne=ymSet.length===1?ymSet[0].split('|'):null;
   const volOf=x=>x.s&&x.s.cur!=null&&x.sc?x.s.cur*x.sc:-1;
   const tr=st.slice().sort((a,b)=>volOf(b)-volOf(a)).map(x=>{ const v=x.e.vol||{}, cur=x.s&&x.s.cur!=null?(x.sc?`<b>${won(Math.round(x.s.cur*x.sc))}</b>건`:`지수 ${x.s.cur.toFixed(1)}`):'-', ka=all.indexOf(x.k), how=kwHow(x.k);
+    const t=x.tr, tSub=t.dir?[t.dir!=='flat'&&t.streak?(t.all?`관측 내내(${t.streak}개월+)`:`${t.streak}개월째`):'', `반년 ${t.ch>=0?'+':''}${t.ch.toFixed(0)}%`].filter(Boolean).join(' · '):'';
     return `<tr${sel.includes(x.k)?'':' style="opacity:.55"'}><td class="l"><span class="ovDot" style="background:${kwColor(x.k)}"></span><b>${pEsc(x.k)}</b><div class="kwSub">${x.e.grain} · ${ymS(x.from.slice(0,7))}~${ymS(x.to.slice(0,7))}</div></td>
-    <td class="l kwYoy">${x.ym.pct==null?'<span class="msDim">-</span>':`${pp(x.ym.pct)} ${x.sc?`<span class="kwFlow">${won(Math.round(x.ym.b*x.sc))} → <b>${won(Math.round(x.ym.a*x.sc))}</b>건</span>`:''}${ymOne?'':`<div class="kwSub">${ymS(x.ym.prev)} → ${ymS(x.ym.cur)}</div>`}`}</td>
-    <td class="r">${cur}</td>
-    <td class="c">${pp(x.s&&x.s.yoy)}</td><td class="c">${pp(x.s&&x.s.qoq)}</td><td class="c">${x.s?ymS(x.s.peak):'-'}</td>
+    <td class="c kwYoy">${tp(t)}${t.turn?` <span class="kwTurn">${t.turn}</span>`:''}${tSub?`<div class="kwSub">${tSub}</div>`:''}</td>
+    <td class="l kwYoy">${t.pct==null?'<span class="msDim">2년치 미만</span>':`${pp(t.pct)}${x.sc?` <span class="kwFlow">월평균 ${won(Math.round(t.b*x.sc))} → <b>${won(Math.round(t.a*x.sc))}</b>건</span>`:''}`}</td>
+    <td class="l kwYoy kwRef">${x.ym.pct==null?'<span class="msDim">-</span>':`${pp(x.ym.pct)} ${x.sc?`<span class="kwFlow">${won(Math.round(x.ym.b*x.sc))} → <b>${won(Math.round(x.ym.a*x.sc))}</b>건</span>`:''}${ymOne?'':`<div class="kwSub">${ymS(x.ym.prev)} → ${ymS(x.ym.cur)}</div>`}`}</td>
+    <td class="c kwRef">${pp(x.s&&x.s.yoy)}</td><td class="c kwRef">${pp(x.s&&x.s.qoq)}</td><td class="r">${cur}</td><td class="c">${x.s?ymS(x.s.peak):'-'}</td>
     <td class="c" style="white-space:nowrap"><input type="month" class="kwIn" value="${v.ym||kwLastFullMonth()}" onchange="kwVol(${ka},this.value,null)"> <input type="number" class="kwIn" style="width:110px" placeholder="하위 검색어 합계" value="${v.n||''}" onchange="kwVol(${ka},null,this.value)">
       <div class="kwSub">${how?pEsc(how):'<span class="kwWarn">환산 불가 — 검색량 입력 또는 기준 키워드와 같이 조회</span>'}</div></td>
     <td class="l">${x.it?pEsc(x.it):'<span class="msDim">-</span>'}</td>
@@ -8394,18 +8411,19 @@ function kwHtml(rows){
   const unitTxt=mode==='vol'?'추정 월 검색량(건) = 데이터랩 지수 × (입력한 한 달 검색량 ÷ 그 달 지수) — 기준 키워드로 이어진 조회도 같은 눈금':sets.length>1?'⚠ 서로 다른 파일의 지수 — 기준이 달라 높낮이 직접 비교 불가 (한 달 검색량을 넣거나, 기준 키워드를 같이 넣어 조회하면 환산돼 비교됨)':'네이버 데이터랩 지수(이 조회에서 가장 큰 값 = 100)';
   return `<div class="msCard ovWide"><div class="ovH">검색 키워드 추이 <span>키워드 ${all.length}개 누적 · 그래프 ${sel.length}개 선택 — 아래 버튼을 눌러 켜고 끔</span></div>
     <div class="ovChips kwChips">${chips}</div>
-    ${top&&low&&top!==low?`<div class="ovWash">전년 동월 대비 ${top.ym.pct>=0?'가장 많이 오른':'가장 적게 내린'} 키워드 <b>${pEsc(top.k)} ${pc(top.ym.pct)}</b> (${top.ym.prev}→${top.ym.cur}) · ${low.ym.pct<0?'가장 많이 내린':'가장 적게 오른'} 키워드 <b>${pEsc(low.k)} ${pc(low.ym.pct)}</b> (${low.ym.prev}→${low.ym.cur})</div>`:''}
-    <div class="kwUnit${mode!=='vol'&&sets.length>1?' kwWarn':''}">${unitTxt}</div>
+    ${sv.length?`<div class="ovWash"><b>1년 추세</b> 상승 ${cnt('up')} · 보합 ${cnt('flat')} · 하락 ${cnt('down')}개${top&&low&&top!==low?` — 최근 12개월이 그 전 12개월보다 ${top.tr.pct>=0?'가장 많이 늘어난':'가장 적게 줄어든'} 키워드 <b>${pEsc(top.k)} ${pc(top.tr.pct)}</b> · ${low.tr.pct<0?'가장 많이 줄어든':'가장 적게 늘어난'} 키워드 <b>${pEsc(low.k)} ${pc(low.tr.pct)}</b>`:''}</div>`:''}
+    <div class="kwUnit${mode!=='vol'&&sets.length>1?' kwWarn':''}"><span class="kwSeg"><button class="${kwSmooth?'':'on'}" onclick="kwSmoothSet(0)">원 데이터</button><button class="${kwSmooth?'on':''}" onclick="kwSmoothSet(1)">추세선 (이동평균)</button></span> ${unitTxt}${kwSmooth?' · 추세선 = 주간 12주 / 일간 84일 / 월간 3개월 이동평균':''}</div>
     <div class="kwChartBox"><canvas id="kwChart"></canvas></div>
-    <div style="overflow-x:auto;margin-top:12px"><table class="ovItems kwTbl"><thead><tr><th class="l" rowspan="2">키워드</th><th class="l" rowspan="2">전년 동월 대비${ymOne?` (${ymS(ymOne[0])} → ${ymS(ymOne[1])})`:''}<br><span class="kwThSub">추정 월 검색량 작년 → 올해</span></th><th class="r" rowspan="2">최근 3개월 평균<br><span class="kwThSub">추정 월 검색량</span></th><th class="c" colspan="2">최근 3개월 평균 증감</th><th class="c" rowspan="2">최고 월</th><th class="c" rowspan="2">한 달 검색량 (직접 입력)<br><span class="kwThSub">하위 검색어 합계 · 아래는 환산 방식</span></th><th class="l" rowspan="2">연결 품목</th><th rowspan="2"></th></tr><tr><th class="c">1년 전 대비</th><th class="c">직전 3개월 대비</th></tr></thead><tbody>${tr}</tbody></table></div>
-    <div class="msNote">데이터랩 숫자는 검색 건수가 아니라 조회마다 최고점을 100으로 둔 상대 지수입니다 → 수요 규모는 한 달 검색량으로 유추합니다. 한 달 검색량 = 네이버 검색광고 → 키워드 도구의 '월간 검색수(PC+모바일)', <b>데이터랩에 묶어 넣은 하위 검색어들의 합계</b>를 그 달과 함께 입력(하나만 넣으면 작게 잡힘). 키워드마다 다 넣을 필요는 없고, 기준 키워드 하나만 넣어도 같은 조회·기준 키워드로 이어진 조회는 자동 환산됩니다. 네이버 검색만 반영(쿠팡 내 검색 제외) — 키워드 간 크기 비교·증감 흐름용. 전년 동월 대비 = 입력한 달(없으면 지난달) ÷ 1년 전 같은 달, 지수끼리 비율이라 검색량을 안 넣어도 계산됨. 최근 3개월 증감 = 최근 3개월 평균 ÷ 1년 전 같은 3개월(또는 직전 3개월) 평균. ${guide}</div></div>`;
+    <div style="overflow-x:auto;margin-top:12px"><table class="ovItems kwTbl"><thead><tr><th class="l" rowspan="2">키워드</th><th class="c" rowspan="2">추세<br><span class="kwThSub">12개월 이동평균 방향</span></th><th class="l" rowspan="2">연간 증감<br><span class="kwThSub">최근 12개월 vs 그 전 12개월</span></th><th class="c kwRefH" colspan="3">참고 — 단기 증감</th><th class="r" rowspan="2">최근 3개월 평균<br><span class="kwThSub">추정 월 검색량</span></th><th class="c" rowspan="2">최고 월</th><th class="c" rowspan="2">한 달 검색량 (직접 입력)<br><span class="kwThSub">하위 검색어 합계 · 아래는 환산 방식</span></th><th class="l" rowspan="2">연결 품목</th><th rowspan="2"></th></tr><tr><th class="l kwRefH">전년 동월${ymOne?` (${ymS(ymOne[0])}→${ymS(ymOne[1])})`:''}</th><th class="c kwRefH">최근 3개월<br>vs 1년 전</th><th class="c kwRefH">최근 3개월<br>vs 직전</th></tr></thead><tbody>${tr}</tbody></table></div>
+    <div class="msNote">데이터랩 숫자는 검색 건수가 아니라 조회마다 최고점을 100으로 둔 상대 지수입니다 → 수요 규모는 한 달 검색량으로 유추합니다. 한 달 검색량 = 네이버 검색광고 → 키워드 도구의 '월간 검색수(PC+모바일)', <b>데이터랩에 묶어 넣은 하위 검색어들의 합계</b>를 그 달과 함께 입력(하나만 넣으면 작게 잡힘). 키워드마다 다 넣을 필요는 없고, 기준 키워드 하나만 넣어도 같은 조회·기준 키워드로 이어진 조회는 자동 환산됩니다. 네이버 검색만 반영(쿠팡 내 검색 제외) — 키워드 간 크기 비교·증감 흐름용. <b>판단은 추세·연간 증감 기준</b> — 추세 = 12개월 이동평균이 최근 6개월간 3% 넘게 오르면 상승, 내리면 하락, 그 사이면 보합(몇 개월째 같은 방향인지, 최근 2개월 방향이 바뀌면 반등·꺾임 조짐 표시). 연간 증감 = 최근 12개월 평균 ÷ 그 전 12개월 평균(계절 영향 상쇄, 이번 달은 진행 중이라 제외). 전년 동월 대비 = 입력한 달(없으면 지난달) ÷ 1년 전 같은 달, 지수끼리 비율이라 검색량을 안 넣어도 계산됨. 최근 3개월 증감 = 최근 3개월 평균 ÷ 1년 전 같은 3개월(또는 직전 3개월) 평균. ${guide}</div></div>`;
 }
 function kwDraw(){
   if(kwChart){ try{ kwChart.destroy(); }catch(e){} kwChart=null; }
   const cv=document.getElementById('kwChart'); if(!cv||!window.Chart) return; const S=kwStore(), sel=kwSelected(); if(!sel.length) return;
   kwFx=null; const mode=kwMode(sel), ds=[...new Set([].concat(...sel.map(k=>Object.keys(S[k].pts))))].sort();
   kwChart=new Chart(cv,{type:'line',data:{labels:ds,datasets:sel.map(k=>{ const e=S[k], sc=mode==='vol'?kwScale(k):1;
-      return {label:k,data:ds.map(d=>e.pts[d]!=null?Math.round(e.pts[d]*sc*100)/100:null),borderColor:kwColor(k),backgroundColor:kwColor(k),fill:false,tension:0,pointRadius:0,pointHoverRadius:3,borderWidth:2,spanGaps:true}; })},
+      let p=e.pts; if(kwSmooth){ const w=e.grain==='일간'?84:e.grain==='월간'?3:12, kd=Object.keys(e.pts).sort(); p={}; kd.forEach((d,i)=>{ if(i<w-1) return; let s=0; for(let j=i-w+1;j<=i;j++) s+=e.pts[kd[j]]; p[d]=s/w; }); }
+      return {label:k,data:ds.map(d=>p[d]!=null?Math.round(p[d]*sc*100)/100:null),borderColor:kwColor(k),backgroundColor:kwColor(k),fill:false,tension:0,pointRadius:0,pointHoverRadius:3,borderWidth:2,spanGaps:true}; })},
     options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},
       tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${mode==='vol'?won(Math.round(c.parsed.y))+'건':c.parsed.y}`}}},
       scales:{x:{grid:{display:false},ticks:{maxTicksLimit:10,maxRotation:0,callback:function(v){ const d=this.getLabelForValue(v); return d?d.slice(2,7).replace('-','.'):''; }}},
