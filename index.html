@@ -8372,13 +8372,18 @@ function kwHtml(rows){
   const sel=kwSelected(), mode=kwMode(sel), sets=[...new Set(sel.map(k=>S[k].set))];
   const pc=v=>v==null?'<span class="msDim">-</span>':`<b class="${v>=0?'kwUp':'kwDn'}">${v>=0?'▲':'▼'}${Math.abs(v).toFixed(0)}%</b>`;
   const st=all.map(k=>{ const e=S[k], sc=kwScale(k), mo=kwMonthly(e); const ds=Object.keys(e.pts).sort();
-    return {k,e,sc,s:kwStat(mo),it:kwItem(k,rows),from:ds[0],to:ds[ds.length-1]}; });
+    // [v175] 전년 동월 대비 — 기준 달 = 한 달 검색량을 넣은 달(없으면 지난달, 그 달 데이터가 없으면 마지막 달). 지수끼리 비율이라 검색량 없이도 계산
+    const lf=kwLastFullMonth(), ms=Object.keys(mo).sort(), bm=(e.vol&&e.vol.ym&&mo[e.vol.ym]!=null)?e.vol.ym:mo[lf]!=null?lf:ms[ms.length-1], pm=bm?(+bm.slice(0,4)-1)+bm.slice(4):null;
+    const ym={cur:bm,prev:pm,a:bm?mo[bm]:null,b:pm?mo[pm]:null}; ym.pct=ym.a!=null&&ym.b>0?(ym.a/ym.b-1)*100:null;
+    return {k,e,sc,s:kwStat(mo),ym,it:kwItem(k,rows),from:ds[0],to:ds[ds.length-1]}; });
   const chips=all.map(k=>`<button class="${sel.includes(k)?'on':''}" onclick="kwToggle(${all.indexOf(k)})"><span class="ovDot" style="background:${kwColor(k)}"></span>${pEsc(k)}</button>`).join('');
-  const sv=st.filter(x=>sel.includes(x.k)&&x.s&&x.s.yoy!=null).sort((a,b)=>b.s.yoy-a.s.yoy), top=sv[0], low=sv[sv.length-1];
+  const sv=st.filter(x=>sel.includes(x.k)&&x.ym.pct!=null).sort((a,b)=>b.ym.pct-a.ym.pct), top=sv[0], low=sv[sv.length-1];
   const tr=st.map(x=>{ const v=x.e.vol||{}, cur=x.s&&x.s.cur!=null?(x.sc?won(Math.round(x.s.cur*x.sc))+'건':x.s.cur.toFixed(1)):'-', ka=all.indexOf(x.k);
     return `<tr${sel.includes(x.k)?'':' style="opacity:.55"'}><td class="l"><span class="ovDot" style="background:${kwColor(x.k)}"></span><b>${pEsc(x.k)}</b></td>
     <td class="c msDim">${x.e.grain} · ${x.from.slice(0,7)}~${x.to.slice(0,7)}</td>
-    <td class="r">${cur}</td><td class="r">${pc(x.s&&x.s.yoy)}</td><td class="r">${pc(x.s&&x.s.qoq)}</td><td class="c">${x.s?x.s.peak:'-'}</td>
+    <td class="r">${cur}</td>
+    <td class="r" style="white-space:nowrap">${x.ym.pct==null?'<span class="msDim">-</span>':`${pc(x.ym.pct)}<div class="msDim" style="font-size:11px">${x.ym.prev.slice(2).replace('-','.')} → ${x.ym.cur.slice(2).replace('-','.')}${x.sc?` · ${won(Math.round(x.ym.b*x.sc))} → ${won(Math.round(x.ym.a*x.sc))}건`:''}</div>`}</td>
+    <td class="r">${pc(x.s&&x.s.yoy)}</td><td class="r">${pc(x.s&&x.s.qoq)}</td><td class="c">${x.s?x.s.peak:'-'}</td>
     <td class="c" style="white-space:nowrap"><input type="month" class="kwIn" value="${v.ym||kwLastFullMonth()}" onchange="kwVol(${ka},this.value,null)"> <input type="number" class="kwIn" style="width:120px" placeholder="하위 검색어 합계" value="${v.n||''}" onchange="kwVol(${ka},null,this.value)"></td>
     <td class="c">${kwHow(x.k)?`<span class="${v.n?'':'msDim'}">${pEsc(kwHow(x.k))}</span>`:'<span class="kwWarn">환산 불가</span>'}</td>
     <td class="l">${x.it?pEsc(x.it):'<span class="msDim">-</span>'}</td>
@@ -8386,11 +8391,11 @@ function kwHtml(rows){
   const unitTxt=mode==='vol'?'추정 월 검색량(건) = 데이터랩 지수 × (입력한 한 달 검색량 ÷ 그 달 지수) — 기준 키워드로 이어진 조회도 같은 눈금':sets.length>1?'⚠ 서로 다른 파일의 지수 — 기준이 달라 높낮이 직접 비교 불가 (한 달 검색량을 넣거나, 기준 키워드를 같이 넣어 조회하면 환산돼 비교됨)':'네이버 데이터랩 지수(이 조회에서 가장 큰 값 = 100)';
   return `<div class="msCard ovWide"><div class="ovH">검색 키워드 추이 <span>키워드 ${all.length}개 누적 · 그래프 ${sel.length}개 선택 — 아래 버튼을 눌러 켜고 끔</span></div>
     <div class="ovChips kwChips">${chips}</div>
-    ${top&&low&&top!==low?`<div class="ovWash">최근 3개월, 1년 전 대비 가장 많이 오른 키워드 <b>${pEsc(top.k)} ${pc(top.s.yoy)}</b> · 가장 많이 내린 키워드 <b>${pEsc(low.k)} ${pc(low.s.yoy)}</b></div>`:''}
+    ${top&&low&&top!==low?`<div class="ovWash">전년 동월 대비 ${top.ym.pct>=0?'가장 많이 오른':'가장 적게 내린'} 키워드 <b>${pEsc(top.k)} ${pc(top.ym.pct)}</b> (${top.ym.prev}→${top.ym.cur}) · ${low.ym.pct<0?'가장 많이 내린':'가장 적게 오른'} 키워드 <b>${pEsc(low.k)} ${pc(low.ym.pct)}</b> (${low.ym.prev}→${low.ym.cur})</div>`:''}
     <div class="kwUnit${mode!=='vol'&&sets.length>1?' kwWarn':''}">${unitTxt}</div>
     <div class="kwChartBox"><canvas id="kwChart"></canvas></div>
-    <div style="overflow-x:auto;margin-top:12px"><table class="ovItems"><thead><tr><th class="l">키워드</th><th>단위 · 기간</th><th class="r">최근 3개월 평균<br><span class="msDim">추정 월 검색량</span></th><th class="r">1년 전 대비</th><th class="r">직전 3개월 대비</th><th>최고 월</th><th>한 달 검색량 (직접 입력)</th><th>검색량 환산</th><th class="l">연결 품목</th><th></th></tr></thead><tbody>${tr}</tbody></table></div>
-    <div class="msNote">데이터랩 숫자는 검색 건수가 아니라 조회마다 최고점을 100으로 둔 상대 지수입니다 → 수요 규모는 한 달 검색량으로 유추합니다. 한 달 검색량 = 네이버 검색광고 → 키워드 도구의 '월간 검색수(PC+모바일)', <b>데이터랩에 묶어 넣은 하위 검색어들의 합계</b>를 그 달과 함께 입력(하나만 넣으면 작게 잡힘). 키워드마다 다 넣을 필요는 없고, 기준 키워드 하나만 넣어도 같은 조회·기준 키워드로 이어진 조회는 자동 환산됩니다. 네이버 검색만 반영(쿠팡 내 검색 제외) — 키워드 간 크기 비교·증감 흐름용. 증감 = 최근 3개월 평균 ÷ 1년 전 같은 3개월(또는 직전 3개월) 평균. ${guide}</div></div>`;
+    <div style="overflow-x:auto;margin-top:12px"><table class="ovItems"><thead><tr><th class="l">키워드</th><th>단위 · 기간</th><th class="r">최근 3개월 평균<br><span class="msDim">추정 월 검색량</span></th><th class="r">전년 동월 대비<br><span class="msDim">입력한 달 기준</span></th><th class="r">최근 3개월<br><span class="msDim">1년 전 대비</span></th><th class="r">직전 3개월 대비</th><th>최고 월</th><th>한 달 검색량 (직접 입력)</th><th>검색량 환산</th><th class="l">연결 품목</th><th></th></tr></thead><tbody>${tr}</tbody></table></div>
+    <div class="msNote">데이터랩 숫자는 검색 건수가 아니라 조회마다 최고점을 100으로 둔 상대 지수입니다 → 수요 규모는 한 달 검색량으로 유추합니다. 한 달 검색량 = 네이버 검색광고 → 키워드 도구의 '월간 검색수(PC+모바일)', <b>데이터랩에 묶어 넣은 하위 검색어들의 합계</b>를 그 달과 함께 입력(하나만 넣으면 작게 잡힘). 키워드마다 다 넣을 필요는 없고, 기준 키워드 하나만 넣어도 같은 조회·기준 키워드로 이어진 조회는 자동 환산됩니다. 네이버 검색만 반영(쿠팡 내 검색 제외) — 키워드 간 크기 비교·증감 흐름용. 전년 동월 대비 = 입력한 달(없으면 지난달) ÷ 1년 전 같은 달, 지수끼리 비율이라 검색량을 안 넣어도 계산됨. 최근 3개월 증감 = 최근 3개월 평균 ÷ 1년 전 같은 3개월(또는 직전 3개월) 평균. ${guide}</div></div>`;
 }
 function kwDraw(){
   if(kwChart){ try{ kwChart.destroy(); }catch(e){} kwChart=null; }
