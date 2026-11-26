@@ -8323,13 +8323,32 @@ function kwStore(){   // 예전(v172) 묶음 형식 → 키워드별 형식으�
   const K=DATA.keywordTrend=DATA.keywordTrend||{}; K.kws=K.kws||{};
   if(K.groups){ K.groups.forEach(g=>g.kws.forEach(k=>{ if(/^(일간|주간|월간)\s*:/.test(k)||K.kws[k]) return; const pts={}; Object.entries(g.series[k]||{}).forEach(([ym,v])=>{ pts[ym+'-01']=v; });
     K.kws[k]={pts,grain:'월간',set:g.file+'·'+g.at,file:g.file,at:g.at}; })); delete K.groups; }
+  // [v174] 조회(파일)별 원래 값 보관 — 키워드가 새 파일로 교체돼도 예전 조회 속 기준 키워드 값으로 눈금을 이어 붙이기 위함
+  K.sets=K.sets||{}; Object.entries(K.kws).forEach(([k,e])=>{ const t=K.sets[e.set]=K.sets[e.set]||{file:e.file,at:e.at,grain:e.grain,pts:{}}; if(!t.pts[k]) t.pts[k]=e.pts; });
   return K.kws;
 }
+function kwPrune(){ const K=DATA.keywordTrend; if(!K||!K.sets) return; Object.keys(K.sets).forEach(id=>{ if(!Object.keys(K.sets[id].pts).some(k=>K.kws[k])) delete K.sets[id]; }); }
 function kwMonthly(e){ const s={}, n={}; Object.entries(e.pts).forEach(([d,v])=>{ const ym=d.slice(0,7); s[ym]=(s[ym]||0)+v; n[ym]=(n[ym]||0)+1; }); const o={}; Object.keys(s).forEach(m=>{ o[m]=s[m]/n[m]; }); return o; }
-function kwScale(e){   // 지수 1 = 검색량 몇 건인지 (한 달 검색량 입력 시)
-  if(!e.vol||!(e.vol.n>0)) return null; const mo=kwMonthly(e), ms=Object.keys(mo).sort(); if(!ms.length) return null;
-  const base=mo[e.vol.ym]!=null?mo[e.vol.ym]:mo[ms[ms.length-1]]; return base>0?e.vol.n/base:null;
+function kwBase(pts,vol){ const mo=kwMonthly({pts}), ms=Object.keys(mo).sort(); if(!ms.length) return null; const b=mo[vol.ym]!=null?mo[vol.ym]:mo[ms[ms.length-1]]; return b>0?vol.n/b:null; }
+// [v174] 조회별 눈금(지수 1 = 몇 건): ① 그 조회 안 키워드에 한 달 검색량이 있으면 직접 ② 없으면 다른 조회와 같이 들어간 '기준 키워드'의 월 평균 비율로 이어 붙임
+function kwFactors(){
+  const K=DATA.keywordTrend||{}, S=K.kws||{}, T=K.sets||{}, f={}, how={};
+  Object.entries(T).forEach(([id,t])=>{ for(const k of Object.keys(t.pts)){ const e=S[k]; if(e&&e.vol&&e.vol.n>0){ const x=kwBase(t.pts[k],e.vol); if(x){ f[id]=x; how[id]={kw:k}; break; } } } });
+  let moved=true; while(moved){ moved=false;
+    Object.entries(T).forEach(([id,t])=>{ if(f[id]) return;
+      for(const [uid,u] of Object.entries(T)){ if(!f[uid]) continue; const sh=Object.keys(t.pts).find(k=>u.pts[k]); if(!sh) continue;
+        const a=kwMonthly({pts:u.pts[sh]}), b=kwMonthly({pts:t.pts[sh]}), ms=Object.keys(a).filter(m=>b[m]!=null);
+        const sa=ms.reduce((p,m)=>p+a[m],0), sb=ms.reduce((p,m)=>p+b[m],0); if(!(sa>0&&sb>0)) continue;
+        f[id]=f[uid]*sa/sb; how[id]={kw:sh,anchor:true}; moved=true; return; } }); }
+  return {f,how};
 }
+let kwFx=null;
+function kwScale(k){   // 지수 1 = 검색량 몇 건인지 (자기 한 달 검색량 > 같은 조회의 다른 키워드 > 기준 키워드로 이은 조회)
+  const S=kwStore(), e=S[k]; if(!e) return null; if(e.vol&&e.vol.n>0) return kwBase(e.pts,e.vol);
+  const F=kwFx||(kwFx=kwFactors()); return F.f[e.set]||null;
+}
+function kwHow(k){ const e=kwStore()[k]; if(!e) return ''; if(e.vol&&e.vol.n>0) return '직접 입력';
+  const F=kwFx||(kwFx=kwFactors()), h=F.how[e.set]; if(!h||!F.f[e.set]) return ''; return h.anchor?`'${h.kw}' 기준 환산`:`같은 조회 '${h.kw}' 기준`; }
 function kwStat(s){   // s = {YYYY-MM: 월 평균}. 최근 3개월 vs 1년 전 같은 3개월, vs 직전 3개월
   const ms=Object.keys(s).sort(); if(!ms.length) return null; const last=ms[ms.length-1];
   const shift=(ym,d)=>{ let y=+ym.slice(0,4), m=+ym.slice(5,7)+d; while(m<1){m+=12;y--;} while(m>12){m-=12;y++;} return y+'-'+String(m).padStart(2,'0'); };
@@ -8344,15 +8363,15 @@ function kwList(){ const S=kwStore(); return Object.keys(S).sort((a,b)=>String(S
 function kwSelected(){ const S=kwStore(), all=kwList(); if(kwOn) kwOn=kwOn.filter(k=>S[k]);
   if(!kwOn||!kwOn.length){ const s0=all.length?S[all[0]].set:''; kwOn=all.filter(k=>S[k].set===s0); } return kwOn; }
 function kwColor(k){ return OV_TYPE_C[Math.max(0,kwList().indexOf(k))%OV_TYPE_C.length]; }
-function kwMode(sel){ const S=kwStore(); if(sel.length&&sel.every(k=>kwScale(S[k]))) return 'vol'; return 'idx'; }
+function kwMode(sel){ if(sel.length&&sel.every(k=>kwScale(k))) return 'vol'; return 'idx'; }
 function kwLastFullMonth(){ const d=new Date(NOW.getFullYear(),NOW.getMonth()-1,1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 function kwHtml(rows){
-  const S=kwStore(), all=kwList();
-  const guide=`네이버 데이터랩(datalab.naver.com) → 검색어트렌드 → 키워드 입력(최대 5개) → 조회 → 엑셀 다운로드 → 위 <b>🔍 키워드 조사 업로드</b>. 올릴 때마다 키워드가 쌓이고, 같은 키워드를 다시 올리면 최신 파일로 바뀝니다.`;
+  const S=kwStore(), all=kwList(); kwFx=null;
+  const guide=`네이버 데이터랩(datalab.naver.com) → 검색어트렌드 → 키워드 입력(최대 5개) → 조회 → 엑셀 다운로드 → 위 <b>🔍 키워드 조사 업로드</b>. 올릴 때마다 키워드가 쌓이고, 같은 키워드를 다시 올리면 최신 파일로 바뀝니다. <b>다른 품목을 조회할 때는 기준 키워드 하나(예: 캡슐세제)를 꼭 같이 넣고 나머지 4개만 바꾸세요</b> — 기준 키워드 값의 비율로 새 키워드도 자동으로 같은 눈금(추정 월 검색량)에 맞춰집니다.`;
   if(!all.length) return `<div class="msCard ovWide"><div class="ovH">검색 키워드 추이 <span>아직 업로드된 키워드 조사가 없습니다</span></div><div class="msNote" style="margin-top:0">${guide}</div></div>`;
   const sel=kwSelected(), mode=kwMode(sel), sets=[...new Set(sel.map(k=>S[k].set))];
   const pc=v=>v==null?'<span class="msDim">-</span>':`<b class="${v>=0?'kwUp':'kwDn'}">${v>=0?'▲':'▼'}${Math.abs(v).toFixed(0)}%</b>`;
-  const st=all.map(k=>{ const e=S[k], sc=kwScale(e), mo=kwMonthly(e); const ds=Object.keys(e.pts).sort();
+  const st=all.map(k=>{ const e=S[k], sc=kwScale(k), mo=kwMonthly(e); const ds=Object.keys(e.pts).sort();
     return {k,e,sc,s:kwStat(mo),it:kwItem(k,rows),from:ds[0],to:ds[ds.length-1]}; });
   const chips=all.map(k=>`<button class="${sel.includes(k)?'on':''}" onclick="kwToggle(${all.indexOf(k)})"><span class="ovDot" style="background:${kwColor(k)}"></span>${pEsc(k)}</button>`).join('');
   const sv=st.filter(x=>sel.includes(x.k)&&x.s&&x.s.yoy!=null).sort((a,b)=>b.s.yoy-a.s.yoy), top=sv[0], low=sv[sv.length-1];
@@ -8360,23 +8379,24 @@ function kwHtml(rows){
     return `<tr${sel.includes(x.k)?'':' style="opacity:.55"'}><td class="l"><span class="ovDot" style="background:${kwColor(x.k)}"></span><b>${pEsc(x.k)}</b></td>
     <td class="c msDim">${x.e.grain} · ${x.from.slice(0,7)}~${x.to.slice(0,7)}</td>
     <td class="r">${cur}</td><td class="r">${pc(x.s&&x.s.yoy)}</td><td class="r">${pc(x.s&&x.s.qoq)}</td><td class="c">${x.s?x.s.peak:'-'}</td>
-    <td class="c" style="white-space:nowrap"><input type="month" class="kwIn" value="${v.ym||kwLastFullMonth()}" onchange="kwVol(${ka},this.value,null)"> <input type="number" class="kwIn" style="width:92px" placeholder="검색량" value="${v.n||''}" onchange="kwVol(${ka},null,this.value)"></td>
+    <td class="c" style="white-space:nowrap"><input type="month" class="kwIn" value="${v.ym||kwLastFullMonth()}" onchange="kwVol(${ka},this.value,null)"> <input type="number" class="kwIn" style="width:120px" placeholder="하위 검색어 합계" value="${v.n||''}" onchange="kwVol(${ka},null,this.value)"></td>
+    <td class="c">${kwHow(x.k)?`<span class="${v.n?'':'msDim'}">${pEsc(kwHow(x.k))}</span>`:'<span class="kwWarn">환산 불가</span>'}</td>
     <td class="l">${x.it?pEsc(x.it):'<span class="msDim">-</span>'}</td>
     <td class="c"><a href="javascript:void 0" title="키워드 삭제" onclick="kwRemove(${ka})">✕</a></td></tr>`; }).join('');
-  const unitTxt=mode==='vol'?'한 달 검색량으로 환산한 값(건)':sets.length>1?'⚠ 서로 다른 파일의 지수 — 기준이 달라 높낮이 직접 비교 불가 (한 달 검색량을 넣으면 검색량으로 환산해 비교)':'네이버 데이터랩 지수(이 조회에서 가장 큰 값 = 100)';
+  const unitTxt=mode==='vol'?'추정 월 검색량(건) = 데이터랩 지수 × (입력한 한 달 검색량 ÷ 그 달 지수) — 기준 키워드로 이어진 조회도 같은 눈금':sets.length>1?'⚠ 서로 다른 파일의 지수 — 기준이 달라 높낮이 직접 비교 불가 (한 달 검색량을 넣거나, 기준 키워드를 같이 넣어 조회하면 환산돼 비교됨)':'네이버 데이터랩 지수(이 조회에서 가장 큰 값 = 100)';
   return `<div class="msCard ovWide"><div class="ovH">검색 키워드 추이 <span>키워드 ${all.length}개 누적 · 그래프 ${sel.length}개 선택 — 아래 버튼을 눌러 켜고 끔</span></div>
     <div class="ovChips kwChips">${chips}</div>
     ${top&&low&&top!==low?`<div class="ovWash">최근 3개월, 1년 전 대비 가장 많이 오른 키워드 <b>${pEsc(top.k)} ${pc(top.s.yoy)}</b> · 가장 많이 내린 키워드 <b>${pEsc(low.k)} ${pc(low.s.yoy)}</b></div>`:''}
     <div class="kwUnit${mode!=='vol'&&sets.length>1?' kwWarn':''}">${unitTxt}</div>
     <div class="kwChartBox"><canvas id="kwChart"></canvas></div>
-    <div style="overflow-x:auto;margin-top:12px"><table class="ovItems"><thead><tr><th class="l">키워드</th><th>단위 · 기간</th><th class="r">최근 3개월 평균</th><th class="r">1년 전 대비</th><th class="r">직전 3개월 대비</th><th>최고 월</th><th>한 달 검색량 (직접 입력)</th><th class="l">연결 품목</th><th></th></tr></thead><tbody>${tr}</tbody></table></div>
-    <div class="msNote">증감 = 최근 3개월 평균 ÷ 1년 전 같은 3개월(또는 직전 3개월) 평균. 한 달 검색량은 네이버 검색광고 → 키워드 도구의 '월간 검색수(PC+모바일)'를 그 달과 함께 넣으면 됩니다 — 넣으면 그 달 지수를 기준으로 전체 추이가 검색량(건)으로 바뀝니다. ${guide}</div></div>`;
+    <div style="overflow-x:auto;margin-top:12px"><table class="ovItems"><thead><tr><th class="l">키워드</th><th>단위 · 기간</th><th class="r">최근 3개월 평균<br><span class="msDim">추정 월 검색량</span></th><th class="r">1년 전 대비</th><th class="r">직전 3개월 대비</th><th>최고 월</th><th>한 달 검색량 (직접 입력)</th><th>검색량 환산</th><th class="l">연결 품목</th><th></th></tr></thead><tbody>${tr}</tbody></table></div>
+    <div class="msNote">데이터랩 숫자는 검색 건수가 아니라 조회마다 최고점을 100으로 둔 상대 지수입니다 → 수요 규모는 한 달 검색량으로 유추합니다. 한 달 검색량 = 네이버 검색광고 → 키워드 도구의 '월간 검색수(PC+모바일)', <b>데이터랩에 묶어 넣은 하위 검색어들의 합계</b>를 그 달과 함께 입력(하나만 넣으면 작게 잡힘). 키워드마다 다 넣을 필요는 없고, 기준 키워드 하나만 넣어도 같은 조회·기준 키워드로 이어진 조회는 자동 환산됩니다. 네이버 검색만 반영(쿠팡 내 검색 제외) — 키워드 간 크기 비교·증감 흐름용. 증감 = 최근 3개월 평균 ÷ 1년 전 같은 3개월(또는 직전 3개월) 평균. ${guide}</div></div>`;
 }
 function kwDraw(){
   if(kwChart){ try{ kwChart.destroy(); }catch(e){} kwChart=null; }
   const cv=document.getElementById('kwChart'); if(!cv||!window.Chart) return; const S=kwStore(), sel=kwSelected(); if(!sel.length) return;
-  const mode=kwMode(sel), ds=[...new Set([].concat(...sel.map(k=>Object.keys(S[k].pts))))].sort();
-  kwChart=new Chart(cv,{type:'line',data:{labels:ds,datasets:sel.map(k=>{ const e=S[k], sc=mode==='vol'?kwScale(e):1;
+  kwFx=null; const mode=kwMode(sel), ds=[...new Set([].concat(...sel.map(k=>Object.keys(S[k].pts))))].sort();
+  kwChart=new Chart(cv,{type:'line',data:{labels:ds,datasets:sel.map(k=>{ const e=S[k], sc=mode==='vol'?kwScale(k):1;
       return {label:k,data:ds.map(d=>e.pts[d]!=null?Math.round(e.pts[d]*sc*100)/100:null),borderColor:kwColor(k),backgroundColor:kwColor(k),fill:false,tension:0,pointRadius:0,pointHoverRadius:3,borderWidth:2,spanGaps:true}; })},
     options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},
       tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${mode==='vol'?won(Math.round(c.parsed.y))+'건':c.parsed.y}`}}},
@@ -8385,7 +8405,7 @@ function kwDraw(){
 }
 window.kwToggle=function(i){ const k=kwList()[i], sel=kwSelected().slice(), j=sel.indexOf(k); if(j>=0){ if(sel.length>1) sel.splice(j,1); } else sel.push(k); kwOn=sel; renderMarket(); };
 window.kwVol=function(i,ym,n){ const k=kwList()[i], e=kwStore()[k]; if(!e) return; e.vol=e.vol||{ym:kwLastFullMonth(),n:0}; if(ym) e.vol.ym=ym; if(n!=null) e.vol.n=kwNum(n)||0; if(!e.vol.n) delete e.vol; markDirty(); renderMarket(); toast(`'${k}' 한 달 검색량 반영 — 파일 저장으로 백업하세요`); };
-window.kwRemove=function(i){ const S=kwStore(), k=kwList()[i]; if(!S[k]||!confirm(`'${k}' 키워드를 삭제할까요?`)) return; delete S[k]; if(kwOn) kwOn=kwOn.filter(x=>x!==k); markDirty(); renderMarket(); toast('키워드 삭제됨 — 파일 저장으로 백업하세요'); };
+window.kwRemove=function(i){ const S=kwStore(), k=kwList()[i]; if(!S[k]||!confirm(`'${k}' 키워드를 삭제할까요?`)) return; delete S[k]; kwPrune(); if(kwOn) kwOn=kwOn.filter(x=>x!==k); markDirty(); renderMarket(); toast('키워드 삭제됨 — 파일 저장으로 백업하세요'); };
 document.getElementById('btnKwUpload').onclick=()=>document.getElementById('kwFileInput').click();
 document.getElementById('kwFileInput').onchange=e=>{
   const file=e.target.files[0]; if(!file) return;
@@ -8394,8 +8414,10 @@ document.getElementById('kwFileInput').onchange=e=>{
     const S=kwStore(), ds=[...new Set([].concat(...r.kws.map(k=>Object.keys(r.pts[k]))))].sort(), rep=r.kws.filter(k=>S[k]), nw=r.kws.filter(k=>!S[k]);
     if(!confirm(`'${file.name}'\n\n키워드 ${r.kws.length}개 (${r.grain}): ${r.kws.join(', ')}\n기간 ${ds[0]} ~ ${ds[ds.length-1]}\n\n${nw.length?`새로 추가: ${nw.join(', ')}\n`:''}${rep.length?`이미 있어 최신으로 교체: ${rep.join(', ')}\n`:''}\n키워드 조사에 반영할까요?`)){ toast('업로드 취소됨'); return; }
     r.kws.forEach(k=>{ const old=S[k]; S[k]={pts:r.pts[k],grain:r.grain,set:r.set,file:r.file,at:r.at}; if(old&&old.vol) S[k].vol=old.vol; });
+    DATA.keywordTrend.sets[r.set]={file:r.file,at:r.at,grain:r.grain,pts:r.pts}; kwPrune(); kwFx=null;
+    const miss=r.kws.filter(k=>!kwScale(k));
     kwOn=r.kws.slice(); marketTab='home'; markDirty(); renderMarket();
-    toast(`키워드 조사 반영 — 추가 ${nw.length} · 교체 ${rep.length} (누적 ${Object.keys(S).length}개). 파일 저장으로 백업하세요.`);
+    toast(`키워드 조사 반영 — 추가 ${nw.length} · 교체 ${rep.length} (누적 ${Object.keys(S).length}개). ${miss.length?`'${miss.join(', ')}'은 검색량 환산 불가 — 한 달 검색량을 넣거나 기준 키워드를 같이 넣어 다시 조회하세요. `:'모두 추정 월 검색량으로 환산됨. '}파일 저장으로 백업하세요.`);
   }));
 };
 function renderMarket(){
