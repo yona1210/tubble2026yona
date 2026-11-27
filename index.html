@@ -7532,7 +7532,7 @@ const MS_ORDER=['keep','grow','weak','opp','ref'];
 const msVerdictBadge=r=>r&&r.early?'<span class="msPill early">출시 초기</span>':msPill(r.v);
 // [v160] 통계청 계열(세탁용·주방용·기타 세제·실내용 가향제) — 품목이 속한 계열과 계열 값
 function msFamOf(r){ const f=MS_FAM.find(f=>f.ns.includes(r.n)); if(!f) return null; const ST=ovStat(DATA.coupangItemMarket);
-  const v={washDet:msWD().v,washEtc:Math.max(0,ST.parts[0].v-msWD().v),kitchen:ST.parts[1].v,etc:ST.parts[2].v,aroma:ST.aroma}[f.k]; return {t:f.t,v}; }
+  const v={washDet:msWD().v,washEtc:Math.max(0,ST.parts[0].v-msWD().v),kitchen:ST.parts[1].v,etc:ST.parts[2].v,aroma:ST.aroma,soap:ST.soap}[f.k]; return {t:f.t,v}; }
 // [v160] 쿠팡 1위 '브랜드'(품목 안 브랜드별 추정액 합 기준) + 비중, 조사 상품 5개 미만이면 표본 부족
 function msTopBrand(r){ const D=DATA.coupangItemMarket, c=D&&r.u?(D.items||[]).find(x=>x.item===r.u):null;
   if(!c||!c.brands||!c.brands[0]||!(c.amt>0)) return null; return {b:c.brands[0][0],s:c.brands[0][1]/c.amt,n:c.n,thin:c.n<5}; }
@@ -7574,22 +7574,24 @@ const MS_FAM=[
   {k:'washEtc',t:'세탁용 합성세제 중 세탁세제 외',sh:'세탁용 나머지',ns:['액체섬유유연제','시트섬유유연제','유아섬유유연제','울세제','홈드라이세제','얼룩제거제','유아세제','세탁조클리너','이염방지시트']},
   {k:'kitchen',t:'주방용 합성세제',sh:'주방용',ns:['일반주방세제','천연성분주방세제','다목적 용기세척제','식기세척기용세제','유아 주방세제','야채과일세정제']},
   {k:'etc',t:'기타 세제',sh:'기타 세제',ns:['욕실세정제','변기세정제','기름때세정제','싱크대세정제','배수구세정제','곰팡이세정제','에어컨세정제','유리세정제','광택왁스/크리너','세정티슈(파우치형)','세정티슈(통형)','유리거울 세정티슈','물걸레 청소포','정전기 청소포']},
+  {k:'soap',t:'세탁 비누',sh:'세탁 비누',ns:['세탁비누','유아세탁비누'],sep:true},
   {k:'aroma',t:'실내용 가향제',sh:'가향제',ns:['섬유탈취제','실내용탈취제','차량용탈취제','화장실탈취제','냉장고탈취제','신발탈취제','피톤치드 탈취제'],sep:true}
 ];
 function msMarketEst(rows,cimBy){
-  const ST=ovStat(DATA.coupangItemMarket), statV={washDet:msWD().v,washEtc:Math.max(0,ST.parts[0].v-msWD().v),kitchen:ST.parts[1].v,etc:ST.parts[2].v,aroma:ST.aroma};
+  const ST=ovStat(DATA.coupangItemMarket), statV={washDet:msWD().v,washEtc:Math.max(0,ST.parts[0].v-msWD().v),kitchen:ST.parts[1].v,etc:ST.parts[2].v,aroma:ST.aroma,soap:ST.soap};
   const cp=r=>{ const c=r.u&&cimBy[r.u]; return c?c.amt*12/1e8:0; };
   const byId={}, fams=[];
   MS_FAM.forEach(f=>{ const mem=rows.filter(r=>!r.nj&&f.ns.includes(r.n)), s=mem.reduce((a,r)=>a+cp(r),0), V=statV[f.k];
     mem.forEach(r=>{ const e0=s>0?V*cp(r)/s:V/mem.length; byId[r.id]={est:e0,lo:e0,hi:e0,basis:'통계청 배분',fam:f.t,cp:cp(r)}; });
     fams.push({k:f.k,t:f.t,v:V,cp:s,k2:s>0?V/s:null,n:mem.length,sep:!!f.sep}); });
-  const ks=fams.map(f=>f.k2).filter(x=>x>0).sort((a,b)=>a-b), kMed=ks.length?(ks.length%2?ks[(ks.length-1)/2]:(ks[ks.length/2-1]+ks[ks.length/2])/2):null;
+  const ks=fams.filter(f=>f.k!=='soap').map(f=>f.k2).filter(x=>x>0)   // [v180] 세탁 비누는 오프라인(빨랫비누) 위주라 배수(23배)가 대표성 없음 → 환산 배수에서 제외
+   .sort((a,b)=>a-b), kMed=ks.length?(ks.length%2?ks[(ks.length-1)/2]:(ks[ks.length/2-1]+ks[ks.length/2])/2):null;
   // [v167] 쿠팡 환산은 범위로: 중간값 = 4개 계열 배수 중앙값, 범위 = 가장 낮은 계열 배수 ~ 가장 높은 계열 배수
   const kMin=ks.length?ks[0]:null, kMax=ks.length?ks[ks.length-1]:null;
   let conv=0, convLo=0, convHi=0; const convRows=[];
   rows.forEach(r=>{ if(r.nj||byId[r.id]) return; const c=cp(r); if(c>0&&kMed){ byId[r.id]={est:c*kMed,lo:c*kMin,hi:c*kMax,basis:'쿠팡 환산',fam:'통계청 품목 없음',cp:c}; conv+=c*kMed; convLo+=c*kMin; convHi+=c*kMax; convRows.push(r.n); } });
-  const stat=ST.total, total=stat+ST.aroma+conv;
-  return {byId,fams,kMed,kMin,kMax,conv,convLo,convHi,convRows,stat,aroma:ST.aroma,total,totalLo:stat+ST.aroma+convLo,totalHi:stat+ST.aroma+convHi,ST};
+  const stat=ST.total, total=stat+ST.aroma+ST.soap+conv;
+  return {byId,fams,kMed,kMin,kMax,conv,convLo,convHi,convRows,stat,aroma:ST.aroma,soap:ST.soap,total,totalLo:stat+ST.aroma+ST.soap+convLo,totalHi:stat+ST.aroma+ST.soap+convHi,ST};
 }
 function msRows(){
   const M=MKT(), mx={}; (M.matrix||[]).forEach(r=>{ if(r&&r.cat&&!mx[r.cat]) mx[r.cat]=r; });
@@ -7727,13 +7729,13 @@ const MS_STAT_YEAR='2024년';   // [v161] 통계청 광업·제조업조사 세�
 function ovStat(D){
   const R=(D&&D.ref&&D.ref.rows)||[], find=re=>R.find(r=>re.test(String(r[0]||'')));
   const num=r=>r?(+String(r[1]).replace(/[^\d.]/g,'')||null):null;
-  const wash=find(/세탁용\s*합성세제/), kit=find(/주방용\s*합성세제/), etc=find(/^기타\s*세제/), sub=find(/세제\s*소계/), aroma=find(/실내용\s*가향제/);
+  const soap=find(/^세탁\s*비누/), wash=find(/세탁용\s*합성세제/), kit=find(/주방용\s*합성세제/), etc=find(/^기타\s*세제/), sub=find(/세제\s*소계/), aroma=find(/실내용\s*가향제/);
   const parts=[{g:'세탁용 합성세제',v:num(wash)||10384},{g:'주방용 합성세제',v:num(kit)||5077},{g:'기타 세제',v:num(etc)||2094}];
   const total=num(sub)||parts.reduce((a,x)=>a+x.v,0);
   let year=String((sub||wash||[])[3]||'');
   if(!year||/확인\s*필요/.test(year)) year=MS_STAT_YEAR;   // [v161] 사용자 확인: 통계청 출하액 2024년
   const src=String((sub||wash||[])[5]||'통계청 광업·제조업조사');
-  return {parts,total,year,src,aroma:num(aroma)||2710};
+  return {parts,total,year,src,aroma:num(aroma)||2710,soap:num(soap)||262};   // [v180] 세탁 비누 = 통계청 출하액 26,223백만원(2024) — 시트 4에 '세탁 비누' 줄이 있으면 그 값
 }
 // [v167] 추정 시장 칸: 통계청 배분(실선) / 쿠팡 환산(점선 + 범위). 판정에는 쓰지 않는 참고 추정치
 function ovEstCell(x){
@@ -7764,9 +7766,9 @@ function ovMktHtml(E,ST,cimBy,rows){
   const left=`
     <div class="msCard ovC"><div class="ovH">국내 세제 시장 규모 <span>${pEsc(ST.src)} 품목별 출하액(10인 이상) · ${pEsc(ST.year)}</span></div>
       <div class="ovDonutWrap"><div class="ovDonut"><canvas id="ovMkt"></canvas><div class="ovDC"><b>${(ST.parts[0].v/ST.total*100).toFixed(0)}%</b><span>세탁용 비중</span></div></div><div class="ovLgs">${lg}</div></div>
-      <div class="ovAside">실내용 가향제 <b>${won(Math.round(ST.aroma))}억</b> (탈취제·방향제 포함, 세제 합계와 별도)</div>
+      <div class="ovAside">실내용 가향제 <b>${won(Math.round(ST.aroma))}억</b> (탈취제·방향제 포함, 세제 합계와 별도) · 세탁 비누 <b>${won(Math.round(ST.soap))}억</b> (비누라 합성세제 합계와 별도)</div>
       ${(()=>{ const ers=rows.filter(r=>!r.nj&&r.est>0), t=ers.reduce((a,r)=>a+r.est,0), lo=ers.reduce((a,r)=>a+r.estLo,0), hi=ers.reduce((a,r)=>a+r.estHi,0), cv=ers.filter(r=>r.estBasis==='쿠팡 환산').reduce((a,r)=>a+r.est,0);
-        return t>0?`<div class="ovAside est">품목 단위 <b>추정 시장 합계 ${(t/10000).toFixed(2)}조</b> <small>(범위 ${(lo/10000).toFixed(2)}~${(hi/10000).toFixed(2)}조)</small><br>= 통계청 세제 ${won(Math.round(ST.total))}억 + 가향제 ${won(Math.round(ST.aroma))}억 + 통계청 품목 없는 것(향기지속제·표백제·제습제 등) 쿠팡 환산 ${msEok(cv)} — 참고용 추정</div>`:''; })()}
+        return t>0?`<div class="ovAside est">품목 단위 <b>추정 시장 합계 ${(t/10000).toFixed(2)}조</b> <small>(범위 ${(lo/10000).toFixed(2)}~${(hi/10000).toFixed(2)}조)</small><br>= 통계청 세제 ${won(Math.round(ST.total))}억 + 가향제 ${won(Math.round(ST.aroma))}억 + 세탁 비누 ${won(Math.round(ST.soap))}억 + 통계청 품목 없는 것(향기지속제·표백제·제습제 등) 쿠팡 환산 ${msEok(cv)} — 참고용 추정</div>`:''; })()}
       <div class="msNote">출처: ${pEsc(ST.src)} 품목별 출하액(종사자 10인 이상 사업체 전수), ${pEsc(ST.year)}. 국내 제조사 출하 기준이라 수입품은 빠지고 수출·업소용은 들어 있습니다. 쿠팡 조사 숫자와는 기준이 달라 합산·비교하지 않습니다.</div></div>
 `;
   const right=`<div class="msCard ovC ovWide"><div class="ovH">${pEsc(ovGroupSel)} 품목별 구성 <span>${pEsc(ovGroupSel)} ${msEok(G.v)} · 품목군별 유형 비중(%는 품목군 안) · 연 환산</span></div>
@@ -7999,8 +8001,8 @@ function msSizeHtml(rows,L){
       <td class="l">${r.b1?`${pEsc(r.b1)} <span class="szPct">${(r.b1s*100).toFixed(0)}%</span>${r.nS<5?` <span class="szThin" title="조사 상품 ${r.nS}개">표본 부족</span>`:''}`:'<span class="msDim">-</span>'}</td>
       <td>${bar(r.revY,mxT,'t')}</td></tr>`).join('');
   }).join('');
-  const ST=GS.ST, statSum=ST.total+ST.aroma, tC=sum(it,'cpY'), tT=sum(it,'revY');
-  const foot=`<tr class="szTot"><td class="l">전체 합계</td><td class="r">${msEok(statSum)} <small>= 통계청 세제 ${msEok(ST.total)} + 실내용 가향제 ${msEok(ST.aroma)}</small></td><td class="r">${msEok(tC)}</td><td></td><td class="r">${msEok(tT)} <small>상품 매출 12개월 환산 · 선물세트·배송비 제외</small></td></tr>`;
+  const ST=GS.ST, statSum=ST.total+ST.aroma+ST.soap, tC=sum(it,'cpY'), tT=sum(it,'revY');
+  const foot=`<tr class="szTot"><td class="l">전체 합계</td><td class="r">${msEok(statSum)} <small>= 통계청 세제 ${msEok(ST.total)} + 실내용 가향제 ${msEok(ST.aroma)} + 세탁 비누 ${msEok(ST.soap)}</small></td><td class="r">${msEok(tC)}</td><td></td><td class="r">${msEok(tT)} <small>상품 매출 12개월 환산 · 선물세트·배송비 제외</small></td></tr>`;
   return `<div class="msCard"><div class="msCardH"><h3>품목별 규모 비교</h3><span class="msSum">모두 연간 기준 · 행을 누르면 품목별 상세</span></div>
     <div style="overflow-x:auto"><table class="msTbl szTbl"><thead><tr><th class="l">품목</th><th class="l">시장 규모 <small>품목은 미확인 · 카테고리는 통계청</small></th><th class="l">쿠팡 조사 상품 연 추정 <small>최대 10개</small></th><th class="l">쿠팡 1위 <small>비중</small></th><th class="l">터블 매출 <small>12개월 환산</small></th></tr></thead>
     <tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>
