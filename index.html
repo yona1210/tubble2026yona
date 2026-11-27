@@ -7568,11 +7568,12 @@ function msWD(){
   se.forEach(r=>{ const k=name(r).replace(/^네이버 검색 증감 · /,''), v=pct(r[2]!==''&&r[2]!=null?r[2]:r[1]); if(v==null) return; if(k==='캡슐') out.search.capsule=v; else if(k==='액체') out.search.liquid=v; else if(/가루|분말/.test(k)) out.search.powder=v; if(r[3]) out.search.period=String(r[3]); if(r[5]) out.search.src=String(r[5]); });
   out.from=src; return out;
 }
+// [v179] 세정티슈·청소포는 생활화학제품 '세정제'로 신고 → 통계청 '기타 세제'에 포함(쿠팡 환산 별도 가산 X). 탈취제는 KSIC 실내 가향제 예시 '악취 방지용 방향제품'이라 가향제 유지
 const MS_FAM=[
   {k:'washDet',t:'세탁세제',sh:'세탁세제',ns:['액체세제','분말세제','캡슐세제','시트세제']},
   {k:'washEtc',t:'세탁용 합성세제 중 세탁세제 외',sh:'세탁용 나머지',ns:['액체섬유유연제','시트섬유유연제','유아섬유유연제','울세제','홈드라이세제','얼룩제거제','유아세제','세탁조클리너','이염방지시트']},
   {k:'kitchen',t:'주방용 합성세제',sh:'주방용',ns:['일반주방세제','천연성분주방세제','다목적 용기세척제','식기세척기용세제','유아 주방세제','야채과일세정제']},
-  {k:'etc',t:'기타 세제',sh:'기타 세제',ns:['욕실세정제','변기세정제','기름때세정제','싱크대세정제','배수구세정제','곰팡이세정제','에어컨세정제','유리세정제','광택왁스/크리너']},
+  {k:'etc',t:'기타 세제',sh:'기타 세제',ns:['욕실세정제','변기세정제','기름때세정제','싱크대세정제','배수구세정제','곰팡이세정제','에어컨세정제','유리세정제','광택왁스/크리너','세정티슈(파우치형)','세정티슈(통형)','유리거울 세정티슈','물걸레 청소포','정전기 청소포']},
   {k:'aroma',t:'실내용 가향제',sh:'가향제',ns:['섬유탈취제','실내용탈취제','차량용탈취제','화장실탈취제','냉장고탈취제','신발탈취제','피톤치드 탈취제'],sep:true}
 ];
 function msMarketEst(rows,cimBy){
@@ -7629,7 +7630,7 @@ function msRows(){
   COUPANG_CATS.forEach(g=>walk(g,[]));
   // ===== [v158] 품목별 시장 규모 추정(로드맵 미사용) — 모든 화면이 같은 값을 씀 =====
   //  ① 통계청 광업·제조업조사 계열(세탁용·주방용·기타 세제·실내용 가향제)에 속한 품목: 계열 합계를 계열 안 쿠팡 조사 판매액 비율로 나눔 → 품목 합 = 통계청 값
-  //  ② 통계청 품목이 없는 것(섬유유연제·향기지속제·청소포·제습제 등): 쿠팡 연 판매액 × 4개 계열 '통계청 ÷ 쿠팡' 배수의 중앙값
+  //  ② 통계청 품목이 없는 것(향기지속제·표백제·제습제 등): 쿠팡 연 판매액 × 4개 계열 '통계청 ÷ 쿠팡' 배수의 중앙값
   //  ③ 쿠팡 조사도 없는 로드맵 전용 시장: 추정 안 함(참고)
   // ===== [v161] 판정 = 화면에 보이는 숫자만(B안). 품목 시장 규모 추정치는 쓰지 않음(품목 시장 = 미확인)
   //  지킬 곳: 선도 표시 또는 터블 매출(12개월 환산) ≥ 쿠팡 조사 합계(연)의 50%
@@ -7765,7 +7766,7 @@ function ovMktHtml(E,ST,cimBy,rows){
       <div class="ovDonutWrap"><div class="ovDonut"><canvas id="ovMkt"></canvas><div class="ovDC"><b>${(ST.parts[0].v/ST.total*100).toFixed(0)}%</b><span>세탁용 비중</span></div></div><div class="ovLgs">${lg}</div></div>
       <div class="ovAside">실내용 가향제 <b>${won(Math.round(ST.aroma))}억</b> (탈취제·방향제 포함, 세제 합계와 별도)</div>
       ${(()=>{ const ers=rows.filter(r=>!r.nj&&r.est>0), t=ers.reduce((a,r)=>a+r.est,0), lo=ers.reduce((a,r)=>a+r.estLo,0), hi=ers.reduce((a,r)=>a+r.estHi,0), cv=ers.filter(r=>r.estBasis==='쿠팡 환산').reduce((a,r)=>a+r.est,0);
-        return t>0?`<div class="ovAside est">품목 단위 <b>추정 시장 합계 ${(t/10000).toFixed(2)}조</b> <small>(범위 ${(lo/10000).toFixed(2)}~${(hi/10000).toFixed(2)}조)</small><br>= 통계청 세제 ${won(Math.round(ST.total))}억 + 가향제 ${won(Math.round(ST.aroma))}억 + 통계청 품목 없는 것(향기지속제·청소포·제습제 등) 쿠팡 환산 ${msEok(cv)} — 참고용 추정</div>`:''; })()}
+        return t>0?`<div class="ovAside est">품목 단위 <b>추정 시장 합계 ${(t/10000).toFixed(2)}조</b> <small>(범위 ${(lo/10000).toFixed(2)}~${(hi/10000).toFixed(2)}조)</small><br>= 통계청 세제 ${won(Math.round(ST.total))}억 + 가향제 ${won(Math.round(ST.aroma))}억 + 통계청 품목 없는 것(향기지속제·표백제·제습제 등) 쿠팡 환산 ${msEok(cv)} — 참고용 추정</div>`:''; })()}
       <div class="msNote">출처: ${pEsc(ST.src)} 품목별 출하액(종사자 10인 이상 사업체 전수), ${pEsc(ST.year)}. 국내 제조사 출하 기준이라 수입품은 빠지고 수출·업소용은 들어 있습니다. 쿠팡 조사 숫자와는 기준이 달라 합산·비교하지 않습니다.</div></div>
 `;
   const right=`<div class="msCard ovC ovWide"><div class="ovH">${pEsc(ovGroupSel)} 품목별 구성 <span>${pEsc(ovGroupSel)} ${msEok(G.v)} · 품목군별 유형 비중(%는 품목군 안) · 연 환산</span></div>
